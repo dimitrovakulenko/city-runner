@@ -28,17 +28,22 @@ class ActivityApiTests(unittest.TestCase):
         self.assertEqual(self.client.get("/api/activities", auth=("poc", "secret")).status_code, 200)
 
     def test_pagination_search_unknown_metadata_and_deterministic_order(self):
-        response = self.client.get("/api/activities?limit=1&offset=1", auth=("poc", "secret"))
-        self.assertEqual(response.json(), {"items": [{"id": "-9007199254740993", "name": "Morning Walk", "date": "2026-10-04", "type": "unknown"}], "limit": 1, "offset": 1, "total": 3})
-        result = self.client.get("/api/activities?name=morning", auth=("poc", "secret")).json()
-        self.assertEqual([item["name"] for item in result["items"]], ["Morning Walk", "Morning Run"])
-        unknown = self.client.get("/api/activities?offset=2", auth=("poc", "secret")).json()["items"][0]
+        response = self.client.get("/api/activities?page=2&page_size=1", auth=("poc", "secret"))
+        self.assertEqual(response.json(), {"items": [{"id": "-9007199254740993", "name": "Morning Walk", "date": "2026-10-04", "type": "unknown", "processed": False, "unmapped_points": 0}], "page": 2, "page_size": 1, "total": 3})
+        result = self.client.get("/api/activities?q=morning", auth=("poc", "secret")).json()
+        self.assertEqual([item["name"] for item in result["items"]], ["Morning Run", "Morning Walk"])
+        self.assertEqual(result["page"], 1)
+        date_match = self.client.get("/api/activities?q=2026-10-04", auth=("poc", "secret")).json()
+        self.assertEqual([item["name"] for item in date_match["items"]], ["Morning Run", "Morning Walk"])
+        type_match = self.client.get("/api/activities?q=running", auth=("poc", "secret")).json()
+        self.assertEqual([item["name"] for item in type_match["items"]], ["Morning Run"])
+        unknown = self.client.get("/api/activities?page=1&page_size=3", auth=("poc", "secret")).json()["items"][2]
         self.assertEqual((unknown["date"], unknown["type"]), ("unknown", "unknown"))
 
     def test_detail_preserves_segments_timestamps_bounds_and_string_id(self):
         result = self.client.get("/api/activities/-9007199254740993", auth=("poc", "secret"))
         self.assertEqual(result.status_code, 200)
         self.assertEqual(result.json(), {"id": "-9007199254740993", "name": "Morning Walk", "date": "2026-10-04", "type": "unknown",
-                                         "tracks": [[[-1.0, -2.0]]], "timestamps": [[None]], "bounds": [[-1.0, -2.0], [-1.0, -2.0]]})
+                                         "processed": False, "unmapped_points": 0, "tracks": [[[-1.0, -2.0]]],
+                                         "timestamps": [[None]], "bounds": [[-1.0, -2.0], [-1.0, -2.0]]})
         self.assertEqual(self.client.get("/api/activities/999", auth=("poc", "secret")).status_code, 404)
-
