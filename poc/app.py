@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from shapely.geometry import LineString, box, mapping, shape
 
+from poc.activity_api import create_router as create_activity_router
 from poc.core import Overpass, Store, parse_gpx
 from poc.garmin_sync import sync
 
@@ -70,6 +71,7 @@ def create_app(store=None, password=None, poll=True):
                 task.cancel()
 
     app = FastAPI(lifespan=lifespan, dependencies=[Depends(authorize)], docs_url=None, redoc_url=None, openapi_url=None)
+    app.include_router(create_activity_router(store))
 
     @app.middleware("http")
     async def private_headers(request, call_next):
