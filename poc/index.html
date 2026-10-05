@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>City Runner · Garmin PoC</title>
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@6.12.0/dist/maplibre-gl.css">
+  <style>
+    * { box-sizing: border-box; } body { margin: 0; font: 15px system-ui; color: #172432; background: #f5f7fa; }
+    main { display: grid; grid-template-columns: 320px 1fr; height: 100dvh; } aside { padding: 24px; overflow: auto; border-right: 1px solid #d9e1e8; }
+    h1 { font-size: 24px; margin: 0 0 6px; } p { line-height: 1.5; } small { color: #52677c; } button { cursor: pointer; font: inherit; padding: 10px 14px; border: 1px solid #bccbd6; border-radius: 6px; background: white; color: inherit; }
+    #sync { width: 100%; background: #173e54; color: white; margin: 18px 0 10px; border: 0; } button:disabled { opacity: .6; cursor: wait; }
+    #status { white-space: pre-line; font-size: 13px; line-height: 1.6; } #cities { margin-top: 20px; display: grid; gap: 8px; } .city { text-align: left; }
+    #map { min-height: 0; } .legend { display: grid; gap: 8px; margin: 20px 0; font-size: 13px; } .legend span::before { content: ''; display: inline-block; width: 18px; height: 4px; vertical-align: middle; margin-right: 8px; background: var(--color); }
+    #error { color: #a23929; white-space: pre-line; } code { word-break: break-word; font-size: 11px; } a { color: #173e54; }
+    @media (max-width: 700px) { main { grid-template-columns: 1fr; grid-template-rows: 38dvh 62dvh; } aside { padding: 14px; } #cities { display: flex; overflow-x: auto; } .city { flex-shrink: 0; } }
+  </style>
+</head>
+<body>
+<main>
+  <aside>
+    <h1>City Runner</h1><small>Personal Garmin experiment</small>
+    <p id="profile">Connect your account locally to import your history.</p>
+    <button id="sync">Sync Garmin now</button>
+    <button id="import">Import GPX</button><input id="gpx-file" type="file" accept=".gpx,application/gpx+xml" hidden>
+    <p id="import-result" role="status"></p>
+    <div id="status"></div><p id="error" role="alert"></p>
+    <button id="all">Show all cities</button><div id="cities"></div>
+    <div class="legend">
+      <span style="--color:#249463">Completed street</span><span style="--color:#d29821">Partially visited</span>
+      <span style="--color:#b4bac4">Unvisited street</span><span style="--color:#8054c7">Recorded GPS track</span>
+    </div>
+    <small>Zoom in for visited/missing nodes. Coverage uses a 25 m GPS tolerance and OSM node counts.</small>
+    <p id="poll-info"><small>Automatic sync checks Garmin every five minutes while this server runs. Your watch must upload to Garmin first.</small></p>
+    <p id="connection-info"><small>First connection:</small><br><code>.venv/bin/python -m poc.garmin_sync login</code></p>
+  </aside>
+  <div id="map" aria-label="Your street completion map"></div>
+</main>
+<script type="module">
+import * as maplibregl from 'https://unpkg.com/maplibre-gl@6.12.0/dist/maplibre-gl.mjs';
+const $ = id => document.getElementById(id);
+const map = new maplibregl.Map({container:'map', style:'https://tiles.openfreemap.org/styles/liberty', center:[4.35,50.85], zoom:11});
+map.addControl(new maplibregl.NavigationControl());
+let loaded = false, cityRows = [], lastRevision = '', mapRequest = 0, fitted = false;
+async function api(path, options) {
+  const response = await fetch(new URL(path, window.location.origin), options);
+  if (!response.ok) { const error = await response.json().catch(() => ({})); throw new Error(error.detail || `Request failed (${response.status}). Reload to sign in or retry.`); }
+  return response.json();
+}
+function fitAll() {
+  if (!cityRows.length) return;
+  const bounds = new maplibregl.LngLatBounds(); cityRows.forEach(city => { bounds.extend(city.bounds[0]); bounds.extend(city.bounds[1]); });
+  map.fitBounds(bounds, {padding:40, maxZoom:13}); fitted = true;
+}
+async function refreshMap() {
+  if (!loaded) return;
+  const request = ++mapRequest, b = map.getBounds();
+  const bbox = [Math.max(-180,b.getWest()), Math.max(-90,b.getSouth()), Math.min(180,b.getEast()), Math.min(90,b.getNorth())].join(',');
+  try {
+    const data = await api(`/api/map?bbox=${bbox}&zoom=${map.getZoom()}`);
+    if (request !== mapRequest) return;
+    map.getSource('coverage').setData(data.features); map.getSource('nodes').setData(data.nodes);
+    if (data.nodes_truncated) $('error').textContent = 'Zoom in: this viewport contains more than 20,000 nodes.';
+  } catch(error) { $('error').textContent = error.message; }
+}
+async function refresh() {
+  try {
+    const status = await api('/api/status'), s = status.sync, c = status.counts;
+    $('profile').textContent = status.demo && c.file_imports ? 'Demo + your imported GPX files' : status.profile ? status.profile.name : 'Connect your account using the login command below.';
+    $('sync').disabled = s.running || status.demo;
+    $('sync').textContent = status.demo ? 'Synthetic demo · no Garmin connection' : 'Sync Garmin now';
+    $('poll-info').hidden = $('connection-info').hidden = status.demo;
+    $('status').textContent = `${s.stage}\n${c.activities || 0} activities saved · ${c.processed || 0} processed\n${c.without_foot_gps || 0} without running/walking/hiking GPS\n${status.demo ? 'Demo mode' : `History import: ${status.history_complete ? 'finished' : 'not finished'}`}${s.pending ? `\nMatching ${s.processed || 0}/${s.pending}` : ''}`;
+    $('error').textContent = `${s.error || ''}${s.errors ? `\n${s.errors} import/processing errors; retry sync.` : ''}${c.unmapped_points ? `\n${c.unmapped_points} GPS samples ${status.location_lookup_pending ? 'are outside downloaded cities. Further lookup needs your consent.' : 'have no supported city boundary. See POC.md.'}` : ''}`;
+    const revision = JSON.stringify([c,s]);
+    if (revision !== lastRevision) {
+      lastRevision = revision; cityRows = await api('/api/cities'); $('cities').replaceChildren();
+      cityRows.forEach(city => {
+        const button = document.createElement('button'); button.className = 'city';
+        button.textContent = `${city.name} · ${city.percent}%\n${city.completed}/${city.total} streets`;
+        button.onclick = () => map.fitBounds(city.bounds,{padding:40,maxZoom:14}); $('cities').append(button);
+      });
+      if (!fitted && loaded) fitAll(); await refreshMap();
+    }
+  } catch(error) { $('error').textContent = error.message; }
+}
+map.on('load', () => {
+  const empty = {type:'FeatureCollection',features:[]};
+  map.addSource('coverage',{type:'geojson',data:empty}); map.addSource('nodes',{type:'geojson',data:empty});
+  map.addLayer({id:'streets',type:'line',source:'coverage',filter:['==',['get','kind'],'street'],paint:{'line-width':4,'line-color':['match',['get','state'],'complete','#249463','partial','#d29821','#b4bac4']}});
+  map.addLayer({id:'tracks',type:'line',source:'coverage',filter:['==',['get','kind'],'track'],paint:{'line-width':2,'line-color':'#8054c7','line-opacity':0.65}});
+  map.addLayer({id:'points',type:'circle',source:'nodes',minzoom:14,paint:{'circle-radius':4,'circle-color':['case',['get','visited'],'#249463','#d04437'],'circle-stroke-width':1,'circle-stroke-color':'white'}});
+  loaded = true; refresh(); refreshMap(); if (!fitted) fitAll();
+});
+map.on('moveend',refreshMap);
+map.on('click','streets',event => {
+  const p = event.features[0].properties, content = document.createElement('div');
+  content.textContent = `${p.name}: ${p.visited}/${p.total} nodes visited (${p.state})`;
+  new maplibregl.Popup().setLngLat(event.lngLat).setDOMContent(content).addTo(map);
+});
+map.on('error', () => { if (!loaded) $('error').textContent = 'Map could not load. Internet access is required for the basemap and map library.'; });
+$('sync').onclick = async () => { try { await api('/api/sync',{method:'POST',headers:{'X-PoC-Request':'1'}}); await refresh(); } catch(error) { $('error').textContent = error.message; } };
+$('all').onclick = fitAll;
+$('import').onclick = () => $('gpx-file').click();
+$('gpx-file').onchange = async () => {
+  const file = $('gpx-file').files[0]; if (!file) return;
+  if (file.size > 10 * 1024 * 1024) { $('import-result').textContent = 'Choose a GPX file smaller than 10 MB.'; return; }
+  $('import').disabled = true; $('import-result').textContent = `Importing ${file.name}…`;
+  try {
+    const result = await api(`/api/import?name=${encodeURIComponent(file.name.slice(0,200))}`, {method:'POST',headers:{'X-PoC-Request':'1','Content-Type':'application/gpx+xml'},body:await file.arrayBuffer()});
+    $('import-result').textContent = `${result.duplicate ? 'Already loaded' : 'Loaded'} ${file.name} · ${result.points} GPS points. Coverage status below.`;
+    map.fitBounds(result.bounds,{padding:40,maxZoom:16}); fitted = true;
+    lastRevision = ''; await refresh();
+  } catch(error) { $('import-result').textContent = error.message; }
+  finally { $('import').disabled = false; $('gpx-file').value = ''; }
+};
+refresh(); setInterval(refresh,5000);
+</script>
+</body>
+</html>
