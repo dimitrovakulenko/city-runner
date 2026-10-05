@@ -1,0 +1,20 @@
+[Unit]
+Description=City Runner backend
+After=network-online.target postgresql.service
+Wants=network-online.target
+Requires=postgresql.service
+
+[Service]
+Type=simple
+User=cityrunner
+Group=cityrunner
+WorkingDirectory=/opt/city-runner
+EnvironmentFile=/etc/city-runner/backend.env
+ExecStart=/opt/city-runner/.venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
