@@ -6,12 +6,12 @@ Updated 5 October 2026; original baseline main `f3e67ba`. This is the execution 
 
 | Task | State | Evidence / remaining gate |
 | --- | --- | --- |
-| D01 | Implemented; local checks passed; hosted CI pending | `8478f10`; disposable PostGIS migration/API runner passed on main, including inherited unrelated database URL; 20 PoC and 3 backend tests, mobile typecheck passed |
+| D01 | Done: local and hosted checks passed | `8478f10`; disposable PostGIS runner passed, including inherited unrelated database URL; [hosted CI on f3bbfc4](https://github.com/dimitrovakulenko/city-runner/actions/runs/37368238597) passed backend and mobile typecheck |
 | D02 | Partial; native execution blocked by missing tooling | `3fc2517`, [native testing](docs/native-testing.md); no installed iOS runtime, CocoaPods, Android tools or usable JDK; no native build/UI acceptance |
 | D03 | Done: feasibility dossier; provider approval remains open | `cb6a26e`, [provider dossier](docs/provider-feasibility.md); no outreach/access claims |
 | D04 | Done: reviewed contract and typed activity responses | `336f86f`, [backend contract](docs/backend-contract.md); baseline API tests pass; source ownership, nonce and map-version invariants pinned |
-| D05 | In progress: Luna High | Verified identity exchange and bearer sessions; real credentials/native login acceptance remain separate |
-| D09 | In progress: Luna Medium | Durable jobs/worker; migration follows D05 accounts; actual lease/concurrency checks required |
+| D05 | Server implementation verified; native/provider acceptance pending | `4219f5d`, Luna High; 11 backend tests and four disposable PostGIS checks passed, including concurrent first login, single-use challenge and legacy-owner migration; real credentials/native login remain open |
+| D09 | Done: reviewed and verified; Luna Medium | `d2aea13`; 12 disposable PostGIS checks passed across auth/jobs/activities, including lease recovery, stale acknowledgements, parallel claims, bounded recovery, rollback, priority/retry/cancellation and sanitized logs; CLI completed a synthetic job in one attempt |
 
 Other D tasks remain todo. The coordinator owns these status updates.
 
@@ -24,10 +24,10 @@ Build a complete personal exploration loop: **sign in → import history → ins
 | Existing code | Keep | Missing for a real app |
 | --- | --- | --- |
 | `poc/` | GPX parsing, matching fixtures, coverage rules, working browser comparison | Single-user SQLite and full scans cannot be the shared application backend |
-| `backend/` | FastAPI, Alembic, PostgreSQL/PostGIS foundation, owner-scoped activity explorer | Real sessions, ingestion, jobs, shared geography, coverage/map/planner APIs; current deployment rejects every request without injected auth |
+| `backend/` | FastAPI, Alembic, PostgreSQL/PostGIS, owner-scoped activities, verified provider tokens, hashed bearer sessions and durable worker queue | File-ingestion handler, shared geography, coverage/map/planner APIs; real provider credentials and native login flow |
 | `apps/mobile/` | Expo/React Native, MapLibre Native, activity layout and segmented tracks | Backend connection, real accounts, upload, streets/cities, planner, location; all current activities are fixtures |
 | `infra/` | Terraform Lightsail/private S3 and Caddy/systemd templates | Worker deployment, executable installation procedure, secrets, backups/restore, deployed acceptance |
-| Tests | PoC and activity API regression checks | Repeatable PostGIS integration CI, native builds/UI checks, production end-to-end import |
+| Tests | PoC, activity/auth checks and repeatable PostGIS integration CI | Native builds/UI checks and production end-to-end import |
 
 Previous verification: 20 PoC tests and 3 backend tests passed; temporary PostgreSQL/PostGIS migration/API checks and manual Chrome PoC import/map checks passed. Mobile type checking and JS bundle export passed. **Native builds/UI, real cloud sync and production end-to-end functionality remain unverified.** JS export is not native acceptance.
 

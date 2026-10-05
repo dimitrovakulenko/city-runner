@@ -1,6 +1,6 @@
 # Backend contract: first production slice
 
-D04, 5 October 2026. This contract is accepted for the next implementation tasks; it describes planned tables/endpoints unless explicitly marked implemented. Existing activity list/detail now have Pydantic response models in `backend/app/schemas.py`, exposed by OpenAPI. D01 owns integration harness/CI; D05, D09 and D11 own the migrations described below, in that sequence. Review schema changes before dispatching dependent work.
+D04, 5 October 2026. This contract is accepted for the next implementation tasks; it describes planned tables/endpoints unless explicitly marked implemented. Activity list/detail have Pydantic response models in `backend/app/schemas.py`, exposed by OpenAPI. D05's account/challenge/session endpoints and D09's job functions/worker are implemented and tested; native login and real ingestion remain pending. D01 owns integration harness/CI; D05, D09 and D11 own the migrations described below, in that sequence. Review schema changes before dispatching dependent work.
 
 ## Compatibility
 

@@ -59,7 +59,7 @@ Public data access is not access to everybody's workouts. First-release measurem
 
 ## Architecture recommendation
 
-Keep Python/FastAPI for API and workers to reuse the spike's domain code and tests. This revises the earlier proposed TypeScript backend. The FastAPI/PostGIS activity API and migration foundation are implemented; the worker, geography, coverage and ingestion transition remains unfinished. Keep client TypeScript in React Native and the later React/Tauri desktop interface. Share generated API contracts and client logic; keep completion rules on the server.
+Keep Python/FastAPI for API and workers to reuse the spike's domain code and tests. This revises the earlier proposed TypeScript backend. FastAPI/PostGIS activities, server authentication, migrations and the durable worker queue are implemented; geography, coverage and ingestion remain unfinished. Keep client TypeScript in React Native and the later React/Tauri desktop interface. Share generated API contracts and client logic; keep completion rules on the server.
 
 ```mermaid
 flowchart LR
@@ -124,7 +124,7 @@ Proposed product flow:
   → automatic merge → deployment/build → reporter sees release status
 ```
 
-GitHub is the selected repository host; PR/CI automation is not configured. Keep product reports in our database and optionally mirror sanitized engineering issues later. Users should not need GitHub or Jira to report a problem or verify a fix. The local Git repository is initialized; CI, previews and agents remain implementation work.
+GitHub hosts the repository and backend/mobile CI. Keep product reports in our database and optionally mirror sanitized engineering issues later. Users should not need GitHub or Jira to report a problem or verify a fix. Previews and agent-driven merge orchestration remain implementation work.
 
 ### Report contract
 

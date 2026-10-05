@@ -15,6 +15,8 @@ rtk psql activities -c 'CREATE EXTENSION IF NOT EXISTS postgis'
 
 Set `DATABASE_URL=postgresql+psycopg:///activities` for a local Unix-socket connection (or an explicit authenticated URL for TCP), apply migrations with `rtk .venv/bin/python -m alembic -c backend/alembic.ini upgrade head`, then start the API with `rtk .venv/bin/uvicorn backend.app.main:app --reload`. SQLite unit tests remain available with `rtk .venv/bin/python -m unittest discover -s backend/tests`.
 
+Set registered `GOOGLE_CLIENT_IDS` and/or `APPLE_CLIENT_IDS` to enable provider challenges and identity exchange. Without them login fails closed. Native login/client wiring is still pending; the verification tests use synthetic signed identities. Run the worker separately with `rtk .venv/bin/python -m backend.app.worker`; `--once` handles at most one synthetic `dev.noop` job. No production import handler is registered yet.
+
 The PostGIS integration runner creates a UUID-named `city_runner_test_*` database, runs migration up/down/up and synthetic owner/search/track API checks, then drops that database even when tests fail. It requires a PostgreSQL administrator URL that can create/drop databases and install the PostGIS extension. Run `rtk proxy env PATH="$PWD/.venv/bin:$PATH" scripts/dev/postgis-test.sh` from the repository root. The default admin URL uses the local Unix socket and current OS username. To select another local cluster, set `POSTGIS_ADMIN_DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:PORT/postgres`. The test URL is derived from the same admin URL, and the harness overrides any inherited `DATABASE_URL` before running migrations.
 
 ## Mobile typecheck
