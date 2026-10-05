@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        run: |
+          python -m pip install -r backend/requirements.txt
+          python -m pip install -r requirements-poc.txt
+      - name: Run PoC tests
+        run: python -m unittest discover -s tests -v
+      - name: Run SQLite backend tests
+        run: python -m unittest discover -s backend/tests
+      - name: Install PostgreSQL and PostGIS
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql postgresql-postgis
+          sudo service postgresql start
+          sudo -u postgres createuser --superuser "$USER"
+      - name: Run PostGIS integration tests
+        run: scripts/dev/postgis-test.sh
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci
+        working-directory: apps/mobile
+      - run: npm run typecheck
+        working-directory: apps/mobile
