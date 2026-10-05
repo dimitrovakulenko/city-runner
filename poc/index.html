@@ -13,6 +13,18 @@
     #map { min-height: 0; } .legend { display: grid; gap: 8px; margin: 20px 0; font-size: 13px; } .legend span::before { content: ''; display: inline-block; width: 18px; height: 4px; vertical-align: middle; margin-right: 8px; background: var(--color); }
     .filters { display: grid; gap: 8px; margin: 18px 0; padding: 12px; border: 1px solid #d9e1e8; border-radius: 6px; } .filters legend { padding: 0 4px; font-weight: 600; } .filters select { font: inherit; padding: 8px; border: 1px solid #bccbd6; border-radius: 6px; background: white; color: inherit; } .filters .toggle { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
     #error { color: #a23929; white-space: pre-line; } code { word-break: break-word; font-size: 11px; } a { color: #173e54; }
+    .activity-panel { margin: 22px 0; padding-top: 16px; border-top: 1px solid #d9e1e8; }
+    .activity-panel h2 { font-size: 18px; margin: 0 0 10px; }
+    #activity-search { width: 100%; padding: 9px; border: 1px solid #bccbd6; border-radius: 6px; font: inherit; }
+    #activity-list { display: grid; gap: 6px; margin: 10px 0; }
+    .activity-row { text-align: left; padding: 9px; }
+    .activity-row[aria-pressed="true"] { border-color: #8054c7; box-shadow: 0 0 0 2px #8054c733; }
+    .activity-row strong, .activity-row small { display: block; }
+    #activity-state, #activity-detail { font-size: 13px; white-space: pre-line; }
+    #activity-detail { padding: 10px; background: white; border: 1px solid #d9e1e8; border-radius: 6px; overflow-wrap: anywhere; }
+    #activity-error { color: #a23929; font-size: 13px; }
+    .activity-pagination { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+    .activity-pagination button { padding: 6px 10px; }
     @media (max-width: 700px) { main { grid-template-columns: 1fr; grid-template-rows: 38dvh 62dvh; } aside { padding: 14px; } #cities { display: flex; overflow-x: auto; } .city { flex-shrink: 0; } }
   </style>
 </head>
@@ -26,6 +38,16 @@
     <p id="import-result" role="status"></p>
     <div id="status"></div><p id="error" role="alert"></p>
     <button id="all">Show all cities</button><div id="cities"></div>
+    <section class="activity-panel" aria-labelledby="activity-heading">
+      <h2 id="activity-heading">Activities</h2>
+      <label for="activity-search"><small>Search name, date or type</small></label>
+      <input id="activity-search" type="search" autocomplete="off">
+      <div id="activity-state" role="status" aria-live="polite">Loading activities…</div>
+      <div id="activity-list"></div>
+      <div class="activity-pagination"><button id="activity-prev" type="button">Previous</button><span id="activity-page"></span><button id="activity-next" type="button">Next</button></div>
+      <p id="activity-error" role="alert"></p>
+      <div id="activity-detail" hidden></div>
+    </section>
     <fieldset class="filters" aria-label="Map filters">
       <legend>Map filters</legend>
       <label for="street-filter">Street completion</label>
@@ -53,6 +75,7 @@ const $ = id => document.getElementById(id);
 const map = new maplibregl.Map({container:'map', style:'https://tiles.openfreemap.org/styles/liberty', center:[4.35,50.85], zoom:11});
 map.addControl(new maplibregl.NavigationControl());
 let loaded = false, cityRows = [], lastRevision = '', mapRequest = 0, fitted = false;
+let activityPage = 1, activityTotal = 0, activitySearchTimer, activityRequest = 0, selectedActivityId = null, activityDetailRequest = 0;
 async function api(path, options) {
   const response = await fetch(new URL(path, window.location.origin), options);
   if (!response.ok) { const error = await response.json().catch(() => ({})); throw new Error(error.detail || `Request failed (${response.status}). Reload to sign in or retry.`); }
@@ -74,6 +97,83 @@ async function refreshMap() {
     applyMapFilters();
     if (data.nodes_truncated) $('error').textContent = 'Zoom in: this viewport contains more than 20,000 nodes.';
   } catch(error) { $('error').textContent = error.message; }
+}
+function activityValue(value) { return value == null || value === '' ? 'Unknown' : String(value); }
+function activityError(message) { $('activity-error').textContent = message; }
+function renderActivityDetail(activity) {
+  const panel = $('activity-detail'); panel.replaceChildren(); panel.hidden = false;
+  const heading = document.createElement('strong'); heading.textContent = activityValue(activity.name); panel.append(heading);
+  const meta = document.createElement('p');
+  meta.textContent = `Date: ${activityValue(activity.date)} · Type: ${activityValue(activity.type)}\nProcessing: ${activity.processed ? 'Complete' : 'Pending'} · Unmapped points: ${activity.unmapped_points ?? 'Unknown'}`;
+  panel.append(meta);
+  if (!Array.isArray(activity.tracks) || !activity.tracks.length) {
+    const empty = document.createElement('p'); empty.textContent = 'No GPS track details are available.'; panel.append(empty); return;
+  }
+  const timestamps = Array.isArray(activity.timestamps) ? activity.timestamps : [];
+  const timeValues = timestamps.flat().filter(value => value != null && value !== '');
+  const time = document.createElement('p');
+  time.textContent = `Track segments: ${activity.tracks.length} · GPS samples: ${activity.tracks.reduce((sum, segment) => sum + segment.length, 0)} · Time metadata: ${timeValues.length ? `${timeValues.length} timestamps` : 'Unknown'}`;
+  panel.append(time);
+}
+function renderActivityRows(items) {
+  const list = $('activity-list'); list.replaceChildren();
+  items.forEach(activity => {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'activity-row';
+    button.dataset.id = String(activity.id);
+    button.setAttribute('aria-pressed', String(activity.id === selectedActivityId));
+    const name = document.createElement('strong'); name.textContent = activityValue(activity.name);
+    const meta = document.createElement('small'); meta.textContent = `${activityValue(activity.date)} · ${activityValue(activity.type)}${activity.processed ? '' : ' · Processing'}`;
+    button.append(name, meta);
+    button.onclick = () => selectActivity(activity.id);
+    list.append(button);
+  });
+}
+async function refreshActivities() {
+  const request = ++activityRequest;
+  $('activity-state').textContent = 'Loading activities…'; activityError('');
+  $('activity-prev').disabled = true; $('activity-next').disabled = true;
+  try {
+    const query = new URLSearchParams({q:$('activity-search').value.trim(),page:String(activityPage),page_size:'20'});
+    const data = await api(`/api/activities?${query}`);
+    if (request !== activityRequest) return;
+    if (!Array.isArray(data.items) || !Number.isFinite(data.total)) throw new Error('Activity response was incomplete.');
+    activityTotal = data.total; renderActivityRows(data.items);
+    const pages = Math.ceil(activityTotal / 20);
+    $('activity-state').textContent = activityTotal ? `${activityTotal} activities` : 'No activities found.';
+    $('activity-page').textContent = pages ? `Page ${data.page} of ${pages}` : '';
+    $('activity-prev').disabled = data.page <= 1;
+    $('activity-next').disabled = data.page >= pages;
+    if (selectedActivityId != null && !data.items.some(item => item.id === selectedActivityId)) {
+      const stillExists = activityTotal > 0;
+      if (!stillExists) clearSelectedActivity();
+    }
+  } catch (error) {
+    if (request !== activityRequest) return;
+    $('activity-list').replaceChildren(); $('activity-page').textContent = '';
+    $('activity-state').textContent = 'Could not load activities.'; activityError(error.message);
+  }
+}
+function clearSelectedActivity() {
+  selectedActivityId = null; activityDetailRequest++;
+  $('activity-detail').hidden = true; $('activity-detail').replaceChildren();
+  if (map.getSource('selected-track')) map.getSource('selected-track').setData({type:'FeatureCollection',features:[]});
+}
+async function selectActivity(id) {
+  selectedActivityId = id; activityError('');
+  Array.from($('activity-list').children).forEach(button => button.setAttribute('aria-pressed', String(button.dataset.id === String(id))));
+  const request = ++activityDetailRequest;
+  $('activity-detail').hidden = false; $('activity-detail').textContent = 'Loading activity details…';
+  try {
+    const activity = await api(`/api/activities/${encodeURIComponent(id)}`);
+    if (request !== activityDetailRequest || selectedActivityId !== id) return;
+    renderActivityDetail(activity);
+    const features = (Array.isArray(activity.tracks) ? activity.tracks : []).filter(segment => Array.isArray(segment) && segment.length >= 2).map(segment => ({type:'Feature',geometry:{type:'LineString',coordinates:segment},properties:{}}));
+    if (map.getSource('selected-track')) map.getSource('selected-track').setData({type:'FeatureCollection',features});
+  } catch (error) {
+    if (request !== activityDetailRequest) return;
+    $('activity-detail').textContent = 'Activity details are unavailable.'; activityError(error.message);
+    if (map.getSource('selected-track')) map.getSource('selected-track').setData({type:'FeatureCollection',features:[]});
+  }
 }
 async function refresh() {
   try {
@@ -99,8 +199,10 @@ async function refresh() {
 map.on('load', () => {
   const empty = {type:'FeatureCollection',features:[]};
   map.addSource('coverage',{type:'geojson',data:empty}); map.addSource('nodes',{type:'geojson',data:empty});
+  map.addSource('selected-track',{type:'geojson',data:empty});
   map.addLayer({id:'streets',type:'line',source:'coverage',filter:['==',['get','kind'],'street'],paint:{'line-width':4,'line-color':['match',['get','state'],'complete','#249463','partial','#d29821','#b4bac4']}});
   map.addLayer({id:'tracks',type:'line',source:'coverage',filter:['==',['get','kind'],'track'],paint:{'line-width':2,'line-color':'#8054c7','line-opacity':0.65}});
+  map.addLayer({id:'selected-track',type:'line',source:'selected-track',paint:{'line-width':5,'line-color':'#ef5b35','line-opacity':0.95}});
   map.addLayer({id:'points',type:'circle',source:'nodes',minzoom:14,paint:{'circle-radius':4,'circle-color':['case',['get','visited'],'#249463','#d04437'],'circle-stroke-width':1,'circle-stroke-color':'white'}});
   applyMapFilters();
   loaded = true; refresh(); refreshMap(); if (!fitted) fitAll();
@@ -123,6 +225,9 @@ function applyMapFilters() {
   map.setFilter('points', $('missing-nodes').checked ? ['==',['get','visited'],false] : null);
 }
 $('sync').onclick = async () => { try { await api('/api/sync',{method:'POST',headers:{'X-PoC-Request':'1'}}); await refresh(); } catch(error) { $('error').textContent = error.message; } };
+$('activity-search').addEventListener('input', () => { clearTimeout(activitySearchTimer); activityPage = 1; activitySearchTimer = setTimeout(refreshActivities, 250); });
+$('activity-prev').onclick = () => { if (activityPage > 1) { activityPage--; refreshActivities(); } };
+$('activity-next').onclick = () => { if (activityPage * 20 < activityTotal) { activityPage++; refreshActivities(); } };
 $('all').onclick = fitAll;
 $('import').onclick = () => $('gpx-file').click();
 $('gpx-file').onchange = async () => {
@@ -137,7 +242,7 @@ $('gpx-file').onchange = async () => {
   } catch(error) { $('import-result').textContent = error.message; }
   finally { $('import').disabled = false; $('gpx-file').value = ''; }
 };
-refresh(); setInterval(refresh,5000);
+refresh(); refreshActivities(); setInterval(refresh,5000);
 </script>
 </body>
 </html>
