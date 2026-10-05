@@ -14,6 +14,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
 from backend.app.jobs import claim, complete, fail
+from backend.app.uploads import process_upload
 
 logger = logging.getLogger(__name__)
 Handler = Callable[[dict[str, Any]], None]
@@ -45,18 +46,22 @@ def run_once(engine: Engine, handlers: dict[str, Handler], *, lease_seconds: int
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run queued City Runner jobs")
-    parser.add_argument("--once", action="store_true", help="claim at most one synthetic dev.noop job")
+    parser.add_argument("--once", action="store_true", help="claim and process at most one queued job")
     parser.add_argument("--poll-seconds", type=float, default=1.0)
     args = parser.parse_args()
     if not 0.1 <= args.poll_seconds <= 60:
         parser.error("--poll-seconds must be between 0.1 and 60")
     engine = create_engine(os.getenv("DATABASE_URL", "postgresql+psycopg://localhost/activities"), pool_pre_ping=True)
+    handlers = {
+        "dev.noop": _noop,
+        "process_upload": lambda job: process_upload(engine, job),
+    }
     try:
         if args.once:
-            run_once(engine, {"dev.noop": _noop})
+            run_once(engine, handlers)
             return
         while True:
-            if not run_once(engine, {"dev.noop": _noop}):
+            if not run_once(engine, handlers):
                 time.sleep(args.poll_seconds)
     except KeyboardInterrupt:
         logger.info("worker stopped")

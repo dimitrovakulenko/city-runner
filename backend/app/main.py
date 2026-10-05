@@ -11,6 +11,7 @@ from sqlalchemy.engine import Engine
 
 from backend.app import auth
 from backend.app.schemas import ActivityDetail, ActivityPage
+from backend.app.uploads import create_upload_router
 
 
 class ChallengeRequest(BaseModel):
@@ -100,6 +101,8 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
             if not auth.revoke_token(db, token):
                 raise HTTPException(status_code=401, detail="Unauthenticated.")
         return Response(status_code=204)
+
+    app.include_router(create_upload_router(engine, current_user))
 
     @app.get("/api/activities", response_model=ActivityPage)
     def activities(
