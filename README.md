@@ -2,7 +2,7 @@
 
 An experimental street-exploration app: import GPS activities, see visited OSM nodes and completed streets, and plan what to explore next.
 
-Currently a local Python/FastAPI proof of concept with GPX import, approximate node coverage and a browser map. A production activity API, Android/iPhone fixture shell and infrastructure templates are merged. Production import/maps, real mobile accounts, approved provider integrations and the report → agent fix → verified preview workflow remain unfinished.
+The local Python/FastAPI proof of concept provides GPX import, approximate node coverage and a browser map. The production backend now has accounts/sessions, private GPX uploads, durable processing and shared regional OSM imports. Android/iPhone still displays fixtures; production coverage/maps, real mobile accounts, approved provider integrations and the report → agent fix → verified preview workflow remain unfinished.
 
 ## Run the demo
 
@@ -23,6 +23,9 @@ Open <http://127.0.0.1:8000> using `poc` / `demo`. The demo uses synthetic activ
 
 ## Project documents
 
+- [Production development setup](docs/development.md)
+- [Private GPX upload API](docs/gpx-import.md)
+- [Regional OSM import](docs/osm-import.md)
 - [Build plan and risks](BUILD_PLAN.md)
 - [Requirements](PROJECT.md)
 - [Delivery backlog](BACKLOG.md)

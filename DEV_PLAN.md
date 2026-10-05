@@ -12,8 +12,12 @@ Updated 5 October 2026; original baseline main `f3e67ba`. This is the execution 
 | D04 | Done: reviewed contract and typed activity responses | `336f86f`, [backend contract](docs/backend-contract.md); baseline API tests pass; source ownership, nonce and map-version invariants pinned |
 | D05 | Server implementation verified; native/provider acceptance pending | `4219f5d`, Luna High; 11 backend tests and four disposable PostGIS checks passed, including concurrent first login, single-use challenge and legacy-owner migration; real credentials/native login remain open |
 | D09 | Done: reviewed and verified; Luna Medium | `d2aea13`; 12 disposable PostGIS checks passed across auth/jobs/activities, including lease recovery, stale acknowledgements, parallel claims, bounded recovery, rollback, priority/retry/cancellation and sanitized logs; CLI completed a synthetic job in one attempt |
+| D10 | Done: reviewed and verified; Luna High | `515f0da`, [GPX import](docs/gpx-import.md); bounded authenticated multipart upload, private originals, per-account dedupe, atomic source/job completion and stale-worker protection; actual HTTP + worker CLI smoke passed |
+| D11 | Done: reviewed and verified; Luna | `2068abb`, [OSM import](docs/osm-import.md); versioned XML import, boundary holes/components, shared original nodes and indexed lookups; public Gent snapshot validated 3,108 streets and 51,134 distinct nodes; samples and replacement versions stay staged |
 
 Other D tasks remain todo. The coordinator owns these status updates.
+
+Combined verification on 5 October: 20 PoC tests, 24 backend unit tests, 26 disposable PostGIS tests and mobile typecheck passed. Actual localhost HTTP verified authentication/isolation, multipart import, duplicate handling, worker execution, preserved segments/timestamps, allocation after a legacy BIGINT ID and safe permanent failure. These tests use synthetic activities; the public Gent import uses OSM only. Native UI, real provider login/sync and the production coverage/map loop remain pending. Next independent slice: D12 coverage and D06 mobile API wiring, followed by D13 viewport APIs.
 
 ## Target and current gap
 
@@ -24,7 +28,7 @@ Build a complete personal exploration loop: **sign in → import history → ins
 | Existing code | Keep | Missing for a real app |
 | --- | --- | --- |
 | `poc/` | GPX parsing, matching fixtures, coverage rules, working browser comparison | Single-user SQLite and full scans cannot be the shared application backend |
-| `backend/` | FastAPI, Alembic, PostgreSQL/PostGIS, owner-scoped activities, verified provider tokens, hashed bearer sessions and durable worker queue | File-ingestion handler, shared geography, coverage/map/planner APIs; real provider credentials and native login flow |
+| `backend/` | FastAPI, Alembic, PostgreSQL/PostGIS, owner-scoped activities, verified provider tokens, bearer sessions, durable GPX ingestion and shared regional OSM | Coverage/map/planner APIs, hosted S3 source storage, real provider credentials and native login flow |
 | `apps/mobile/` | Expo/React Native, MapLibre Native, activity layout and segmented tracks | Backend connection, real accounts, upload, streets/cities, planner, location; all current activities are fixtures |
 | `infra/` | Terraform Lightsail/private S3 and Caddy/systemd templates | Worker deployment, executable installation procedure, secrets, backups/restore, deployed acceptance |
 | Tests | PoC, activity/auth checks and repeatable PostGIS integration CI | Native builds/UI checks and production end-to-end import |

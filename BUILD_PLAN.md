@@ -59,7 +59,7 @@ Public data access is not access to everybody's workouts. First-release measurem
 
 ## Architecture recommendation
 
-Keep Python/FastAPI for API and workers to reuse the spike's domain code and tests. This revises the earlier proposed TypeScript backend. FastAPI/PostGIS activities, server authentication, migrations and the durable worker queue are implemented; geography, coverage and ingestion remain unfinished. Keep client TypeScript in React Native and the later React/Tauri desktop interface. Share generated API contracts and client logic; keep completion rules on the server.
+Keep Python/FastAPI for API and workers to reuse the spike's domain code and tests. This revises the earlier proposed TypeScript backend. FastAPI/PostGIS activities, server authentication, migrations, durable GPX ingestion and shared OSM import are implemented; coverage, map APIs and mobile backend wiring remain unfinished. Keep client TypeScript in React Native and the later React/Tauri desktop interface. Share generated API contracts and client logic; keep completion rules on the server.
 
 ```mermaid
 flowchart LR

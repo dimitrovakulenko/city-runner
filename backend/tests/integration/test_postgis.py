@@ -55,6 +55,10 @@ class PostgisActivityTests(unittest.TestCase):
             db.execute(text("""INSERT INTO accounts (id) VALUES ('alice'), ('bob')
                 ON CONFLICT (id) DO NOTHING"""))
 
+    def tearDown(self):
+        with self.engine.begin() as db:
+            db.execute(text("DELETE FROM activities"))
+
     def test_00_migration_up_down_up_preserves_legacy_owner(self):
         command.downgrade(self.config, "base")
         command.upgrade(self.config, "0001_activities")

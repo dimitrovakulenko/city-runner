@@ -1,6 +1,6 @@
 # Backend contract: first production slice
 
-D04, 5 October 2026. This contract is accepted for the next implementation tasks; it describes planned tables/endpoints unless explicitly marked implemented. Activity list/detail have Pydantic response models in `backend/app/schemas.py`, exposed by OpenAPI. D05's account/challenge/session endpoints and D09's job functions/worker are implemented and tested; native login and real ingestion remain pending. D01 owns integration harness/CI; D05, D09 and D11 own the migrations described below, in that sequence. Review schema changes before dispatching dependent work.
+D04, 5 October 2026. This contract is accepted for the next implementation tasks; it describes planned tables/endpoints unless explicitly marked implemented. Activity list/detail have Pydantic response models in `backend/app/schemas.py`, exposed by OpenAPI. D05 identity/sessions, D09 jobs/worker, D10 private GPX uploads and D11 shared OSM import are implemented and tested. Native login, coverage matching and hosted source storage remain pending. Migrations form one chain through `0005_sources`; reserve the next revision for D12. Review schema changes before dispatching dependent work.
 
 ## Compatibility
 
@@ -44,22 +44,26 @@ New work priority 100; history 10. Claim atomically using PostgreSQL row locking
 
 Export plain enqueue/claim/complete/fail/cancel functions plus a worker module command. No Redis, generic distributed framework or provider handlers. A synthetic task handler may prove execution; do not report imports from it. D10 atomically creates upload metadata and enqueues `process_upload`. IDs in job payloads point to owned records, not file paths/credentials from arbitrary callers. Feature handlers load and compare the source revision before writing; queue deduplication alone cannot prevent stale resurrection.
 
-## Sources and GPX ingestion: D10
+## Sources and GPX ingestion: D10 / migration 0005
+
+Migration `0005_sources` follows `0004_geography`; this reserves a single linear migration chain while the two modules are developed in parallel.
 
 `activity_sources`: allocated `id`, `account_id` FK, `activity_id`, `source_kind`, `source_connection_id` nullable, external ID nullable, content hash nullable, revision, private object key nullable, status and timestamps. Add unique `(user_id,id)` on activities and composite FK `(account_id,activity_id)` to it, plus unique `(account_id,id)` on sources. Later provider connections use the same composite ownership constraint; independent account/activity FKs are insufficient. For connection imports enforce uniqueness of connection/external ID; for identical file uploads enforce account/file-kind/content hash uniqueness. Raw objects are private local files in development and private S3 in hosting. Generate object keys server-side; never accept absolute paths. Keep original sample input; geometry simplification only changes display output.
 
-`POST /api/uploads` accepts one GPX multipart file with bounded bytes/points and returns 202 `{id,status,job_id}`; exact duplicate returns the same upload with an explicit duplicate flag. `GET /api/uploads/{id}` returns owned queued/processing/succeeded/failed state, activity ID when available and a safe error. Parser validates GPX, coordinate ranges and aligned timestamps; records absent metadata as unknown. File limitations/cross-source matching remain visible rather than pretending all history has synced. Source schema is added by D10; D09 jobs do not need to know its internal columns.
+`POST /api/uploads` accepts one GPX multipart file (10 MiB, 100,000 points) and returns 202 `{id,status,job_id,duplicate}`; IDs are strings. Exact duplicate returns the same source/job for that account. `GET /api/uploads/{id}` returns owned queued/processing/succeeded/failed/cancelled state, activity ID when available and a safe error. Parser imports recorded tracks, preserves segments/aligned timestamps and records invalid/missing timestamps as null. Planned routes do not count as recorded activities. Final source/activity writes and completion share an unexpired-lease/source-revision check and transaction; ingestion leaves `activities.processed=false` until matching. See [GPX import](gpx-import.md) for storage, body bounds and crash-orphan limits. D09 jobs do not need to know source columns.
 
 ## Shared geography: D11 / migration 0004
 
 | Table | Minimum fields / constraints |
 | --- | --- |
-| `map_datasets` | allocated `id`, region, source timestamp/checksum, eligibility-rule version, `status` (importing/active/retired); activate only validated imports |
+| `map_datasets` | allocated `id`, region, source timestamp/checksum, eligibility-rule version, selected-city config hash, coverage mode/evidence, validated timestamp, `status` (importing/active/retired); unique active version per region |
 | `cities` | allocated `id`, dataset FK, original OSM relation ID, name, boundary `MULTIPOLYGON` SRID4326; unique dataset/relation |
 | `osm_nodes` | dataset FK, original OSM node ID, point `geography(Point,4326)`; primary key dataset/node; GiST spatial index |
 | `osm_ways` | dataset FK, original OSM way ID, name, tags, segmented geometry; primary key dataset/way |
 | `streets` | allocated `id`, city FK, normalized name, display name, eligible-node count; unique city/normalized name |
 | `street_ways` / `street_nodes` | join street to original dataset/way or dataset/node; unique membership, no shared-node duplication |
+
+Membership uses composite dataset foreign keys. Exact OSM names remain distinct per city; no case/whitespace normalization is applied under rule v1. Dataset identity includes sorted city selection and coverage mode. Sampled datasets stay staged and cannot supply complete-city denominators; complete mode records operator evidence, with structural validation and nonempty eligible streets. See [OSM import](osm-import.md) for input completeness, public snapshot evidence and unsupported formats.
 
 Retain the PoC's documented eligible-way policy and city/name grouping initially; document disconnected names and border cases. Never synthesize nodes, copy shared geography per account or treat inaccessible ways as required without an explicit eligibility rule. Public regional import is independent of private GPS. Version IDs are returned with future coverage queries; unsupported regions remain pending. D11 provides indexed city/boundary and nearby-node lookup primitives, not activity matching. D11 may activate the first validated dataset before any user coverage exists. Replacement datasets remain importing until D12 has staged their contributions/summaries; one transactional active-version switch selects matching geography and progress. If a user's new-version progress is not ready, APIs explicitly return coverage pending and do not reuse old-version counts with new denominators.
 
