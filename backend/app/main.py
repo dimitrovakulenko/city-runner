@@ -7,6 +7,8 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
+from backend.app.schemas import ActivityDetail, ActivityPage
+
 
 def create_app(engine: Engine | None = None, identity_resolver: Callable[..., Any] | None = None) -> FastAPI:
     engine = engine or create_engine(os.getenv("DATABASE_URL", "postgresql+psycopg://localhost/activities"), pool_pre_ping=True)
@@ -21,7 +23,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
             raise HTTPException(status_code=401, detail="Unauthenticated.")
         return str(identity)
 
-    @app.get("/api/activities")
+    @app.get("/api/activities", response_model=ActivityPage)
     def activities(
         page: int = Query(1, ge=1),
         page_size: int = Query(20, ge=1, le=100),
@@ -53,7 +55,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
         } for r in rows]
         return {"items": items, "page": page, "page_size": page_size, "total": total}
 
-    @app.get("/api/activities/{activity_id}")
+    @app.get("/api/activities/{activity_id}", response_model=ActivityDetail)
     def activity(activity_id: int, user_id: str = Depends(current_user)):
         with engine.connect() as db:
             row = db.execute(text("""SELECT id, name, date, activity_type, tracks, timestamps,

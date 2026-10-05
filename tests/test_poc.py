@@ -238,7 +238,8 @@ class CoverageTests(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 for _ in range(100):
                     status = client.get("/api/status").json()
-                    if not status["sync"]["running"]:
+                    # Counts and sync state are read separately; wait for both to reflect completion.
+                    if not status["sync"]["running"] and status["counts"]["processed"] == 1:
                         break
                     time.sleep(.01)
                 self.assertFalse(status["sync"]["running"])
