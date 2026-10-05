@@ -1,6 +1,6 @@
 # City Runner: from spike to product
 
-5 October 2026. Research and implementation plan, not delivered functionality. [PROJECT.md](PROJECT.md) owns requirements; [BACKLOG.md](BACKLOG.md) owns status. Public competitor pages establish advertised behaviour, not their internal architecture. No CityStrides database or source access is assumed.
+5 October 2026. Research and implementation plan; only the explicitly recorded foundations are delivered. [PROJECT.md](PROJECT.md) owns requirements; [BACKLOG.md](BACKLOG.md) owns status; [DEV_PLAN.md](DEV_PLAN.md) defines executable milestones, dependencies and subagent briefs against merged main `f3e67ba`. Public competitor pages establish advertised behaviour, not their internal architecture. No CityStrides database or source access is assumed.
 
 ## Product decision
 
@@ -20,12 +20,12 @@ CityStrides currently advertises lifetime maps, street search, city progress and
 | Lifetime GPS map | Basic tracks and city buttons | Free core | Multiple cities, date/type/source filters, viewport queries, readable large history |
 | City progress | Cached Gent + synthetic cities | Free core | Search cities, sort progress, incomplete/partial/completed street lists |
 | Street/node inspection | Street popup; visited/missing points | Free core | Tap street, inspect remaining nodes and contributing activities, missing-only overlay |
-| Activity history | Counts only | Next functionality slice | Paginated list, activity map, import/source state and new coverage attributed to activity |
+| Activity history | PoC browser explorer and backend owner-scoped list/detail; mobile fixtures | Connect production ingestion and clients | Paginated list, activity map, import/source state and new coverage attributed to activity |
 | Completion overrides | Missing | Free core | Mark inaccessible street manually, reason, undo, distinguish manual and GPS completion |
 | Route builder | Missing | Free public beta requirement | Walking/running routing, waypoint edit/undo, distance, save/reopen, GPX export |
 | Current position | Missing | Free mobile core | Foreground location over missing nodes with denied-permission handling |
 | Automatic updates | Experimental five-minute Garmin polling | Mandatory provider events + reconciliation | New events overtake backfill; edits/deletions update contributions; clients refresh |
-| Phone/tablet applications | Browser experiment | Android/iPhone/iPad/Android tablet beta | Physical-device login, map, import, planner, resume and network recovery |
+| Phone/tablet applications | Expo/MapLibre fixture shell; native execution unverified | Android/iPhone/iPad/Android tablet beta | Physical-device login, map, import, planner, resume and network recovery |
 | Desktop applications | Missing | Following required stage | Windows/macOS/Linux install, account, planning, import/export and updates |
 | Support → verified fix | Missing | Reports in beta; agent automation after preview infrastructure | Report, reproducible defect, preview, user verification, CI, merge, release status |
 | Challenges/leaderboards/badges | Missing | Later parity, subject to data-source permission | Separate specification before development; private tracks remain private |
@@ -59,7 +59,7 @@ Public data access is not access to everybody's workouts. First-release measurem
 
 ## Architecture recommendation
 
-Keep Python/FastAPI for API and workers to reuse the spike's domain code and tests. This revises the earlier proposed TypeScript backend; it is a recommendation, not an implemented migration. Keep client TypeScript in React Native and the later React/Tauri desktop interface. Share generated API contracts and client logic; keep completion rules on the server.
+Keep Python/FastAPI for API and workers to reuse the spike's domain code and tests. This revises the earlier proposed TypeScript backend. The FastAPI/PostGIS activity API and migration foundation are implemented; the worker, geography, coverage and ingestion transition remains unfinished. Keep client TypeScript in React Native and the later React/Tauri desktop interface. Share generated API contracts and client logic; keep completion rules on the server.
 
 ```mermaid
 flowchart LR
@@ -169,7 +169,7 @@ Merging is not delivery. Keep distinct statuses for merged, deployed, available 
 
 Stages are sequencing guidance, not a demand to finish every provider approval before useful explorer work. Keep existing real Garmin acceptance as an outstanding integration investigation, not a reason to stop unrelated development. Build reporting before adding an agent; build previews and trusted checks before enabling automatic merge.
 
-GPX date/type and original point timestamps are now retained; invalid/missing metadata is unknown, and legacy rows remain compatible. Street-category and missing-node filters are implemented. Next coding tasks: activity list/detail APIs, selected-activity UI and minimal CI, then city/street search (CR-09, CR-19). Preserve completion rules and visible source/processing limitations. Distance and new coverage attribution remain unimplemented; derive gains using original timestamps and a defined chronological tie-break before displaying them. Keep the working upload and real-run map as the comparison baseline.
+GPX date/type and original point timestamps are retained; invalid/missing metadata is unknown, and legacy rows remain compatible. The PoC activity explorer/selected-activity UI and street-category/missing-node filters are implemented. The production activity API, fixture mobile shell and Terraform templates are merged. Next work: reproducible PostGIS/CI and native builds, reviewed identity/source contracts, then production import/jobs/geography/coverage wired to actual mobile accounts. [DEV_PLAN.md](DEV_PLAN.md) supplies that order and small task briefs. Distance and chronological new-coverage attribution remain unimplemented; define the timestamp tie-break before displaying gains. Keep the working upload and real-run map as the comparison baseline.
 
 ## Risks, costs and decision gates
 
