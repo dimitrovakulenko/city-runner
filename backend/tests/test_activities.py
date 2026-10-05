@@ -44,6 +44,10 @@ class ActivityApiTests(unittest.TestCase):
             "page": 2, "page_size": 1, "total": 2,
         })
         self.assertEqual(self.client.get("/api/activities/4").status_code, 404)
+        self.assertEqual(self.client.get("/api/activities?q=2026-10-04").json()["total"], 2)
+        self.assertEqual(self.client.get("/api/activities?q=RUNNING").json()["total"], 2)
+        self.assertEqual(self.client.get("/api/activities?q=2026-10-05").json()["total"], 0)
+        self.assertEqual(self.client.get("/api/activities?q=Private").json()["total"], 0)
         detail = self.client.get("/api/activities/1").json()
         self.assertEqual(detail, {
             "id": "1", "name": "Morning Run", "date": "2026-10-04", "type": "running",

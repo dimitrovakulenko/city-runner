@@ -35,7 +35,8 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
             "offset": (page - 1) * page_size,
         }
         if q:
-            filters += " AND lower(name) LIKE lower(:q)"
+            filters += " AND (lower(name) LIKE lower(:q) OR lower(coalesce(date, '')) LIKE lower(:q) " \
+                       "OR lower(coalesce(activity_type, '')) LIKE lower(:q))"
             params["q"] = f"%{q}%"
         with engine.connect() as db:
             total = db.execute(text(f"SELECT count(*) FROM activities WHERE {filters}"), params).scalar_one()
