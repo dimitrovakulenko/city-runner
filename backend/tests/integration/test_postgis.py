@@ -16,7 +16,7 @@ DATABASE_URL = os.getenv("POSTGIS_TEST_DATABASE_URL")
 DATABASE_PATTERN = re.compile(r"city_runner_test_[0-9a-f]{12}\Z")
 
 
-@unittest.skipUnless(DATABASE_URL, "set POSTGIS_TEST_DATABASE_URL via scripts/dev/postgis-test.sh")
+@unittest.skipUnless(DATABASE_URL, "set POSTGIS_TEST_DATABASE_URL via the PostGIS test runner")
 class PostgisActivityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -52,8 +52,19 @@ class PostgisActivityTests(unittest.TestCase):
     def setUp(self):
         with self.engine.begin() as db:
             db.execute(text("DELETE FROM activities"))
+            db.execute(text("""INSERT INTO accounts (id) VALUES ('alice'), ('bob')
+                ON CONFLICT (id) DO NOTHING"""))
 
-    def test_00_migration_up_down_up(self):
+    def test_00_migration_up_down_up_preserves_legacy_owner(self):
+        command.downgrade(self.config, "base")
+        command.upgrade(self.config, "0001_activities")
+        with self.engine.begin() as db:
+            db.execute(text("INSERT INTO activities (user_id,name) VALUES ('legacy-owner','Before auth')"))
+        command.upgrade(self.config, "head")
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("SELECT id FROM accounts WHERE id='legacy-owner'")).scalar_one(),
+                             "legacy-owner")
+            self.assertEqual(db.execute(text("SELECT user_id FROM activities")).scalar_one(), "legacy-owner")
         command.downgrade(self.config, "base")
         command.upgrade(self.config, "head")
         with self.engine.connect() as db:
@@ -83,7 +94,7 @@ class PostgisActivityTests(unittest.TestCase):
             self.assertEqual(detail["id"], str(big_id))
             self.assertEqual(len(detail["tracks"]), 2)
             self.assertEqual(detail["timestamps"][1], ["2026-10-04T08:05:00Z"])
-            self.assertEqual(detail["bounds"], [[4.1,50.1],[5.1,51.1]])
+            self.assertEqual(detail["bounds"], [[4.1, 50.1], [5.1, 51.1]])
             self.assertEqual(client.get(f"/api/activities/{generated_id}").json()["id"], str(generated_id))
             identity[0] = "bob"
             self.assertEqual(client.get("/api/activities?q=long").json()["total"], 1)

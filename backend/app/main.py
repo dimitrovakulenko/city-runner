@@ -1,13 +1,45 @@
 import json
 import os
 from collections.abc import Callable
-from typing import Any
+from datetime import datetime
+from typing import Any, Literal
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
+from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
+from backend.app import auth
 from backend.app.schemas import ActivityDetail, ActivityPage
+
+
+class ChallengeRequest(BaseModel):
+    provider: Literal["google", "apple"]
+
+
+class ChallengeResponse(BaseModel):
+    id: str
+    nonce: str
+    expires_at: datetime
+
+
+class ExchangeRequest(BaseModel):
+    challenge_id: str = Field(min_length=36, max_length=36)
+    id_token: str = Field(min_length=1, max_length=16384)
+
+
+class AccountResponse(BaseModel):
+    id: str
+
+
+class ExchangeResponse(BaseModel):
+    token: str
+    expires_at: datetime
+    account: AccountResponse
+
+
+class MeResponse(BaseModel):
+    id: str
 
 
 def create_app(engine: Engine | None = None, identity_resolver: Callable[..., Any] | None = None) -> FastAPI:
@@ -15,13 +47,59 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
     app = FastAPI()
     app.state.engine = engine
 
-    def current_user() -> str:
-        if identity_resolver is None:
-            raise HTTPException(status_code=401, detail="Authentication is not configured.")
-        identity = identity_resolver()
+    def bearer_token(authorization: str | None = Header(None)) -> str:
+        if not authorization:
+            raise HTTPException(status_code=401, detail="Unauthenticated.")
+        scheme, separator, token = authorization.partition(" ")
+        if (not separator or scheme.lower() != "bearer" or not token.strip()
+                or len(token.strip()) > 512):
+            raise HTTPException(status_code=401, detail="Unauthenticated.")
+        return token.strip()
+
+    def current_user(authorization: str | None = Header(None)) -> str:
+        if identity_resolver is not None:
+            # Kept solely for the explicit test hook used by the activity tests.
+            identity = identity_resolver()
+            if not identity:
+                raise HTTPException(status_code=401, detail="Unauthenticated.")
+            return str(identity)
+        token = bearer_token(authorization)
+        with engine.connect() as db:
+            identity = auth.account_for_token(db, token)
         if not identity:
             raise HTTPException(status_code=401, detail="Unauthenticated.")
-        return str(identity)
+        return identity
+
+    @app.post("/api/auth/challenges", response_model=ChallengeResponse)
+    def create_challenge(body: ChallengeRequest):
+        with engine.begin() as db:
+            return auth.new_challenge(db, body.provider)
+
+    @app.post("/api/auth/exchange", response_model=ExchangeResponse)
+    def exchange(body: ExchangeRequest):
+        with engine.connect() as db:
+            challenge = db.execute(text("""SELECT provider, nonce FROM login_challenges
+                WHERE id=:id AND consumed_at IS NULL AND expires_at>:now"""), {
+                "id": body.challenge_id, "now": auth.utcnow(),
+            }).first()
+        if challenge is None:
+            raise HTTPException(status_code=401, detail="Login challenge is invalid, expired, or already used.")
+        provider, nonce = challenge
+        subject = auth.verify_id_token(provider, body.id_token, nonce)
+        with engine.begin() as db:
+            auth.consume_challenge(db, body.challenge_id, provider)
+            return auth.create_identity_and_session(db, provider, subject)
+
+    @app.get("/api/me", response_model=MeResponse)
+    def me(account_id: str = Depends(current_user)):
+        return {"id": account_id}
+
+    @app.delete("/api/auth/session", status_code=204)
+    def logout(token: str = Depends(bearer_token), account_id: str = Depends(current_user)):
+        with engine.begin() as db:
+            if not auth.revoke_token(db, token):
+                raise HTTPException(status_code=401, detail="Unauthenticated.")
+        return Response(status_code=204)
 
     @app.get("/api/activities", response_model=ActivityPage)
     def activities(
