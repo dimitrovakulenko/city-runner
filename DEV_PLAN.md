@@ -1,6 +1,19 @@
 # City Runner development plan
 
-Updated 5 October 2026 against merged main `f3e67ba`. This is the execution plan for a working development application. [PROJECT.md](PROJECT.md) owns product requirements; [BUILD_PLAN.md](BUILD_PLAN.md) owns architecture and risks; [BACKLOG.md](BACKLOG.md) owns work-package status. D IDs below subdivide the existing T packages, not additional scope or estimates. All D tasks are unstarted.
+Updated 5 October 2026; original baseline main `f3e67ba`. This is the execution plan for a working development application. [PROJECT.md](PROJECT.md) owns product requirements; [BUILD_PLAN.md](BUILD_PLAN.md) owns architecture and risks; [BACKLOG.md](BACKLOG.md) owns work-package status. D IDs below subdivide the existing T packages, not additional scope or estimates. Current execution states are recorded below.
+
+## Execution record
+
+| Task | State | Evidence / remaining gate |
+| --- | --- | --- |
+| D01 | Implemented; local checks passed; hosted CI pending | `8478f10`; disposable PostGIS migration/API runner passed on main, including inherited unrelated database URL; 20 PoC and 3 backend tests, mobile typecheck passed |
+| D02 | Partial; native execution blocked by missing tooling | `3fc2517`, [native testing](docs/native-testing.md); no installed iOS runtime, CocoaPods, Android tools or usable JDK; no native build/UI acceptance |
+| D03 | Done: feasibility dossier; provider approval remains open | `cb6a26e`, [provider dossier](docs/provider-feasibility.md); no outreach/access claims |
+| D04 | Done: reviewed contract and typed activity responses | `336f86f`, [backend contract](docs/backend-contract.md); baseline API tests pass; source ownership, nonce and map-version invariants pinned |
+| D05 | In progress: Luna High | Verified identity exchange and bearer sessions; real credentials/native login acceptance remain separate |
+| D09 | In progress: Luna Medium | Durable jobs/worker; migration follows D05 accounts; actual lease/concurrency checks required |
+
+Other D tasks remain todo. The coordinator owns these status updates.
 
 ## Target and current gap
 
@@ -78,7 +91,7 @@ D03 prepares a concrete approval/access checklist, not external messages or appl
 
 ## Agent-sized implementation backlog
 
-Every task below starts `todo`. Only D01–D03 are ready now; other tasks wait for listed dependencies and review. File ownership is assigned at dispatch. D04 owns shared contract/schema decisions; migrations and `backend/app/main.py` changes are integrated serially. Later broad platform/provider tasks must be split again if they exceed one reviewable change.
+Tasks below define scope and dependencies; current states are in the execution record. File ownership is assigned at dispatch. D04 owns shared contract/schema decisions; migrations and `backend/app/main.py` changes are integrated serially. Later broad platform/provider tasks must be split again if they exceed one reviewable change.
 
 | ID / parent | Deliverable | Dependencies | Required acceptance |
 | --- | --- | --- | --- |
