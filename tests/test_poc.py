@@ -1,4 +1,5 @@
 import json
+import sqlite3
 import tempfile
 import time
 import unittest
@@ -44,6 +45,43 @@ class CoverageTests(unittest.TestCase):
         street = self.store.streets()[0]
         self.assertEqual(street["visited"], 2)
         self.assertFalse(street["complete"])
+
+    def test_gpx_metadata_keeps_namespaced_point_timestamps_and_activity_metadata(self):
+        xml = (b'<gpx xmlns="http://www.topografix.com/GPX/1/1"><metadata><time>2026-10-04T23:59:00Z</time></metadata>'
+               b'<trk><type>Running</type><trkseg><trkpt lon="4.35" lat="50.85"><time>2026-10-05T00:01:02Z</time></trkpt>'
+               b'<trkpt lon="4.36" lat="50.85"><time>2026-10-05T00:02:03+02:00</time></trkpt></trkseg></trk></gpx>')
+        self.assertEqual(parse_gpx(xml), [[[4.35, 50.85], [4.36, 50.85]]])
+        self.store.add_activity(1, "Namespaced", "", xml)
+        with self.store.db() as db:
+            row = db.execute("SELECT date,activity_type,timestamps FROM activities WHERE id=1").fetchone()
+        self.assertEqual(row["date"], "2026-10-05")
+        self.assertEqual(row["activity_type"], "running")
+        self.assertEqual(json.loads(row["timestamps"]), [["2026-10-05T00:01:02Z", "2026-10-05T00:02:03+02:00"]])
+
+    def test_missing_and_invalid_gpx_metadata_are_unknown(self):
+        for activity_id, xml in ((1, b'<gpx><trk><trkseg><trkpt lon="4.35" lat="50.85"/></trkseg></trk></gpx>'),
+                                 (2, b'<gpx><metadata><time>yesterday</time></metadata><trk><type> </type><trkseg>'
+                                     b'<trkpt lon="4.35" lat="50.85"><time>bad timestamp</time></trkpt></trkseg></trk></gpx>')):
+            self.store.add_activity(activity_id, "Unknown", "invalid date", xml)
+        with self.store.db() as db:
+            rows = db.execute("SELECT date,activity_type,timestamps FROM activities ORDER BY id").fetchall()
+        self.assertEqual([(row["date"], row["activity_type"], json.loads(row["timestamps"])) for row in rows],
+                         [("unknown", "unknown", [[None]]), ("unknown", "unknown", [[None]])])
+
+    def test_existing_database_rows_survive_metadata_migration(self):
+        path = self.store.path
+        with sqlite3.connect(path) as db:
+            db.execute("DROP TABLE activities")
+            db.execute("CREATE TABLE activities (id INTEGER PRIMARY KEY, name TEXT, date TEXT, tracks TEXT, processed INTEGER DEFAULT 0, unmapped INTEGER DEFAULT 0)")
+            db.execute("INSERT INTO activities VALUES (7,'Old row',NULL,'[[[4.35,50.85]]]',1,0)")
+            db.execute("INSERT INTO hits VALUES (7,42)")
+        self.store = Store(self.folder.name)
+        with self.store.db() as db:
+            row = db.execute("SELECT * FROM activities WHERE id=7").fetchone()
+            hit = db.execute("SELECT node_id FROM hits WHERE activity_id=7").fetchone()
+        self.assertEqual((row["name"], row["date"], row["processed"], row["activity_type"], json.loads(row["timestamps"])),
+                         ("Old row", "unknown", 1, "unknown", []))
+        self.assertEqual(hit["node_id"], 42)
 
     def test_twenty_five_metre_radius_and_repeated_import(self):
         self.store.add_city(relation(1, 4.34, 4.37), roads([

@@ -34,11 +34,17 @@ class Store:
                 CREATE TABLE IF NOT EXISTS nodes (id INTEGER PRIMARY KEY, lon REAL, lat REAL);
                 CREATE VIRTUAL TABLE IF NOT EXISTS node_bounds USING rtree(id,minx,maxx,miny,maxy);
                 CREATE TABLE IF NOT EXISTS street_nodes (street_id TEXT, node_id INTEGER, PRIMARY KEY(street_id,node_id));
-                CREATE TABLE IF NOT EXISTS activities (id INTEGER PRIMARY KEY, name TEXT, date TEXT, tracks TEXT, processed INTEGER DEFAULT 0, unmapped INTEGER DEFAULT 0);
+                CREATE TABLE IF NOT EXISTS activities (id INTEGER PRIMARY KEY, name TEXT, date TEXT, tracks TEXT, processed INTEGER DEFAULT 0, unmapped INTEGER DEFAULT 0, activity_type TEXT DEFAULT 'unknown', timestamps TEXT DEFAULT '[]');
                 CREATE TABLE IF NOT EXISTS hits (activity_id INTEGER, node_id INTEGER, PRIMARY KEY(activity_id,node_id));
                 CREATE INDEX IF NOT EXISTS hits_node ON hits(node_id);
                 CREATE TABLE IF NOT EXISTS unresolved (lon REAL, lat REAL, PRIMARY KEY(lon,lat));
             """)
+            columns = {row[1] for row in db.execute("PRAGMA table_info(activities)")}
+            if "activity_type" not in columns:
+                db.execute("ALTER TABLE activities ADD COLUMN activity_type TEXT NOT NULL DEFAULT 'unknown'")
+            if "timestamps" not in columns:
+                db.execute("ALTER TABLE activities ADD COLUMN timestamps TEXT NOT NULL DEFAULT '[]'")
+            db.execute("UPDATE activities SET date='unknown' WHERE date IS NULL OR TRIM(date)=''")
         self.path.chmod(0o600)
 
     @contextmanager
@@ -62,6 +68,8 @@ class Store:
 
     def add_activity(self, activity_id, name, date, gpx):
         tracks = parse_gpx(gpx)
+        metadata = _parse_gpx_metadata(gpx)
+        activity_date = _valid_date(date) or metadata["date"] or "unknown"
         if gpx:
             folder = self.directory / "tracks"
             folder.mkdir(exist_ok=True, mode=0o700)
@@ -70,8 +78,9 @@ class Store:
                 handle.write(gpx)
             path.chmod(0o600)
         with self.db() as db:
-            db.execute("INSERT OR IGNORE INTO activities(id,name,date,tracks) VALUES (?,?,?,?)",
-                       (int(activity_id), name, date, json.dumps(tracks)))
+            db.execute("INSERT OR IGNORE INTO activities(id,name,date,tracks,activity_type,timestamps) VALUES (?,?,?,?,?,?)",
+                       (int(activity_id), name, activity_date, json.dumps(tracks), metadata["type"],
+                        json.dumps(metadata["timestamps"])))
 
     def has_activity(self, activity_id):
         with self.db() as db:
@@ -203,6 +212,61 @@ def parse_gpx(content):
         if points:
             tracks.append(points)
     return tracks
+
+
+def _parse_gpx_metadata(content):
+    result = {"date": None, "type": "unknown", "timestamps": []}
+    if not content:
+        return result
+    root = ElementTree.fromstring(content)
+    for segment in root.findall(".//{*}trkseg") or [root]:
+        points = []
+        for point in segment.findall(".//{*}trkpt"):
+            try:
+                lon, lat = float(point.attrib["lon"]), float(point.attrib["lat"])
+            except (KeyError, ValueError):
+                continue
+            if not (math.isfinite(lon) and math.isfinite(lat) and -180 <= lon <= 180 and -90 <= lat <= 90):
+                continue
+            timestamp = point.findtext("{*}time")
+            points.append(timestamp if _valid_timestamp(timestamp) else None)
+            if result["date"] is None and timestamp and _valid_timestamp(timestamp):
+                result["date"] = timestamp.strip()[:10]
+        if points:
+            result["timestamps"].append(points)
+    activity_type = root.findtext(".//{*}trk/{*}type")
+    if activity_type and activity_type.strip():
+        result["type"] = activity_type.strip().lower()
+    if result["date"] is None:
+        for element in (root.find("{*}metadata/{*}time"), root.find("{*}time")):
+            timestamp = element.text if element is not None else None
+            if timestamp and _valid_timestamp(timestamp):
+                result["date"] = timestamp.strip()[:10]
+                break
+    return result
+
+
+def _valid_timestamp(value):
+    if not value:
+        return False
+    from datetime import datetime
+    try:
+        datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    return True
+
+
+def _valid_date(value):
+    if not value:
+        return None
+    from datetime import date, datetime
+    try:
+        value = str(value).strip()
+        return date.fromisoformat(value).isoformat() if len(value) == 10 else datetime.fromisoformat(
+            value.replace("Z", "+00:00")).date().isoformat()
+    except ValueError:
+        return None
 
 
 def distance(lon1, lat1, lon2, lat2):
