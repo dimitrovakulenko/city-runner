@@ -4,6 +4,7 @@ import gzip
 import json
 import math
 import os
+import re
 import sqlite3
 import time
 from contextlib import contextmanager
@@ -247,7 +248,7 @@ def _parse_gpx_metadata(content):
 
 
 def _valid_timestamp(value):
-    if not value:
+    if not value or not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:[0-5]\d)?", value.strip()):
         return False
     from datetime import datetime
     try:

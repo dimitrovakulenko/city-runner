@@ -1,5 +1,4 @@
 import json
-import sqlite3
 import tempfile
 import time
 import unittest
@@ -69,8 +68,7 @@ class CoverageTests(unittest.TestCase):
                          [("unknown", "unknown", [[None]]), ("unknown", "unknown", [[None]])])
 
     def test_existing_database_rows_survive_metadata_migration(self):
-        path = self.store.path
-        with sqlite3.connect(path) as db:
+        with self.store.db() as db:
             db.execute("DROP TABLE activities")
             db.execute("CREATE TABLE activities (id INTEGER PRIMARY KEY, name TEXT, date TEXT, tracks TEXT, processed INTEGER DEFAULT 0, unmapped INTEGER DEFAULT 0)")
             db.execute("INSERT INTO activities VALUES (7,'Old row',NULL,'[[[4.35,50.85]]]',1,0)")
@@ -82,6 +80,30 @@ class CoverageTests(unittest.TestCase):
         self.assertEqual((row["name"], row["date"], row["processed"], row["activity_type"], json.loads(row["timestamps"])),
                          ("Old row", "unknown", 1, "unknown", []))
         self.assertEqual(hit["node_id"], 42)
+
+    def test_non_gpx_timestamp_formats_do_not_produce_activity_dates(self):
+        for activity_id, timestamp in enumerate(("2026-10-05", "20261005T120000Z", "2026-10-05 12:00:00",
+                                                  "2026-02-30T12:00:00Z", "2026-10-05T12:00:00+02:99"), 1):
+            with self.subTest(timestamp=timestamp):
+                xml = (f'<gpx><metadata><time>{timestamp}</time></metadata><trk><trkseg>'
+                       f'<trkpt lon="4.35" lat="50.85"><time>{timestamp}</time></trkpt></trkseg></trk></gpx>').encode()
+                self.store.add_activity(activity_id, "Invalid timestamp", "", xml)
+                with self.store.db() as db:
+                    row = db.execute("SELECT date,timestamps FROM activities WHERE id=?", (activity_id,)).fetchone()
+                self.assertEqual((row["date"], json.loads(row["timestamps"])), ("unknown", [[None]]))
+
+    def test_gpx_timestamps_align_with_filtered_positions_and_segments(self):
+        xml = (b'<gpx><trk><trkseg><trkpt lon="nan" lat="50.85"><time>1900-01-01T00:00:00Z</time></trkpt>'
+               b'<trkpt lon="4.35" lat="50.85"><time>2026-10-05T12:00:00.123Z</time></trkpt>'
+               b'<trkpt lon="4.351" lat="50.85"/></trkseg><trkseg>'
+               b'<trkpt lon="4.36" lat="50.85"><time>2026-10-05T12:01:00+02:00</time></trkpt>'
+               b'</trkseg></trk></gpx>')
+        self.store.add_activity(1, "Segment timestamps", "", xml)
+        with self.store.db() as db:
+            row = db.execute("SELECT date,tracks,timestamps FROM activities WHERE id=1").fetchone()
+        self.assertEqual(row["date"], "2026-10-05")
+        self.assertEqual(json.loads(row["tracks"]), [[[4.35, 50.85], [4.351, 50.85]], [[4.36, 50.85]]])
+        self.assertEqual(json.loads(row["timestamps"]), [["2026-10-05T12:00:00.123Z", None], ["2026-10-05T12:01:00+02:00"]])
 
     def test_twenty_five_metre_radius_and_repeated_import(self):
         self.store.add_city(relation(1, 4.34, 4.37), roads([

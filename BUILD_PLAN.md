@@ -169,7 +169,7 @@ Merging is not delivery. Keep distinct statuses for merged, deployed, available 
 
 Stages are sequencing guidance, not a demand to finish every provider approval before useful explorer work. Keep existing real Garmin acceptance as an outstanding integration investigation, not a reason to stop unrelated development. Build reporting before adding an agent; build previews and trusted checks before enabling automatic merge.
 
-Next coding task: the activity/city/street explorer (CR-09, CR-19), without changing completion rules. Activity dates/types/distance must first be parsed or marked unknown; the current GPX importer saves a blank date and drops timestamps. Add list/detail APIs, pagination/search, selected-activity track display, missing-only layers, and visible source/processing limitations. Derive new coverage using original timestamps and a defined chronological tie-break; until then do not invent per-run gains. Keep the working upload and real-run map as the comparison baseline.
+GPX date/type and original point timestamps are now retained; invalid/missing metadata is unknown, and legacy rows remain compatible. Street-category and missing-node filters are implemented. Next coding tasks: activity list/detail APIs, selected-activity UI and minimal CI, then city/street search (CR-09, CR-19). Preserve completion rules and visible source/processing limitations. Distance and new coverage attribution remain unimplemented; derive gains using original timestamps and a defined chronological tie-break before displaying them. Keep the working upload and real-run map as the comparison baseline.
 
 ## Risks, costs and decision gates
 

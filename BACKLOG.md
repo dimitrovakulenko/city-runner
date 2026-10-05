@@ -12,7 +12,7 @@ The spike is sufficient to begin independent product features. Production provid
 
 ## Next implementation slice
 
-Build the useful explorer (CR-09, CR-19) using the current map as a baseline: parse/preserve activity metadata, paginated activity list/detail, city/street search, selected-activity track and missing-only layers. Display source/import limitations and unknown metadata honestly. T05/T11 cover this work; do not add a second estimate for the same screens. Provider feasibility proceeds alongside it. Full provider history, precise road intervals and the agent pipeline are not claimed as part of this first slice.
+GPX metadata and map filters are implemented and reviewed. Next: paginated activity list/detail APIs, selected-activity UI and minimal CI, then city/street search. Display source/import limitations and unknown metadata honestly. T02/T05/T11 cover this work; do not add a second estimate for the same screens. Provider feasibility proceeds alongside it. Full provider history, precise road intervals and the agent pipeline are not claimed as part of this first slice.
 
 ## First milestone: personal Garmin PoC
 
@@ -23,7 +23,7 @@ Build the useful explorer (CR-09, CR-19) using the current map as a baseline: pa
 | P03 Single-user auth and browser map | Implemented; Chrome GPX upload verified | `poc/app.py`, `poc/index.html`; authenticated API/map tests pass; one real exported GPX was imported through Chrome, separately from four seeded demo activities. |
 | P04 Real-account acceptance and measurements | Pending user login | Multi-city history, new activity automatic sync, restart, manual accuracy checks, elapsed time, storage, and map latency recorded. This is the milestone gate. |
 
-Fifteen automated tests pass, including synthetic GPX metadata and legacy-database migration, file upload, validation, duplicate detection, coverage updates, OSM road eligibility/geometry, and offline processing while location-query consent is pending. One real Strava GPX export/upload is verified; this does not establish Strava account sync or Garmin acceptance. Start/run instructions and explicit PoC limitations are in [POC.md](POC.md).
+Seventeen automated tests pass, including synthetic GPX metadata, invalid timestamp formats, segment/point timestamp alignment, legacy-database migration, file upload, validation, duplicate detection, coverage updates, OSM road eligibility/geometry, and offline processing while location-query consent is pending. Map filter review passed JavaScript syntax and mocked control/refresh checks: street categories, missing-only nodes, unchanged track visibility and node zoom threshold. This is not new real-device verification. One real Strava GPX export/upload is verified; this does not establish Strava account sync or Garmin acceptance. Start/run instructions and explicit PoC limitations are in [POC.md](POC.md).
 
 ## Work packages
 
@@ -39,7 +39,7 @@ Fifteen automated tests pass, including synthetic GPX metadata and legacy-databa
 | T08 | Production Garmin adapter, history/notifications, source attribution and deduplication (CR-03–05) | Depends on T01; personal PoC is separate from approved adapter | 6–10 days | Approved access and real-device activity import, verified backfill limits and reconnect |
 | T09 | iPhone HealthKit route/history/update bridge (CR-06) | Planned | 4–7 days | Apple Watch/iPhone workouts, late route, missing route, denied/revoked permission |
 | T10 | Android Health Connect availability/permissions/foreground routes (CR-06) | Planned | 4–7 days | Supported-device import, consent-required flow, missing data, visible background limitation |
-| T11 | Activity/city/street explorer, search/filter/detail/contributions, map/settings, local cache and uploads (CR-09,11,19) | Planned; begin explorer contracts using current map | 10–18 days | Real activity list/detail and street search; both apps usable on physical devices; large-history map workload and network interruption verified |
+| T11 | Activity/city/street explorer, search/filter/detail/contributions, map/settings, local cache and uploads (CR-09,11,19) | In progress; street-category/missing-node filters implemented; activity explorer next | 10–18 days | Map filters preserve selection across data refresh and retain GPS tracks/node zoom threshold; activity APIs/UI, street search and phone apps remain |
 | T12 | Free pedestrian route planner, missing-node overlay, saved routes and GPX export (CR-10) | Planned; vendor/access decision needed | 6–10 days | Plan/edit/save/reopen/export a route; verify pedestrian access and distance on fixtures |
 | T13 | Sync reconciliation, cross-source deduplication/provenance, fresh app status (CR-04–05,14) | Planned | 4–7 days | Duplicate/missed/out-of-order events, throttling, source deletion, latency benchmark |
 | T14 | Minimal web billing surface, Stripe Checkout/portal, entitlements and trial (CR-12–13) | Planned; premium/trial/payment decisions needed | 4–7 days | Sandbox payment/renewal/cancel/refund/replay flows; free features remain accessible after expiry |
