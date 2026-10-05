@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "name": "City Runner",
+    "slug": "city-runner",
+    "version": "0.1.0",
+    "orientation": "default",
+    "newArchEnabled": true,
+    "ios": { "supportsTablet": true, "bundleIdentifier": "app.cityrunner.mobile" },
+    "android": { "package": "app.cityrunner.mobile" },
+    "plugins": ["@maplibre/maplibre-react-native"]
+  }
+}

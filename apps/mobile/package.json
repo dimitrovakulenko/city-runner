@@ -1,0 +1,23 @@
+{
+  "name": "@city-runner/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo/AppEntry",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@maplibre/maplibre-react-native": "^11.0.0",
+    "expo": "^57.0.0",
+    "expo-dev-client": "~57.0.19",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "~6.0.3"
+  }
+}
