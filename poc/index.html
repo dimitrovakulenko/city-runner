@@ -11,6 +11,7 @@
     #sync { width: 100%; background: #173e54; color: white; margin: 18px 0 10px; border: 0; } button:disabled { opacity: .6; cursor: wait; }
     #status { white-space: pre-line; font-size: 13px; line-height: 1.6; } #cities { margin-top: 20px; display: grid; gap: 8px; } .city { text-align: left; }
     #map { min-height: 0; } .legend { display: grid; gap: 8px; margin: 20px 0; font-size: 13px; } .legend span::before { content: ''; display: inline-block; width: 18px; height: 4px; vertical-align: middle; margin-right: 8px; background: var(--color); }
+    .filters { display: grid; gap: 8px; margin: 18px 0; padding: 12px; border: 1px solid #d9e1e8; border-radius: 6px; } .filters legend { padding: 0 4px; font-weight: 600; } .filters select { font: inherit; padding: 8px; border: 1px solid #bccbd6; border-radius: 6px; background: white; color: inherit; } .filters .toggle { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
     #error { color: #a23929; white-space: pre-line; } code { word-break: break-word; font-size: 11px; } a { color: #173e54; }
     @media (max-width: 700px) { main { grid-template-columns: 1fr; grid-template-rows: 38dvh 62dvh; } aside { padding: 14px; } #cities { display: flex; overflow-x: auto; } .city { flex-shrink: 0; } }
   </style>
@@ -25,6 +26,17 @@
     <p id="import-result" role="status"></p>
     <div id="status"></div><p id="error" role="alert"></p>
     <button id="all">Show all cities</button><div id="cities"></div>
+    <fieldset class="filters" aria-label="Map filters">
+      <legend>Map filters</legend>
+      <label for="street-filter">Street completion</label>
+      <select id="street-filter">
+        <option value="all">All streets</option>
+        <option value="missing">Unvisited</option>
+        <option value="partial">Partial</option>
+        <option value="complete">Completed</option>
+      </select>
+      <label class="toggle" for="missing-nodes"><input id="missing-nodes" type="checkbox"> Missing nodes only</label>
+    </fieldset>
     <div class="legend">
       <span style="--color:#249463">Completed street</span><span style="--color:#d29821">Partially visited</span>
       <span style="--color:#b4bac4">Unvisited street</span><span style="--color:#8054c7">Recorded GPS track</span>
@@ -59,6 +71,7 @@ async function refreshMap() {
     const data = await api(`/api/map?bbox=${bbox}&zoom=${map.getZoom()}`);
     if (request !== mapRequest) return;
     map.getSource('coverage').setData(data.features); map.getSource('nodes').setData(data.nodes);
+    applyMapFilters();
     if (data.nodes_truncated) $('error').textContent = 'Zoom in: this viewport contains more than 20,000 nodes.';
   } catch(error) { $('error').textContent = error.message; }
 }
@@ -89,6 +102,7 @@ map.on('load', () => {
   map.addLayer({id:'streets',type:'line',source:'coverage',filter:['==',['get','kind'],'street'],paint:{'line-width':4,'line-color':['match',['get','state'],'complete','#249463','partial','#d29821','#b4bac4']}});
   map.addLayer({id:'tracks',type:'line',source:'coverage',filter:['==',['get','kind'],'track'],paint:{'line-width':2,'line-color':'#8054c7','line-opacity':0.65}});
   map.addLayer({id:'points',type:'circle',source:'nodes',minzoom:14,paint:{'circle-radius':4,'circle-color':['case',['get','visited'],'#249463','#d04437'],'circle-stroke-width':1,'circle-stroke-color':'white'}});
+  applyMapFilters();
   loaded = true; refresh(); refreshMap(); if (!fitted) fitAll();
 });
 map.on('moveend',refreshMap);
@@ -98,6 +112,16 @@ map.on('click','streets',event => {
   new maplibregl.Popup().setLngLat(event.lngLat).setDOMContent(content).addTo(map);
 });
 map.on('error', () => { if (!loaded) $('error').textContent = 'Map could not load. Internet access is required for the basemap and map library.'; });
+$('street-filter').addEventListener('change', applyMapFilters);
+$('missing-nodes').addEventListener('change', applyMapFilters);
+function applyMapFilters() {
+  if (!map.getLayer('streets')) return;
+  const state = $('street-filter').value;
+  map.setFilter('streets', state === 'all'
+    ? ['==',['get','kind'],'street']
+    : ['all',['==',['get','kind'],'street'],['==',['get','state'],state]]);
+  map.setFilter('points', $('missing-nodes').checked ? ['==',['get','visited'],false] : null);
+}
 $('sync').onclick = async () => { try { await api('/api/sync',{method:'POST',headers:{'X-PoC-Request':'1'}}); await refresh(); } catch(error) { $('error').textContent = error.message; } };
 $('all').onclick = fitAll;
 $('import').onclick = () => $('gpx-file').click();
