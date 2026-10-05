@@ -15,6 +15,8 @@ def upgrade():
         sa.Column("name", sa.String(200), nullable=False),
         sa.Column("date", sa.String(40)),
         sa.Column("activity_type", sa.String(80)),
+        sa.Column("processed", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("unmapped_points", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("tracks", sa.JSON(), nullable=False, server_default="[]"),
         sa.Column("timestamps", sa.JSON(), nullable=False, server_default="[]"),
     )
