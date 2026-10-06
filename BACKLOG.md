@@ -29,6 +29,8 @@ Latest D18 verification: 31 backend unit tests, 62 disposable PostGIS tests and 
 
 Browser UI/polish verification: 8 web adapter tests, strict web build, 5 production-bundle Chrome checks and a public-Gent walkthrough passed. Synthetic GPX/FIT uploads reached original-node street completion while the default account stayed empty. Checks include sequential upload progress, stop/reselection/resume, failed-upload retry, serialized manifest creation and navigation-safe batch queuing, corrupt-file guidance, account isolation and terminal deletion. FIT sport/date naming and paused-file readiness passed 32 backend units, 62 disposable PostGIS tests and 89 shared mobile tests; mobile typecheck, generated-type check and both JavaScript exports passed. Real browser Google consent awaits a registered web OAuth client ID; Android/iOS testing belongs to the separate team.
 
+The browser baseline/polish passed independent review and merged into main as `a6283fd`. [Hosted CI](https://github.com/dimitrovakulenko/city-runner/actions/runs/37518803881) passed all three backend/mobile/web jobs.
+
 ## Work packages
 
 | Task | Scope and requirements | Status | Estimate | Completion evidence |
