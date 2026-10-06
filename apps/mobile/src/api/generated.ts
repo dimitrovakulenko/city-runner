@@ -133,6 +133,9 @@ export type StreetDetail = {
   eligible_nodes: number | null;
   threshold: number | null;
   state: 'complete' | 'partial' | 'missing' | null;
+  manual_completed: boolean;
+  manual_reason: string | null;
+  effective_state: 'complete' | 'partial' | 'missing' | null;
   remaining_nodes: Array<RemainingNode> | null;
   remaining_nodes_page: PageInfo;
 };
@@ -149,6 +152,10 @@ export type ContributionPage = {
   total: number | null;
 };
 
+export type ManualCompletionBody = {
+  reason: string;
+};
+
 export type CityItem = {
   id: string;
   name: string;
@@ -156,6 +163,8 @@ export type CityItem = {
   visited_nodes: number | null;
   eligible_nodes: number | null;
   completed_streets: number | null;
+  manual_completed_streets: number;
+  effective_completed_streets: number | null;
   eligible_streets: number | null;
 };
 
@@ -234,6 +243,8 @@ export type ProgressDataset = {
   failed_sources: number | null;
   eligible_streets: number | null;
   completed_streets: number | null;
+  manual_completed_streets: number;
+  effective_completed_streets: number | null;
   eligible_nodes: number | null;
 };
 
@@ -253,6 +264,9 @@ export type StreetFeature = {
   visited_nodes: number | null;
   eligible_nodes: number | null;
   completed: boolean | null;
+  manual_completed: boolean;
+  manual_reason: string | null;
+  effective_completed: boolean | null;
 };
 
 export type StreetItem = {
@@ -264,6 +278,9 @@ export type StreetItem = {
   eligible_nodes: number | null;
   threshold: number | null;
   state: 'complete' | 'partial' | 'missing' | null;
+  manual_completed: boolean;
+  manual_reason: string | null;
+  effective_state: 'complete' | 'partial' | 'missing' | null;
 };
 
 export type TrackFeature = {

@@ -33,6 +33,7 @@ SCHEMAS = (
     "StreetPage",
     "StreetDetail",
     "ContributionPage",
+    "ManualCompletionBody",
 )
 
 
