@@ -74,6 +74,7 @@ test('session replacement aborts old requests and clears every private store and
   const sessions = new BrowserSessions(storage()); await sessions.setToken('alice');
   let finish!: (response: Response) => void;
   const runtime = createRuntime(sessions, '', () => new Promise<Response>((resolve) => { finish = resolve; }));
+  runtime.planner.setName('Alice private synthetic route'); runtime.planner.addWaypoint([4, 50]);
   const local = runtime.files.register(new File(['private synthetic'], 'run.gpx'));
   const pending = runtime.activities.loadPage(); await Promise.resolve(); await Promise.resolve();
   await sessions.setToken('bob');
@@ -82,5 +83,6 @@ test('session replacement aborts old requests and clears every private store and
   assert.deepEqual(runtime.activities.getState().items, []);
   assert.deepEqual(runtime.imports.getState().batches, []);
   assert.equal(runtime.explore.getState().map, null);
+  assert.equal(runtime.planner.getState().name, ''); assert.deepEqual(runtime.planner.getState().waypoints, []);
   assert.throws(() => runtime.files.form(local), /Select this file again/);
 });

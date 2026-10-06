@@ -73,7 +73,7 @@ try:
         command.upgrade(config, 'head')
         engine = create_engine(url, pool_pre_ping=True)
         with engine.begin() as db:
-            for account in ['alice', 'bob']:
+            for account in ['alice', 'bob', 'carol']:
                 db.execute(text('INSERT INTO accounts(id) VALUES (:id)'), {'id': 'web-test-' + account})
                 db.execute(text('INSERT INTO sessions(token_digest,account_id,expires_at) VALUES (:digest,:id,:expires)'), {
                     'digest': hashlib.sha256(('web-synthetic-' + account).encode()).hexdigest(), 'id': 'web-test-' + account,
@@ -85,7 +85,10 @@ try:
         elif os.environ.get('WEB_PREVIEW_EMPTY') != '1':
             import_osm_xml(engine, osm, region='Demo Region', city_relation_ids=[900], source_timestamp='2026-10-06T00:00:00Z',
                 coverage_mode='complete', coverage_evidence='Synthetic browser QA only')
-        app = create_app(engine)
+        def synthetic_route(points):
+            return {'code': 'Ok', 'waypoints': [{'location': point, 'distance': 0} for point in points],
+                'routes': [{'geometry': {'type': 'LineString', 'coordinates': points}, 'distance': 1234.5, 'duration': 900}]}
+        app = create_app(engine, routing_provider=synthetic_route if os.environ.get('WEB_TEST_ROUTING') == '1' else None)
         if os.environ.get('WEB_TEST_LOGIN') == '1':
             @app.post('/api/dev/session', include_in_schema=False)
             def development_session():

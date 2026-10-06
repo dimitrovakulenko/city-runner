@@ -2,7 +2,7 @@
 
 The first D37 slice uses React and MapLibre with the production backend. It reuses the generated API types, API clients, authentication controller and account-scoped stores in `apps/mobile/src`. Browser adapters supply Google Identity Services, tab session storage and real `File` multipart bodies. The PoC is separate.
 
-Implemented: responsive Explore map, activities/search/detail/deletion, city/street search and remaining nodes, separate manual completion/undo, and durable GPX/FIT manifests with sequential upload, duplicate/status reporting, retry, stop/resume and recovery. Planner, provider connections and desktop packaging remain future slices.
+Implemented: responsive Explore map, activities/search/detail/deletion, city/street search and remaining nodes, separate manual completion/undo, durable GPX/FIT manifests, and waypoint planning with saved routes and GPX export. Provider connections and desktop packaging remain future slices.
 
 ## Development
 
@@ -18,6 +18,16 @@ Open `http://127.0.0.1:5173`. Vite proxies `/api` to `http://127.0.0.1:8001`; `A
 For real Google login, set the public `VITE_GOOGLE_CLIENT_ID` to a registered **web** OAuth client ID, allow the exact browser origin in Google Console and include that ID in backend `GOOGLE_CLIENT_IDS`. Restart Vite and the API after changing configuration. The browser passes the exact server challenge nonce to [Google Identity Services](https://developers.google.com/identity/gsi/web/reference/js-reference), then exchanges the returned signed ID token with the backend. There is no browser client secret. Missing configuration fails closed; real Google consent remains unverified.
 
 The opaque bearer session is held in this tab's `sessionStorage`; reload restores it through `/api/me`, and logout revokes it. Account changes clear private stores, abort requests and release selected files. Manifests and accepted jobs remain server-side. Browser `File` references are memory-only: after reload, select each waiting file again, then resume a paused batch. Accepted jobs continue after **Stop uploading**; deleted items have no retry/reselection action.
+
+## Route planning
+
+Apply the backend migrations and explicitly set `ROUTING_PROVIDER=fossgis` for development foot routing. Routing is disabled by default; see [routing limits and provider policy](../../docs/routing.md). Routes use the account-owned production APIs, not browser storage.
+
+Open **Routes**, click the map to add up to 20 waypoints, drag numbered markers to move them, and use the list to reorder/remove/undo or enter precise coordinates. A city street's remaining-node **+** button starts or extends the draft. Preview is explicit; edits discard old geometry and late responses cannot overwrite a newer draft. Enter a name, preview, then save. Reopen saved routes after reload or on another device, edit with revision conflict protection, delete, or export the saved GPX. Planned routes never change GPS coverage. GPX uses route points without recording timestamps.
+
+The development service receives/logs waypoints and permits at most one request per second. Its foot graph and 100 m snapping bound do not establish acceptance for every access restriction or closure. Provider capacity/terms acceptance remains open before public release.
+
+For an existing disposable preview that must keep its uploaded activities while adding the route API, `ROUTES_API_PROXY_TARGET` can override only `/api/routes`; keep `API_PROXY_TARGET` pointed at its original upload/auth API. Both APIs must use the same migrated database. This local override is unnecessary with a single updated backend.
 
 ## Verification
 
@@ -45,4 +55,4 @@ For public streets without seeded runs, also set `WEB_PREVIEW_GENT_OSM=/path/to/
 
 With that backend and the web preview running, `rtk npm run test:gent` verifies the actual browser file picker/upload → worker ingestion → street matching → activity detail, contributions, progress and rendered-map responses. It checks original coordinates/timestamps and segment preservation, GPX completion of all 38 Goudenleeuwplein nodes and FIT completion of all 20 Poeljemarkt nodes, restart display and isolation from the empty default account. The test deletes its own two synthetic activities afterwards. No real workout history is used.
 
-Verified locally: 10 adapter tests, 5 synthetic Chrome walkthroughs against the production bundle and the public-Gent walkthrough. Development Chrome checks also verify automatic login, session restoration, logout/re-login and recovery of stale test sessions. Checks cover rendered maps, responsive layout, private signed-out state, account isolation, real activity/street/correction calls, visible-layer truncation warnings, GPX/FIT stop/resume with waiting-file reselection after reload, serialized file selection, failed-upload retry, corrupt-file guidance, accepted-job recovery and terminal deletion. Missing nodes start hidden and appear at close zoom; upload progress distinguishes file submission from processing; FIT titles use sport/date. Real Google consent still requires a registered web client ID. Deployment and desktop packaging remain future work.
+Verified locally: 10 adapter tests, 6 synthetic Chrome walkthroughs against the production bundle and the earlier public-Gent walkthrough. Browser route checks use an injected synthetic provider response, never the public service. They cover marker dragging, reorder/remove/undo, saved-route reload, escaped GPX download, other-account 404s, deletion and unchanged GPS progress. Development Chrome checks also verify automatic login, session restoration, logout/re-login and recovery of stale test sessions. Import checks cover segmented maps, responsive layout, private signed-out state, account isolation, activity/street/correction calls, GPX/FIT stop/resume with reselection after reload, serialized file selection, failed-upload retry, corrupt-file guidance and terminal deletion. Real Google consent still requires a registered web client ID. Deployment, native route UI/device acceptance and desktop packaging remain future work.

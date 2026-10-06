@@ -3,6 +3,8 @@ import { ExploreStore } from '../../mobile/src/exploreStore';
 import { CityExplorerStore } from '../../mobile/src/cityExplorerStore';
 import { ImportStore } from '../../mobile/src/importStore';
 import { CorrectionStore } from '../../mobile/src/correctionStore';
+import { RoutePlannerStore } from '../../mobile/src/routePlannerStore';
+import { createRouteApi } from '../../mobile/src/api/routes';
 import { createActivityApi, createApiRequest } from '../../mobile/src/api/client';
 import { createExploreApi } from '../../mobile/src/api/explore';
 import { createCityExplorerApi } from '../../mobile/src/api/cities';
@@ -19,6 +21,7 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
   const activities = new ActivityStore(api);
   const explore = new ExploreStore(createExploreApi(options));
   const cities = new CityExplorerStore(createCityExplorerApi(options));
+  const planner = new RoutePlannerStore(createRouteApi(options));
   const imports = new ImportStore(createBrowserImportApi(options, files), () => crypto.randomUUID(), () => {
     void activities.loadPage(); void explore.refreshAfterCorrection(); void cities.refreshAfterCorrection();
   });
@@ -26,9 +29,9 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
     if (operation === 'activity-delete') activities.activityDeleted(id);
     void explore.refreshAfterCorrection(); void cities.refreshAfterCorrection(); void imports.refresh();
   });
-  const reset = () => { files.clear(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); };
+  const reset = () => { files.clear(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); planner.reset(); };
   sessions.subscribe(reset);
-  return { sessions, files, api, activities, explore, cities, imports, corrections, reset };
+  return { sessions, files, api, activities, explore, cities, imports, corrections, planner, reset };
 }
 
 export type Runtime = ReturnType<typeof createRuntime>;
