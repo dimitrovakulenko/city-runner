@@ -29,6 +29,10 @@ SCHEMAS = (
     "ProgressResponse",
     "UploadResponse",
     "UploadStatusResponse",
+    "CityPage",
+    "StreetPage",
+    "StreetDetail",
+    "ContributionPage",
 )
 
 

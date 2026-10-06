@@ -96,11 +96,92 @@ export type UploadStatusResponse = {
   error: string | null;
 };
 
+export type CityPage = {
+  dataset_id: string;
+  dataset_state: 'active' | 'importing' | 'retired';
+  rule: 'normal' | 'strict';
+  coverage: DatasetCoverage;
+  items: Array<CityItem>;
+  page: number;
+  page_size: number;
+  total: number;
+};
+
+export type StreetPage = {
+  dataset_id: string;
+  city_id: string;
+  dataset_state: 'active' | 'importing' | 'retired';
+  rule: 'normal' | 'strict';
+  coverage: DatasetCoverage;
+  filter: 'all' | 'incomplete' | 'partial' | 'completed';
+  filter_applied: boolean;
+  items: Array<StreetItem>;
+  page: number;
+  page_size: number;
+  total: number;
+};
+
+export type StreetDetail = {
+  id: string;
+  dataset_id: string;
+  city_id: string;
+  name: string;
+  dataset_state: 'active' | 'importing' | 'retired';
+  rule: 'normal' | 'strict';
+  coverage: DatasetCoverage;
+  visited_nodes: number | null;
+  eligible_nodes: number | null;
+  threshold: number | null;
+  state: 'complete' | 'partial' | 'missing' | null;
+  remaining_nodes: Array<RemainingNode> | null;
+  remaining_nodes_page: PageInfo;
+};
+
+export type ContributionPage = {
+  dataset_id: string;
+  street_id: string;
+  dataset_state: 'active' | 'importing' | 'retired';
+  coverage: DatasetCoverage;
+  activities_available: boolean;
+  activities: Array<ContributingActivity>;
+  page: number;
+  page_size: number;
+  total: number | null;
+};
+
+export type CityItem = {
+  id: string;
+  name: string;
+  admin_level: string;
+  visited_nodes: number | null;
+  eligible_nodes: number | null;
+  completed_streets: number | null;
+  eligible_streets: number | null;
+};
+
 export type CityScope = {
   id: string;
   dataset_id: string;
   name: string;
   bounds: [number, number, number, number];
+};
+
+export type ContributingActivity = {
+  id: string;
+  name: string;
+  date: string;
+  type: string;
+  supported_nodes: number;
+};
+
+export type DatasetCoverage = {
+  status: 'ready' | 'pending' | 'failed';
+  progress_revision: string;
+  pending_sources: number;
+  failed_sources: number;
+  pending_imports: number;
+  visited_node_count: number | null;
+  unsupported_sample_count: number | null;
 };
 
 export type DatasetStatus = {
@@ -136,6 +217,12 @@ export type MissingNode = {
   latitude: number;
 };
 
+export type PageInfo = {
+  page: number;
+  page_size: number;
+  total: number | null;
+};
+
 export type ProgressDataset = {
   dataset_id: string;
   region: string;
@@ -150,6 +237,12 @@ export type ProgressDataset = {
   eligible_nodes: number | null;
 };
 
+export type RemainingNode = {
+  id: string;
+  longitude: number;
+  latitude: number;
+};
+
 export type StreetFeature = {
   street_id: string;
   way_id: string;
@@ -160,6 +253,17 @@ export type StreetFeature = {
   visited_nodes: number | null;
   eligible_nodes: number | null;
   completed: boolean | null;
+};
+
+export type StreetItem = {
+  id: string;
+  dataset_id: string;
+  city_id: string;
+  name: string;
+  visited_nodes: number | null;
+  eligible_nodes: number | null;
+  threshold: number | null;
+  state: 'complete' | 'partial' | 'missing' | null;
 };
 
 export type TrackFeature = {
