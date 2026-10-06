@@ -3,11 +3,30 @@ import assert from 'node:assert/strict';
 import { BrowserSessions, SESSION_KEY } from '../src/session';
 import { BrowserFiles } from '../src/files';
 import { createRuntime, createBrowserImportApi } from '../src/runtime';
+import { restoreDevelopmentSession } from '../src/development';
 
 function storage() {
   const values = new Map<string, string>();
   return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); }, removeItem: (key: string) => { values.delete(key); } };
 }
+
+test('development login requires explicit enablement and loopback, preserving existing sessions', async () => {
+  const sessions = new BrowserSessions(storage()); let requests = 0;
+  const request = async () => { requests++; return Response.json({ session_token: 'test-session' }); };
+  await restoreDevelopmentSession(sessions, false, '127.0.0.1', request);
+  await restoreDevelopmentSession(sessions, true, 'app.example.com', request);
+  assert.equal(requests, 0);
+  await restoreDevelopmentSession(sessions, true, '127.0.0.1', request);
+  assert.equal(await sessions.getToken(), 'test-session'); assert.equal(requests, 1);
+  await restoreDevelopmentSession(sessions, true, 'localhost', request); assert.equal(requests, 1);
+});
+
+test('a delayed development login never replaces a newer account', async () => {
+  const sessions = new BrowserSessions(storage()); let finish!: (response: Response) => void;
+  const pending = restoreDevelopmentSession(sessions, true, '127.0.0.1', () => new Promise<Response>((resolve) => { finish = resolve; }));
+  await Promise.resolve(); await sessions.setToken('new-account'); finish(Response.json({ session_token: 'test-session' }));
+  await pending; assert.equal(await sessions.getToken(), 'new-account');
+});
 
 test('tab session compare-and-clear cannot remove a replacement account', async () => {
   const backing = storage(); const sessions = new BrowserSessions(backing); const changes: Array<string | null> = [];

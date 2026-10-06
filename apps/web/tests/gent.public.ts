@@ -16,7 +16,7 @@ test('public Gent streets: browser GPX and FIT import, original samples, real st
   expect(before.eligible_streets).toBe(3108); expect(before.eligible_nodes).toBe(51134);
   expect(before.completed_streets).toBe(0); expect(before.visited_node_count).toBe(0);
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Your city. A new perspective.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Your city. A new perspective.' }).or(page.getByText('Test account', { exact: true }))).toBeVisible();
   await page.evaluate(() => sessionStorage.setItem('city-runner.session', 'web-synthetic-bob')); await page.reload();
   await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
   await expect(page.locator('.map-area')).toHaveAttribute('data-ready', 'true', { timeout: 20_000 });

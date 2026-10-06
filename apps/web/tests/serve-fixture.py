@@ -1,6 +1,7 @@
 """Disposable local browser QA backend; never opens an existing activity database."""
 import hashlib
 import os
+import secrets
 import sys
 import tempfile
 import threading
@@ -85,6 +86,15 @@ try:
             import_osm_xml(engine, osm, region='Demo Region', city_relation_ids=[900], source_timestamp='2026-10-06T00:00:00Z',
                 coverage_mode='complete', coverage_evidence='Synthetic browser QA only')
         app = create_app(engine)
+        if os.environ.get('WEB_TEST_LOGIN') == '1':
+            @app.post('/api/dev/session', include_in_schema=False)
+            def development_session():
+                token = secrets.token_urlsafe(32)
+                with engine.begin() as db:
+                    db.execute(text('INSERT INTO sessions(token_digest,account_id,expires_at) VALUES (:digest,:id,:expires)'), {
+                        'digest': hashlib.sha256(token.encode()).hexdigest(), 'id': 'web-test-alice',
+                        'expires': datetime.now(timezone.utc) + timedelta(hours=4)})
+                return {'session_token': token}
         handlers = {'process_upload': lambda job: process_upload(engine, job), 'match_coverage': lambda job: process_source_dataset(engine, job),
             'delete_private_object': lambda job: process_private_object_cleanup(job)}
         with TestClient(app) as client:

@@ -9,6 +9,7 @@ export class BrowserSessions implements SessionStore, AuthSessionStore {
   constructor(private readonly storage: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>) {}
   async getToken(): Promise<string | null> { return this.storage.getItem(SESSION_KEY); }
   async setToken(token: string): Promise<void> { this.write(token); }
+  async setTokenIfEmpty(token: string): Promise<boolean> { if (this.storage.getItem(SESSION_KEY)) return false; this.write(token); return true; }
   async setTokenIfCurrent(token: string, isCurrent: () => boolean): Promise<boolean> {
     if (!isCurrent()) return false;
     this.write(token);
