@@ -1,19 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
 import { Camera, GeoJSONSource, Layer, Map } from '@maplibre/maplibre-react-native';
 import type { MapRef, ViewStateChangeEvent } from '@maplibre/maplibre-react-native';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import type { ExploreStore, ExploreState, Viewport } from './exploreStore';
 import type { MapResponse } from './api/generated';
+import { ImportPanel } from './ImportPanel';
+import type { ImportStore } from './importStore';
 
 const INITIAL_VIEW: Viewport = { bbox: [3.6, 51, 3.85, 51.1], zoom: 12 };
 const FIXTURE_STYLE = 'https://demotiles.maplibre.org/style.json';
 const DEFAULT_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
 
-export function ExploreScreen({ store, fixtureMode, enabled, accountGeneration, tablet }: { store: ExploreStore; fixtureMode: boolean; enabled: boolean; accountGeneration: number; tablet: boolean }) {
+export function ExploreScreen({ store, importStore, fixtureMode, enabled, accountGeneration, tablet }: { store: ExploreStore; importStore: ImportStore; fixtureMode: boolean; enabled: boolean; accountGeneration: number; tablet: boolean }) {
   const [state, setState] = useState<ExploreState>(store.getState());
-  const [pickerError, setPickerError] = useState<string | null>(null);
   const [styleError, setStyleError] = useState(false);
   const [styleRevision, setStyleRevision] = useState(0);
   const mapRef = useRef<MapRef>(null);
@@ -64,28 +64,6 @@ export function ExploreScreen({ store, fixtureMode, enabled, accountGeneration, 
       if (enabledRef.current && generation === store.getAccountGeneration()) void store.refreshViewport(INITIAL_VIEW);
     }
   };
-  const chooseGpx = async () => {
-    if (fixtureMode || !enabledRef.current) return;
-    const accountGeneration = store.getAccountGeneration();
-    setPickerError(null);
-    try {
-      const picked = await DocumentPicker.getDocumentAsync({ type: '*/*', copyToCacheDirectory: true });
-      if (picked.canceled) return;
-      if (!enabledRef.current || accountGeneration !== store.getAccountGeneration()) return;
-      const file = picked.assets[0];
-      if (!file.name.toLowerCase().endsWith('.gpx')) {
-        setPickerError('Choose a .gpx file.');
-        return;
-      }
-      if (file.size !== undefined && file.size > 10 * 1024 * 1024) {
-        setPickerError('GPX files must be 10 MiB or smaller.');
-        return;
-      }
-      await store.uploadFile({ uri: file.uri, name: file.name, mimeType: file.mimeType, size: file.size });
-    } catch {
-      setPickerError('Could not open the file picker. Retry and choose a GPX file.');
-    }
-  };
   const retry = () => { if (fixtureMode || enabledRef.current) void store.retry(); };
   const mapFailure = state.mapStatus === 'offline' || state.mapStatus === 'error';
   const signedOut = state.mapStatus === 'sign-in-required' || state.progressStatus === 'sign-in-required';
@@ -100,21 +78,7 @@ export function ExploreScreen({ store, fixtureMode, enabled, accountGeneration, 
       </View>
       <ScrollView style={styles.info} contentContainerStyle={styles.infoContent}>
         <ProgressSummary state={state} fixtureMode={fixtureMode} />
-        <View style={styles.uploadCard}>
-          <Text style={styles.sectionTitle}>Import a GPX file</Text>
-          <Text style={styles.copy}>Choose one recorded activity. Processing continues on the server.</Text>
-          <Pressable onPress={() => void chooseGpx()} disabled={state.uploading || fixtureMode || !enabled} style={[styles.action, (state.uploading || fixtureMode || !enabled) && styles.actionDisabled]}>
-            {state.uploading ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionText}>{fixtureMode ? 'Unavailable in fixture mode' : 'Choose GPX file'}</Text>}
-          </Pressable>
-          {(pickerError || state.uploadError) && <Text style={styles.error}>{pickerError ?? state.uploadError}</Text>}
-        </View>
-        {state.uploads.map((upload) => <View key={upload.id} style={styles.uploadItem}>
-          <Text style={styles.uploadName} numberOfLines={1}>{upload.fileName}{upload.duplicate ? ' · duplicate' : ''}</Text>
-          <Text style={styles.copy}>{upload.status === 'queued' || upload.status === 'processing' ? `${upload.status} · checking while app is open` : upload.status}</Text>
-          {upload.activity_id && <Text style={styles.copy}>Activity {upload.activity_id} imported</Text>}
-          {upload.error && <Text style={styles.error}>Import error: {upload.error}</Text>}
-          {upload.polling === 'stopped' && (upload.status === 'queued' || upload.status === 'processing') && <Text style={styles.error}>Status polling paused. Refresh to check again.</Text>}
-        </View>)}
+        <ImportPanel store={importStore} enabled={enabled} fixtureMode={fixtureMode} accountGeneration={accountGeneration} />
         {state.foregroundPollingStopped && <Text style={styles.copy}>Automatic checks paused. Use Refresh to check again.</Text>}
         {state.progress?.pending_imports ? <Text style={styles.notice}>{state.progress.pending_imports} import(s) still processing.</Text> : null}
         {state.map?.geography_state === 'geography_pending' && <Text style={styles.notice}>Coverage is not available for this map area yet.</Text>}
