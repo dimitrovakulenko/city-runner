@@ -11,6 +11,7 @@ from sqlalchemy.engine import Engine
 
 from backend.app import auth
 from backend.app.schemas import ActivityDetail, ActivityPage
+from backend.app.map_api import create_map_router
 from backend.app.uploads import create_upload_router
 
 
@@ -103,6 +104,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
         return Response(status_code=204)
 
     app.include_router(create_upload_router(engine, current_user))
+    app.include_router(create_map_router(engine, current_user))
 
     @app.get("/api/activities", response_model=ActivityPage)
     def activities(
