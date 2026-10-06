@@ -1,0 +1,77 @@
+import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import type { MapResponse } from '../../mobile/src/api/generated';
+
+const headers = { Authorization: 'Bearer web-synthetic-discovery' };
+const mercator = (latitude: number) => Math.log(Math.tan(Math.PI / 4 + latitude * Math.PI / 360));
+async function clickCoordinate(page: Page, view: MapResponse, longitude: number, latitude: number) {
+  const box = (await page.locator('.map-canvas').boundingBox())!;
+  const [west, south, east, north] = view.bbox;
+  await page.mouse.click(box.x + (longitude - west) / (east - west) * box.width, box.y + (mercator(north) - mercator(latitude)) / (mercator(north) - mercator(south)) * box.height);
+}
+
+test('street discovery and Node Hunter use real scoped coverage, consume node clicks and discard stale targets', async ({ page }) => {
+  const points = [3.716, 3.720, 3.724, 3.728].map((lon, index) => `<trkpt lat="51.048" lon="${lon}"><time>2026-10-06T08:00:0${index}Z</time></trkpt>`).join('');
+  const response = await page.request.post('/api/uploads', { headers, multipart: { file: { name: 'discovery.gpx', mimeType: 'application/gpx+xml', buffer: Buffer.from(`<gpx version="1.1" creator="synthetic"><trk><name>Node Hunter QA</name><trkseg>${points}</trkseg></trk></gpx>`) } } });
+  expect(response.status()).toBe(202);
+  const upload = await response.json();
+  await expect.poll(async () => (await (await page.request.get(`/api/uploads/${upload.id}`, { headers })).json()).status).toBe('succeeded');
+  await expect.poll(async () => (await (await page.request.get('/api/progress', { headers })).json()).state).toBe('ready');
+  let view: MapResponse | null = null;
+  page.on('response', async (response) => { if (response.ok() && response.url().includes('/api/map?')) view = await response.json(); });
+  await page.goto('/'); await page.evaluate(() => sessionStorage.setItem('city-runner.session', 'web-synthetic-discovery')); await page.reload();
+  await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
+  await expect(page.locator('.map-area')).toHaveAttribute('data-ready', 'true');
+  await expect.poll(() => view !== null).toBe(true);
+  await page.getByRole('button', { name: 'Cities & streets', exact: true }).click();
+  await page.getByLabel('Region', { exact: true }).selectOption({ label: 'Demo Region' });
+  await page.getByRole('button', { name: /Demo City/ }).click();
+  await page.getByLabel('Sort streets', { exact: true }).selectOption('completion-desc');
+  await expect(page.locator('.street-row').first()).toContainText('Garden Way');
+  await page.getByRole('button', { name: 'Nearly done', exact: true }).click();
+  await expect(page.locator('.street-row')).toHaveCount(1);
+  await expect(page.locator('.street-row')).toContainText('80% GPS');
+  // A map feature opens a street absent from the filtered list.
+  await clickCoordinate(page, view!, 3.724, 51.050);
+  await expect(page.getByRole('heading', { name: 'Orchard Street', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Back to streets' }).click();
+  await expect(page.locator('.street-row', { hasText: 'Orchard Street' })).toBeVisible();
+  await page.getByRole('button', { name: 'Explore', exact: true }).click();
+  await page.getByRole('button', { name: 'Find missing nodes', exact: true }).click();
+  await expect(page.getByRole('region', { name: 'Node Hunter', exact: true })).toContainText('Zoom closer');
+  await page.getByRole('button', { name: 'Zoom to missing nodes', exact: true }).click();
+  const hunter = page.getByRole('region', { name: 'Node Hunter', exact: true });
+  await expect(hunter.locator('.node-row').first()).toBeVisible();
+  await hunter.locator('.node-row').first().click();
+  await expect(hunter.getByRole('button', { name: 'Add node to route', exact: true })).toBeVisible();
+  await hunter.getByRole('button', { name: 'Add node to route', exact: true }).click();
+  await expect(page.locator('.planner-marker')).toHaveCount(1);
+  await expect.poll(() => (view?.zoom ?? 0) >= 16).toBe(true);
+  expect(view!.missing_nodes.length).toBeGreaterThan(1);
+  const target = view!.missing_nodes[1];
+  await clickCoordinate(page, view!, target.longitude, target.latitude);
+  await expect(hunter.locator('.hunter-selection')).toContainText(`Missing node ${target.node_id}`);
+  await expect(page.locator('.planner-marker')).toHaveCount(1);
+  await hunter.getByRole('button', { name: 'Add node to route', exact: true }).click();
+  await expect(page.locator('.planner-marker')).toHaveCount(2);
+  await hunter.locator('.node-row').first().click();
+  let release!: () => void; const gate = new Promise<void>((resolve) => { release = resolve; }); let held = false;
+  await page.route('**/api/map?**', async (route) => { const response = await route.fetch(); held = true; await gate; await route.fulfill({ response }); });
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await expect.poll(() => held).toBe(true);
+  await expect(hunter.locator('.node-row')).toHaveCount(0);
+  await expect(hunter.getByRole('button', { name: 'Add node to route', exact: true })).toHaveCount(0);
+  release(); await expect(hunter.locator('.node-row').first()).toBeVisible();
+  await page.unroute('**/api/map?**');
+  await page.route('**/api/map?**', async (route) => { const response = await route.fetch(); const body = await response.json(); body.node_state = 'pending'; body.limits.missing_nodes.truncated = true; await route.fulfill({ response, json: body }); });
+  await page.getByRole('button', { name: 'Refresh your data', exact: true }).click();
+  await expect(hunter).toContainText('Only nodes from ready datasets appear');
+  await expect(hunter).toContainText('limited to 1,000 missing nodes');
+  await hunter.locator('.node-row').first().click();
+  await expect(hunter.getByRole('button', { name: 'Add node to route', exact: true })).toBeEnabled();
+  await page.screenshot({ path: 'test-results/web-node-hunter.png', fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+  await expect(hunter).toHaveCount(0); await expect(page.locator('.planner-marker')).toHaveCount(0);
+});

@@ -2,7 +2,7 @@
 
 The first D37 slice uses React and MapLibre with the production backend. It reuses the generated API types, API clients, authentication controller and account-scoped stores in `apps/mobile/src`. Browser adapters supply Google Identity Services, tab session storage and real `File` multipart bodies. The PoC is separate.
 
-Implemented: responsive Explore map, activities/search/detail/deletion, city/street search and remaining nodes, separate manual completion/undo, durable GPX/FIT manifests, and waypoint planning with saved routes and GPX export. Provider connections and desktop packaging remain future slices.
+Implemented: responsive Explore map, activities/search/detail/deletion, city/street search, completion sorting, nearly-done filtering and Node Hunter, separate manual completion/undo, durable GPX/FIT manifests, and waypoint planning with saved routes and GPX export. Provider connections and desktop packaging remain future slices.
 
 ## Development
 
@@ -27,7 +27,13 @@ Open **Routes**, click the map to add up to 20 waypoints, drag numbered markers 
 
 The development service receives/logs waypoints and permits at most one request per second. Its foot graph and 100 m snapping bound do not establish acceptance for every access restriction or closure. Provider capacity/terms acceptance remains open before public release.
 
-For an existing disposable preview that must keep its uploaded activities while adding the route API, `ROUTES_API_PROXY_TARGET` can override only `/api/routes`; keep `API_PROXY_TARGET` pointed at its original upload/auth API. Both APIs must use the same migrated database. This local override is unnecessary with a single updated backend.
+For an existing disposable preview that must keep its uploaded activities while adding the route API, `ROUTES_API_PROXY_TARGET` can override only `/api/routes`; keep `API_PROXY_TARGET` pointed at its original upload/auth API. Both APIs must use the same migrated database. `DISCOVERY_API_PROXY_TARGET` can similarly override `/api/cities` and `/api/streets` during local API upgrades without restarting the original upload worker. Automated browser fixtures clear both overrides. These local overrides are unnecessary with a single updated backend.
+
+## Street discovery and Node Hunter
+
+In **Cities & streets**, filter **Nearly done** to find streets with at least 80% GPS coverage that still need visits, or sort the whole city by most/least explored and fewest missing nodes. Click a street on the map to open its full detail and contributing activities, including streets absent from the current filtered page.
+
+In **Explore**, choose **Find missing nodes**, then **Zoom to missing nodes**. Select a red map node or a node from the visible-area list and explicitly **Add node to route**. Node Hunter stays available alongside the route editor. Selection never adds a waypoint by itself; moving the map clears stale targets. Lists disclose unavailable/processing coverage and the existing 1,000-node cap. GPS gaps remain distinct from normal-threshold or manual street completion.
 
 ## Verification
 
