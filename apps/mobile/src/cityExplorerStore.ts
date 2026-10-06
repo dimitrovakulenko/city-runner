@@ -1,6 +1,6 @@
 import { ApiError } from './api/client';
 import type { ApiErrorKind } from './api/client';
-import type { CityExplorerApi, StreetFilter } from './api/cities';
+import type { CityExplorerApi, StreetFilter, StreetSort } from './api/cities';
 import type { CityItem, ContributionPage, ContributingActivity, DatasetCoverage, ProgressDataset, ProgressResponse, RemainingNode, StreetDetail, StreetItem } from './api/generated';
 
 export type CityLoadState = 'idle' | 'loading' | 'loading-more' | 'ready' | 'empty' | 'offline' | 'sign-in-required' | 'error';
@@ -21,13 +21,16 @@ export interface CityExplorerState {
   cityStatus: CityLoadState;
   cityError: string | null;
   selectedCityId: string | null;
+  selectedCityName: string | null;
   streetQuery: string;
   streetFilter: StreetFilter;
+  streetSort: StreetSort;
   streets: StreetItem[];
   streetPage: number;
   streetTotal: number;
   streetCoverage: DatasetCoverage | null;
   streetFilterApplied: boolean;
+  streetSortApplied: boolean;
   streetStatus: CityLoadState;
   streetError: string | null;
   selectedStreetId: string | null;
@@ -47,8 +50,8 @@ export interface CityExplorerState {
 
 const INITIAL: CityExplorerState = {
   rule: 'normal', progress: null, progressStatus: 'idle', progressError: null, datasets: [], selectedDatasetId: null,
-  cityQuery: '', cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null, cityStatus: 'idle', cityError: null, selectedCityId: null,
-  streetQuery: '', streetFilter: 'all', streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetStatus: 'idle', streetError: null,
+  cityQuery: '', cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null, cityStatus: 'idle', cityError: null, selectedCityId: null, selectedCityName: null,
+  streetQuery: '', streetFilter: 'all', streetSort: 'name', streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null,
   selectedStreetId: null, detail: null, remainingNodes: null, detailPage: 0, detailStatus: 'idle', detailError: null,
   contributions: [], contributionPage: 0, contributionTotal: null, contributionAvailable: false, contributionCoverage: null,
   contributionStatus: 'idle', contributionError: null,
@@ -60,12 +63,15 @@ function errorState(error: unknown): 'offline' | 'sign-in-required' | 'error' {
   const kind = errorKind(error);
   return kind === 'offline' || kind === 'sign-in-required' ? kind : 'error';
 }
+const MAX_BIGINT_ID = 9223372036854775807n;
+function validBigintId(id: string): boolean { return /^[1-9]\d{0,18}$/.test(id) && BigInt(id) <= MAX_BIGINT_ID; }
 
 export class CityExplorerStore {
   private state = INITIAL;
   private accountGeneration = 0;
   private accountController = new AbortController();
   private requests = { progress: 0, cities: 0, streets: 0, detail: 0, contributions: 0 };
+  private mapStreetContext = false;
   private listeners = new Set<(state: CityExplorerState) => void>();
 
   constructor(private readonly api: CityExplorerApi) {}
@@ -93,6 +99,7 @@ export class CityExplorerStore {
   }
   reset(): void {
     this.accountGeneration++;
+    this.mapStreetContext = false;
     this.accountController.abort();
     this.accountController = new AbortController();
     this.invalidateSelectionRequests();
@@ -109,7 +116,7 @@ export class CityExplorerStore {
     this.invalidateSelectionRequests();
     this.update({ datasets: [], selectedDatasetId: null, cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null,
       cityStatus: 'error', cityError: 'This dataset is no longer active. Refresh the dataset list.',
-      selectedCityId: null, streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetStatus: 'idle', streetError: null,
+      selectedCityId: null, selectedCityName: null, streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null,
       selectedStreetId: null, detail: null, remainingNodes: null, detailStatus: 'idle', detailError: null,
       contributions: [], contributionTotal: null, contributionCoverage: null, contributionStatus: 'idle', contributionError: null });
   }
@@ -143,7 +150,7 @@ export class CityExplorerStore {
     if (rule === this.state.rule) return;
     this.invalidateAll();
     this.update({ rule, cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null, cityStatus: 'idle', cityError: null,
-      streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetStatus: 'idle', streetError: null,
+      streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null,
       selectedStreetId: null, detail: null, remainingNodes: null, detailPage: 0, detailStatus: 'idle', detailError: null,
       contributions: [], contributionPage: 0, contributionTotal: null, contributionAvailable: false, contributionCoverage: null,
       contributionStatus: 'idle', contributionError: null });
@@ -153,10 +160,11 @@ export class CityExplorerStore {
   selectDataset(datasetId: string | null): void {
     if (datasetId === this.state.selectedDatasetId) return;
     if (datasetId !== null && !this.state.datasets.some((dataset) => dataset.dataset_id === datasetId)) return;
+    this.mapStreetContext = false;
     this.invalidateSelectionRequests();
     this.update({ selectedDatasetId: datasetId, cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null,
-      cityStatus: datasetId ? 'loading' : 'idle', cityError: null, selectedCityId: null,
-      streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetStatus: 'idle', streetError: null,
+      cityStatus: datasetId ? 'loading' : 'idle', cityError: null, selectedCityId: null, selectedCityName: null,
+      streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null,
       selectedStreetId: null, detail: null, remainingNodes: null, detailStatus: 'idle', detailError: null,
       contributions: [], contributionPage: 0, contributionTotal: null, contributionAvailable: false, contributionCoverage: null, contributionStatus: 'idle', contributionError: null });
     if (datasetId) void this.loadCities(1, false);
@@ -200,17 +208,21 @@ export class CityExplorerStore {
   selectCity(cityId: string): void {
     if (!this.state.cities.some((city) => city.id === cityId)) return;
     this.invalidateSelectionRequests();
-    this.update({ selectedCityId: cityId, streetQuery: '', streetFilter: 'all', streets: [], streetPage: 0,
-      streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetStatus: 'loading', streetError: null, selectedStreetId: null,
+    this.mapStreetContext = false;
+    this.update({ selectedCityId: cityId, selectedCityName: this.state.cities.find((city) => city.id === cityId)?.name ?? null, streetQuery: '', streetFilter: 'all', streetSort: 'name', streets: [], streetPage: 0,
+      streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'loading', streetError: null, selectedStreetId: null,
       detail: null, remainingNodes: null, detailStatus: 'idle', detailError: null,
       contributions: [], contributionPage: 0, contributionTotal: null, contributionCoverage: null, contributionStatus: 'idle', contributionError: null });
     void this.loadStreets(1, false);
   }
   backToCities(): void {
+    const reloadCities = this.mapStreetContext && this.state.selectedDatasetId !== null;
+    this.mapStreetContext = false;
     this.invalidateSelectionRequests();
-    this.update({ selectedCityId: null, streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetStatus: 'idle', streetError: null,
+    this.update({ selectedCityId: null, selectedCityName: null, streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null,
       selectedStreetId: null, detail: null, remainingNodes: null, detailStatus: 'idle', detailError: null,
       contributions: [], contributionPage: 0, contributionTotal: null, contributionCoverage: null, contributionStatus: 'idle', contributionError: null });
+    if (reloadCities) void this.loadCities(1, false);
   }
   setStreetQuery(query: string): void {
     if (query === this.state.streetQuery) return;
@@ -222,6 +234,12 @@ export class CityExplorerStore {
     this.update({ streetFilter: filter, streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetStatus: 'idle', streetError: null });
     if (this.state.selectedCityId) void this.loadStreets(1, false);
   }
+  setStreetSort(sort: StreetSort): void {
+    if (sort === this.state.streetSort) return;
+    this.update({ streetSort: sort, streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null,
+      streetSortApplied: sort === 'name', streetStatus: 'idle', streetError: null });
+    if (this.state.selectedCityId) void this.loadStreets(1, false);
+  }
   async loadMoreStreets(): Promise<void> {
     if (this.state.streetStatus === 'ready' && this.state.streets.length < this.state.streetTotal) await this.loadStreets(this.state.streetPage + 1, true);
   }
@@ -231,20 +249,20 @@ export class CityExplorerStore {
     if (!datasetId || !cityId) return;
     const request = ++this.requests.streets;
     const generation = this.accountGeneration;
-    const { rule, streetFilter } = this.state;
+    const { rule, streetFilter, streetSort } = this.state;
     const query = this.state.streetQuery;
     this.update({ streetStatus: append ? 'loading-more' : 'loading', streetError: null });
     try {
-      const response = await this.api.getStreets(cityId, { datasetId, rule, filter: streetFilter, q: query, page, pageSize: PAGE_SIZE }, this.accountController.signal);
+      const response = await this.api.getStreets(cityId, { datasetId, rule, filter: streetFilter, sort: streetSort, q: query, page, pageSize: PAGE_SIZE }, this.accountController.signal);
       if (!this.current('streets', request, generation) || datasetId !== this.state.selectedDatasetId || cityId !== this.state.selectedCityId ||
-        rule !== this.state.rule || streetFilter !== this.state.streetFilter || query !== this.state.streetQuery) return;
+        rule !== this.state.rule || streetFilter !== this.state.streetFilter || streetSort !== this.state.streetSort || query !== this.state.streetQuery) return;
       if (response.dataset_id !== datasetId || response.city_id !== cityId || response.dataset_state !== 'active') return this.datasetBecameInactive();
       if (append && this.state.streetCoverage && (this.state.streetCoverage.progress_revision !== response.coverage.progress_revision || this.state.streetCoverage.status !== response.coverage.status)) {
         await this.loadStreets(1, false);
         return;
       }
       this.update({ streets: append ? [...this.state.streets, ...response.items] : response.items, streetPage: response.page,
-        streetTotal: response.total, streetCoverage: response.coverage, streetFilterApplied: response.filter_applied,
+        streetTotal: response.total, streetCoverage: response.coverage, streetFilterApplied: response.filter_applied, streetSortApplied: response.sort_applied,
         streetStatus: response.items.length || (append && this.state.streets.length) ? 'ready' : 'empty' });
     } catch (error) {
       if (!this.current('streets', request, generation)) return;
@@ -261,10 +279,27 @@ export class CityExplorerStore {
     void this.loadStreetDetail(1, false);
     void this.loadContributions(1, false);
   }
+  async openMapStreet(datasetId: string, cityId: string, streetId: string, cityName?: string): Promise<void> {
+    if (!validBigintId(datasetId) || !validBigintId(cityId) || !validBigintId(streetId)) return;
+    this.invalidateSelectionRequests();
+    this.mapStreetContext = true;
+    const knownCityName = this.state.selectedDatasetId === datasetId ? this.state.cities.find((city) => city.id === cityId)?.name : undefined;
+    this.update({ selectedDatasetId: datasetId, selectedCityId: cityId, selectedCityName: cityName?.trim() || knownCityName || null,
+      cityQuery: '', cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null, cityStatus: 'idle', cityError: null,
+      streetQuery: '', streetFilter: 'all', streetSort: 'name', streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null,
+      streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null, selectedStreetId: streetId,
+      detail: null, remainingNodes: null, detailPage: 0, detailStatus: 'loading', detailError: null,
+      contributions: [], contributionPage: 0, contributionTotal: null, contributionAvailable: false, contributionCoverage: null,
+      contributionStatus: 'loading', contributionError: null });
+    await Promise.all([this.loadStreetDetail(1, false), this.loadContributions(1, false)]);
+  }
   backToStreets(): void {
     this.invalidateSelectionRequests();
     this.update({ selectedStreetId: null, detail: null, remainingNodes: null, detailPage: 0, detailStatus: 'idle', detailError: null,
       contributions: [], contributionPage: 0, contributionTotal: null, contributionAvailable: false, contributionCoverage: null, contributionStatus: 'idle', contributionError: null });
+    if (this.mapStreetContext && this.state.selectedDatasetId && this.state.selectedCityId) {
+      void this.loadStreets(1, false);
+    }
   }
   async loadMoreNodes(): Promise<void> {
     const total = this.state.detail?.remaining_nodes_page.total;
@@ -283,7 +318,17 @@ export class CityExplorerStore {
     try {
       const detail = await this.api.getStreet(streetId, { datasetId, rule, page, pageSize: PAGE_SIZE }, this.accountController.signal);
       if (!this.current('detail', request, generation) || datasetId !== this.state.selectedDatasetId || streetId !== this.state.selectedStreetId || rule !== this.state.rule) return;
-      if (detail.dataset_id !== datasetId || detail.id !== streetId || detail.dataset_state !== 'active') return this.datasetBecameInactive();
+      if (detail.dataset_state !== 'active') return this.datasetBecameInactive();
+      if (detail.dataset_id !== datasetId || detail.id !== streetId) {
+        this.requests.contributions++;
+        this.update({ detail: null, remainingNodes: null, detailStatus: 'error', detailError: 'The street response did not match the requested street.',
+          contributions: [], contributionTotal: null, contributionAvailable: false, contributionStatus: 'idle', contributionError: null }); return;
+      }
+      if (detail.city_id !== this.state.selectedCityId) {
+        this.requests.contributions++;
+        this.update({ detail: null, remainingNodes: null, detailStatus: 'error', detailError: 'This street does not belong to the selected city.',
+          contributions: [], contributionTotal: null, contributionAvailable: false, contributionStatus: 'idle', contributionError: null }); return;
+      }
       if (append && this.state.detail && (this.state.detail.coverage.progress_revision !== detail.coverage.progress_revision || this.state.detail.coverage.status !== detail.coverage.status)) {
         await this.loadStreetDetail(1, false);
         return;
@@ -354,9 +399,10 @@ export class CityExplorerStore {
     await Promise.all([this.loadStreetDetail(1, false), this.loadContributions(1, false)]);
   }
   clearSelection(): void {
+    this.mapStreetContext = false;
     this.invalidateSelectionRequests();
     this.update({ selectedDatasetId: null, cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null, cityStatus: 'idle', cityError: null,
-      selectedCityId: null, streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetStatus: 'idle', streetError: null,
+      selectedCityId: null, selectedCityName: null, streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null,
       selectedStreetId: null, detail: null, remainingNodes: null, detailStatus: 'idle', detailError: null,
       contributions: [], contributionPage: 0, contributionTotal: null, contributionAvailable: false, contributionCoverage: null,
       contributionStatus: 'idle', contributionError: null });

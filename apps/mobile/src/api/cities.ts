@@ -8,12 +8,13 @@ import type {
   StreetPage,
 } from './generated';
 
-export type StreetFilter = 'all' | 'incomplete' | 'partial' | 'completed';
+export type StreetFilter = 'all' | 'incomplete' | 'partial' | 'completed' | 'nearly-complete';
+export type StreetSort = 'name' | 'completion-desc' | 'completion-asc' | 'remaining-asc';
 
 export interface CityExplorerApi {
   getProgress(rule: 'normal' | 'strict', signal?: AbortSignal): Promise<ProgressResponse>;
   getCities(datasetId: string, query: { rule: 'normal' | 'strict'; q: string; page: number; pageSize: number }, signal?: AbortSignal): Promise<CityPage>;
-  getStreets(cityId: string, query: { datasetId: string; rule: 'normal' | 'strict'; filter: StreetFilter; q: string; page: number; pageSize: number }, signal?: AbortSignal): Promise<StreetPage>;
+  getStreets(cityId: string, query: { datasetId: string; rule: 'normal' | 'strict'; filter: StreetFilter; sort: StreetSort; q: string; page: number; pageSize: number }, signal?: AbortSignal): Promise<StreetPage>;
   getStreet(streetId: string, query: { datasetId: string; rule: 'normal' | 'strict'; page: number; pageSize: number }, signal?: AbortSignal): Promise<StreetDetail>;
   getContributions(streetId: string, query: { datasetId: string; page: number; pageSize: number }, signal?: AbortSignal): Promise<ContributionPage>;
 }
@@ -35,7 +36,7 @@ export function createCityExplorerApi(options: { baseUrl: string; sessionStore: 
       return request<CityPage>(`/api/cities?${query}`, { signal });
     },
     getStreets(cityId, input, signal) {
-      const query = new URLSearchParams({ dataset_id: input.datasetId, rule: input.rule, filter: input.filter,
+      const query = new URLSearchParams({ dataset_id: input.datasetId, rule: input.rule, filter: input.filter, sort: input.sort,
         page: String(input.page), page_size: String(input.pageSize) });
       if (input.q.trim()) query.set('q', input.q.trim());
       return request<StreetPage>(`/api/cities/${encodeURIComponent(cityId)}/streets?${query}`, { signal });

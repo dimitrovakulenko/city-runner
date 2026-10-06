@@ -23,7 +23,7 @@ const cities = (datasetId: string, page = 1, revision = '5', ids = ['c1'], datas
   dataset_id: datasetId, dataset_state, rule: 'normal', coverage: coverage('ready', revision), items: ids.map((id) => ({ id, name: id, admin_level: '8', visited_nodes: 1, eligible_nodes: 2, completed_streets: 0, manual_completed_streets: 0, effective_completed_streets: 0, eligible_streets: 1 })), page, page_size: 50, total: ids.length,
 });
 const streets = (datasetId: string, cityId = 'c1', ids = ['s1'], revision = '5'): StreetPage => ({
-  dataset_id: datasetId, city_id: cityId, dataset_state: 'active', rule: 'normal', coverage: coverage('ready', revision), filter: 'all', filter_applied: true,
+  dataset_id: datasetId, city_id: cityId, dataset_state: 'active', rule: 'normal', coverage: coverage('ready', revision), filter: 'all', filter_applied: true, sort: 'name', sort_applied: true,
   items: ids.map((id) => ({ id, dataset_id: datasetId, city_id: cityId, name: id, visited_nodes: 1, eligible_nodes: 2, threshold: 2, state: 'partial', manual_completed: false, manual_reason: null, effective_state: 'partial' })), page: 1, page_size: 50, total: ids.length,
 });
 const streetDetail = (datasetId: string, id: string, page = 1, revision = '5', remaining: StreetDetail['remaining_nodes'] = [{ id: '9007199254740993', longitude: 3.7, latitude: 51.0 }]): StreetDetail => ({
@@ -57,13 +57,14 @@ test('city API encodes paging/filter queries and uses the opaque bearer with str
     urls.push(String(url)); auth = new Headers(init?.headers).get('Authorization') ?? ''; return Response.json({});
   } });
   await apiClient.getCities('9007199254740993', { rule: 'strict', q: 'City_% ', page: 2, pageSize: 50 });
-  await apiClient.getStreets('9007199254740995', { datasetId: '9007199254740993', rule: 'strict', filter: 'partial', q: 'Main', page: 3, pageSize: 50 });
+  await apiClient.getStreets('9007199254740995', { datasetId: '9007199254740993', rule: 'strict', filter: 'nearly-complete', sort: 'remaining-asc', q: 'Main', page: 3, pageSize: 50 });
   await apiClient.getStreet('9007199254740997', { datasetId: '9007199254740993', rule: 'strict', page: 4, pageSize: 50 });
   await apiClient.getContributions('9007199254740997', { datasetId: '9007199254740993', page: 2, pageSize: 50 });
   assert.equal(auth, 'Bearer opaque');
   assert.equal(new URL(urls[0]!).searchParams.get('dataset_id'), '9007199254740993');
   assert.equal(new URL(urls[0]!).searchParams.get('q'), 'City_%');
-  assert.equal(new URL(urls[1]!).searchParams.get('filter'), 'partial');
+  assert.equal(new URL(urls[1]!).searchParams.get('filter'), 'nearly-complete');
+  assert.equal(new URL(urls[1]!).searchParams.get('sort'), 'remaining-asc');
   assert.ok(urls[2]!.includes('/api/streets/9007199254740997?'));
   assert.ok(urls[3]!.includes('/api/streets/9007199254740997/contributions?'));
 });
@@ -114,6 +115,50 @@ test('city and street search/filter pages follow the currently selected rule', a
   assert.ok(calls.includes('street:main:partial:strict'));
 });
 
+test('street sort is sent globally before paging and stale sort responses cannot win', async () => {
+  const stale = deferred<StreetPage>(); const queries: string[] = [];
+  const store = new CityExplorerStore(api({
+    async getStreets(city, query) {
+      queries.push(`${query.sort}/${query.filter}/${query.page}`);
+      if (query.sort === 'name') return stale.promise;
+      return { ...streets(query.datasetId, city, ['remaining-first']), filter: query.filter, filter_applied: false,
+        sort: query.sort, sort_applied: false, page: query.page, total: 51 };
+    },
+  }));
+  await selectCity(store); store.setStreetFilter('nearly-complete'); store.setStreetSort('remaining-asc'); await tick();
+  assert.ok(queries.includes('remaining-asc/nearly-complete/1'));
+  assert.equal(store.getState().streetSort, 'remaining-asc'); assert.equal(store.getState().streetSortApplied, false);
+  assert.equal(store.getState().streetFilterApplied, false); assert.equal(store.getState().streets[0]?.id, 'remaining-first');
+  stale.resolve({ ...streets('d1', 'c1', ['stale-name']), page: 1 }); await tick();
+  assert.equal(store.getState().streets[0]?.id, 'remaining-first');
+});
+
+test('sorting during a pending page fences the old page and restarts at page one', async () => {
+  const pendingPage = deferred<StreetPage>(); const calls: string[] = [];
+  const store = new CityExplorerStore(api({
+    async getStreets(city, query) {
+      calls.push(`${query.sort}:${query.page}`);
+      if (query.page === 2) return pendingPage.promise;
+      return { ...streets(query.datasetId, city, [query.sort === 'name' ? 'name-first' : 'completion-first']), total: 100,
+        sort: query.sort, page: query.page };
+    },
+  }));
+  await selectCity(store); const loadingMore = store.loadMoreStreets(); await tick();
+  store.setStreetSort('completion-desc'); await tick();
+  pendingPage.resolve({ ...streets('d1', 'c1', ['old-page-two']), page: 2, sort: 'name', total: 100 }); await loadingMore;
+  assert.deepEqual(calls.slice(-2), ['name:2', 'completion-desc:1']);
+  assert.deepEqual(store.getState().streets.map((street) => street.id), ['completion-first']);
+  assert.equal(store.getState().streetPage, 1);
+});
+
+test('account reset fences a pending sorted street request', async () => {
+  const pending = deferred<StreetPage>();
+  const store = new CityExplorerStore(api({ getStreets: () => pending.promise }));
+  await selectCity(store); store.setStreetSort('completion-asc'); await tick(); store.reset();
+  pending.resolve({ ...streets('d1', 'c1', ['private-sorted']), sort: 'completion-asc' }); await tick();
+  assert.equal(store.getState().streetSort, 'name'); assert.equal(store.getState().streets.length, 0);
+});
+
 test('opening a city does not cancel an unrelated active-dataset refresh', async () => {
   const slow = deferred<ProgressResponse>();
   let progressCalls = 0;
@@ -132,7 +177,7 @@ test('a progress revision change while paging restarts city, missing-node, and c
   const store = new CityExplorerStore(api({
     async getCities(id, query) { cityPages.push(query.page); return { ...cities(id, query.page, query.page === 2 ? '6' : query.page === 1 && cityPages.length > 1 ? '6' : '5', [query.page === 2 ? 'old-page-two' : `city-r${cityPages.length}`]), total: 100 }; },
     async getStreets(id, query) { return streets(query.datasetId, id, ['s1']); },
-    async getStreet(id, query) { nodePages.push(query.page); return streetDetail(query.datasetId, id, query.page, query.page === 2 ? '6' : query.page === 1 && nodePages.length > 1 ? '6' : '5', [{ id: `node-${nodePages.length}`, longitude: 3.7, latitude: 51 }]); },
+    async getStreet(id, query) { nodePages.push(query.page); return { ...streetDetail(query.datasetId, id, query.page, query.page === 2 ? '6' : query.page === 1 && nodePages.length > 1 ? '6' : '5', [{ id: `node-${nodePages.length}`, longitude: 3.7, latitude: 51 }]), city_id: 'city-r3' }; },
     async getContributions(id, query) { activityPages.push(query.page); return { ...contributions(query.datasetId, id, query.page, query.page === 2 ? '6' : query.page === 1 && activityPages.length > 1 ? '6' : '5'), activities: [{ id: `activity-${activityPages.length}`, name: 'Run', date: '2026-10-05', type: 'Run', supported_nodes: 1 }] }; },
   }));
   await store.refreshProgress(); store.selectDataset('d1'); await tick();
@@ -162,6 +207,65 @@ test('rapid street selection ignores delayed details and contributions from the 
   oldDetail.resolve(streetDetail('d1', 's-old')); oldContribution.resolve(contributions('d1', 's-old')); await tick();
   assert.equal(store.getState().detail?.id, 's-new');
   assert.equal(store.getState().contributionAvailable, true);
+});
+
+test('map street opens by exact BIGINT IDs outside the current page and back reloads that city page', async () => {
+  const datasetId = '9007199254740999'; const cityId = '9007199254740993'; const streetId = '9007199254740997';
+  const streetCalls: Array<{ datasetId: string; cityId: string; page: number }> = []; const cityCalls: string[] = [];
+  const store = new CityExplorerStore(api({
+    async getProgress() { return progress([dataset('listed-region')], true); },
+    async getCities(id, query) { cityCalls.push(id); return cities(id, query.page); },
+    async getStreet(id, query) { assert.equal(id, streetId); return { ...streetDetail(query.datasetId, id), city_id: cityId, name: 'Map street' }; },
+    async getContributions(id, query) { return { ...contributions(query.datasetId, id), street_id: id }; },
+    async getStreets(id, query) { streetCalls.push({ datasetId: query.datasetId, cityId: id, page: query.page }); return streets(query.datasetId, id, ['page-street']); },
+  }));
+  await store.refreshProgress(); await store.openMapStreet(datasetId, cityId, streetId, 'Map city label');
+  assert.equal(store.getState().selectedDatasetId, datasetId);
+  assert.equal(store.getState().selectedCityId, cityId); assert.equal(store.getState().selectedCityName, 'Map city label');
+  assert.equal(store.getState().selectedStreetId, streetId); assert.equal(store.getState().detail?.id, streetId);
+  assert.deepEqual(store.getState().datasets.map((item) => item.dataset_id), ['listed-region']);
+  assert.deepEqual(store.getState().cities, []);
+  store.backToStreets(); await tick();
+  assert.deepEqual(streetCalls, [{ datasetId, cityId, page: 1 }]);
+  assert.deepEqual(store.getState().streets.map((item) => item.id), ['page-street']);
+  store.backToCities(); await tick();
+  assert.deepEqual(cityCalls, [datasetId]);
+  assert.deepEqual(store.getState().cities.map((item) => item.id), ['c1']);
+});
+
+test('map street rejects invalid or wrong-city BIGINT IDs without selecting unrelated detail', async () => {
+  let streetReads = 0;
+  const store = new CityExplorerStore(api({ async getStreet(id, query) { streetReads++; return { ...streetDetail(query.datasetId, id), city_id: '2' }; } }));
+  await store.openMapStreet('1', '01', '2'); await store.openMapStreet('1', '1', '9223372036854775808');
+  assert.equal(streetReads, 0); assert.equal(store.getState().selectedStreetId, null);
+  await store.openMapStreet('1', '9007199254740993', '9007199254740997');
+  assert.equal(streetReads, 1); assert.equal(store.getState().detail, null);
+  assert.equal(store.getState().detailStatus, 'error');
+  assert.match(store.getState().detailError ?? '', /selected city/);
+});
+
+test('an old street detail cannot replace a newer map street selection', async () => {
+  const oldDetail = deferred<StreetDetail>();
+  const mapDataset = '9007199254740991'; const mapCity = '9007199254740993'; const mapStreet = '9007199254740997';
+  const store = new CityExplorerStore(api({
+    async getStreets(_city, query) { return streets(query.datasetId, 'c1', ['s1']); },
+    getStreet(id, query) { return id === 's1' ? oldDetail.promise : Promise.resolve({ ...streetDetail(query.datasetId, id), city_id: mapCity, name: 'Map result' }); },
+  }));
+  await selectCity(store); store.selectStreet('s1');
+  await store.openMapStreet(mapDataset, mapCity, mapStreet);
+  oldDetail.resolve(streetDetail('d1', 's1')); await tick();
+  assert.equal(store.getState().selectedStreetId, mapStreet);
+  assert.equal(store.getState().detail?.id, mapStreet); assert.equal(store.getState().detail?.name, 'Map result');
+});
+
+test('account reset fences a delayed map street response', async () => {
+  const pending = deferred<StreetDetail>();
+  const store = new CityExplorerStore(api({ getStreet: () => pending.promise }));
+  const datasetId = '9007199254740991';
+  const opening = store.openMapStreet(datasetId, '9007199254740993', '9007199254740997');
+  store.reset(); pending.resolve(streetDetail(datasetId, '9007199254740997')); await opening;
+  assert.equal(store.getState().selectedDatasetId, null); assert.equal(store.getState().selectedStreetId, null);
+  assert.equal(store.getState().detail, null);
 });
 
 test('pending coverage leaves missing nodes and contribution totals unavailable', async () => {
