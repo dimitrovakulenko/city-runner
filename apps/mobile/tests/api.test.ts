@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { ApiError, createActivityApi } from '../src/api/client';
+import { ApiError, createActivityApi, createApiRequest } from '../src/api/client';
 import type { SessionStore } from '../src/api/client';
 
 function sessions(initial: string | null): SessionStore & { current: string | null } {
@@ -108,4 +108,24 @@ test('unreachable server requests time out without clearing the session', async 
   });
   await assert.rejects(api.getMe(), (error: unknown) => error instanceof ApiError && error.kind === 'offline');
   assert.equal(store.current, 'current');
+});
+
+
+test('account cancellation during token read prevents sending a mutation with the replacement session', async () => {
+  const store = sessions('account-a');
+  let finish!: (token: string) => void;
+  store.getToken = () => new Promise<string>((resolve) => { finish = resolve; });
+  let calls = 0;
+  const request = createApiRequest({ baseUrl: 'https://example.test', sessionStore: store,
+    fetchImpl: async () => { calls++; return new Response(null, { status: 204 }); } });
+  const controller = new AbortController();
+  const pending = request('/api/streets/1/manual-completion?dataset_id=1', {
+    method: 'PUT', body: JSON.stringify({ reason: 'Checked for account A' }), signal: controller.signal,
+  });
+  controller.abort();
+  store.current = 'account-b';
+  finish('account-b');
+  await assert.rejects(pending, (error: unknown) => error instanceof ApiError && error.kind === 'stale-session');
+  assert.equal(calls, 0);
+  assert.equal(store.current, 'account-b');
 });

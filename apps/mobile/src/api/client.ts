@@ -78,6 +78,7 @@ export function createApiRequest(options: {
       headers.set('Authorization', `Bearer ${usedToken}`);
     }
 
+    if (init.signal?.aborted) throw new ApiError('stale-session', 'Request was cancelled before it could be sent.');
     const controller = new AbortController();
     const abort = () => controller.abort();
     if (init.signal?.aborted) abort();
