@@ -9,7 +9,8 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "test:gent": "playwright test --config playwright.gent.config.ts"
   },
   "dependencies": {
     "maplibre-gl": "6.12.0",

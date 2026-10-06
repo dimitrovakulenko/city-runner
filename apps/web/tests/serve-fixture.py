@@ -78,7 +78,10 @@ try:
                     'digest': hashlib.sha256(('web-synthetic-' + account).encode()).hexdigest(), 'id': 'web-test-' + account,
                     'expires': datetime.now(timezone.utc) + timedelta(hours=4)})
         osm = Path(temporary) / 'synthetic.osm'; osm.write_bytes(geography())
-        if os.environ.get('WEB_PREVIEW_EMPTY') != '1':
+        if os.environ.get('WEB_PREVIEW_GENT_OSM'):
+            from gent_fixtures import prepare_gent
+            prepare_gent(engine, os.environ['WEB_PREVIEW_GENT_OSM'], fixtures)
+        elif os.environ.get('WEB_PREVIEW_EMPTY') != '1':
             import_osm_xml(engine, osm, region='Demo Region', city_relation_ids=[900], source_timestamp='2026-10-06T00:00:00Z',
                 coverage_mode='complete', coverage_evidence='Synthetic browser QA only')
         app = create_app(engine)
