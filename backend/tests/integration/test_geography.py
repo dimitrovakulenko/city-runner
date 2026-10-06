@@ -7,7 +7,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import IntegrityError
 
@@ -144,10 +144,9 @@ class GeographyPostgisTests(unittest.TestCase):
             self.assertIn("ix_osm_nodes_point_gist", indexes)
             db.execute(text("SET LOCAL enable_seqscan=off"))
             city_plan = " ".join(db.execute(text("""
-                EXPLAIN SELECT id FROM cities WHERE dataset_id=:dataset
-                  AND boundary && ST_SetSRID(ST_MakePoint(1,1),4326)
+                EXPLAIN SELECT id FROM cities WHERE boundary && ST_SetSRID(ST_MakePoint(1,1),4326)
                   AND ST_Covers(boundary,ST_SetSRID(ST_MakePoint(1,1),4326))
-            """), {"dataset": dataset_id}).scalars())
+            """)).scalars())
             node_plan = " ".join(db.execute(text("""
                 EXPLAIN SELECT osm_node_id FROM osm_nodes
                 WHERE dataset_id=:dataset AND ST_DWithin(point,
@@ -168,6 +167,25 @@ class GeographyPostgisTests(unittest.TestCase):
                 options["lat"] = 1
             with self.subTest(options=options), self.assertRaises(ValueError):
                 find_nearby_nodes(self.engine, dataset_id, **options)
+
+    def test_import_refreshes_geography_planner_statistics(self):
+        analyzed = []
+
+        def record_analyze(connection, cursor, statement, parameters, context, executemany):
+            normalized = statement.strip().upper()
+            if normalized.startswith("ANALYZE "):
+                analyzed.append(normalized.removeprefix("ANALYZE ").strip())
+
+        event.listen(self.engine, "before_cursor_execute", record_analyze)
+        try:
+            import_osm_xml(self.engine, self.path, region=self.region, city_relation_ids=[900],
+                           source_timestamp="2026-10-01T00:00:00Z", coverage_mode="complete",
+                           coverage_evidence="Synthetic complete fixture")
+        finally:
+            event.remove(self.engine, "before_cursor_execute", record_analyze)
+        self.assertEqual(set(analyzed), {
+            "MAP_DATASETS", "CITIES", "STREETS", "STREET_WAYS", "OSM_WAYS", "STREET_NODES", "OSM_NODES",
+        })
 
     def test_repeat_selection_is_idempotent_and_replacement_stays_staged(self):
         first = import_osm_xml(self.engine, self.path, region=self.region,

@@ -290,6 +290,16 @@ class MapApiPostgisTests(unittest.TestCase):
         self.assertEqual(capped.json()["limits"]["tracks"]["returned"], 0)
         self.assertTrue(capped.json()["limits"]["tracks"]["truncated"])
 
+        permitted_points = [[0.1 + i * 1e-7, 0.5 + (i % 2) * 0.0001] for i in range(20000)]
+        with self.engine.begin() as db:
+            db.execute(text("UPDATE activities SET tracks=CAST(:tracks AS json), timestamps=CAST(:times AS json) WHERE id=:id"), {
+                "id": huge_id, "tracks": json.dumps([permitted_points]),
+                "times": json.dumps([[None for _ in permitted_points]]),
+            })
+        permitted = self.client.get("/api/map", params={"bbox": "0,0,2,2", "zoom": 24},
+                                    headers=self.headers(self.account))
+        self.assertEqual(permitted.status_code, 200, permitted.text)
+
         with self.engine.begin() as db:
             db.execute(text("UPDATE activities SET tracks=CAST(:tracks AS json) WHERE id=:id"), {
                 "id": huge_id, "tracks": json.dumps([[[0.2,0.5]]]),
@@ -301,6 +311,9 @@ class MapApiPostgisTests(unittest.TestCase):
             })
             self.assertIsNone(db.execute(text("SELECT track_geometry FROM activities WHERE id=:id"),
                                           {"id": huge_id}).scalar_one())
+        healthy = self.client.get("/api/map", params={"bbox": "5,5,6,6", "zoom": 16},
+                                  headers=self.headers(self.account))
+        self.assertEqual(healthy.status_code, 200, healthy.text)
 
 
 class MapBboxTests(unittest.TestCase):

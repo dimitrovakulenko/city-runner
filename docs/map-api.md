@@ -16,6 +16,8 @@ The response contains owner tracks clipped to the viewport, active complete OSM 
 
 Each feature layer reports returned count, hard limit, and `truncated`. Fixed caps are 20 datasets, 100 cities, 50 activities, 200 street ways, 1,000 missing nodes, 20,000 combined display vertices, and 1 MB of geometry bytes (not a full-response byte cap). At most 51 track candidates and 201 street-way candidates enter exact intersection/clipping; features with over 20,000 source vertices are omitted and mark the layer truncated. A 1.5-second PostgreSQL statement timeout applies per statement, not per request; no p95 latency claim is implied. Track geometry is indexed on `activities.track_geometry` (GiST), backfilled from existing segmented `tracks` and maintained by a database trigger on future inserts/updates. The cache is display-only; source samples and timestamps remain unchanged.
 
+After loading a snapshot, the importer runs `ANALYZE` on `map_datasets`, `cities`, `streets`, `street_ways`, `osm_ways`, `street_nodes`, and `osm_nodes` so viewport queries use current planner statistics. A local synthetic-account check on the public Gent snapshot (3,108 eligible streets, 51,134 nodes) measured 27–30 ms for the overview and 16–31 ms for close zoom across three repeats; these are sample timings, not a latency guarantee.
+
 Example response shape:
 
 ```json

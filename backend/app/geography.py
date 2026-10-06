@@ -343,6 +343,9 @@ def import_osm_xml(
                 if street_count == 0:
                     raise ValueError(f"City relation {relation_id} has no eligible named roads in the extract.")
 
+        for table in ("map_datasets", "cities", "streets", "street_ways", "osm_ways", "street_nodes", "osm_nodes"):
+            db.execute(text(f"ANALYZE {table}"))
+
         db.execute(text("UPDATE map_datasets SET validated_at=now() WHERE id=:id"), {"id": dataset_id})
         has_active = db.execute(text("""
             SELECT 1 FROM map_datasets WHERE region=:region AND status='active'

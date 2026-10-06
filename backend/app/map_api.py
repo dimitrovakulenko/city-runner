@@ -460,7 +460,7 @@ _TRACK_QUERY = """
       SELECT candidates.id,candidates.name,candidates.date,candidates.source_points,
         CASE WHEN candidates.source_points<=:max_source_points THEN
           CASE WHEN ST_Intersects(candidates.track_geometry,box.geom) THEN
-            ST_SimplifyPreserveTopology(ST_Intersection(candidates.track_geometry,box.geom),:tolerance)
+            ST_Simplify(ST_Intersection(candidates.track_geometry,box.geom),:tolerance)
           END
         END AS geom
       FROM candidates CROSS JOIN box
@@ -474,27 +474,36 @@ _TRACK_QUERY = """
 
 _STREET_QUERY = """
     WITH box AS (SELECT ST_MakeEnvelope(:west,:south,:east,:north,4326) AS geom),
+    city_parts AS MATERIALIZED (
+      SELECT c.dataset_id,c.id AS city_id,ST_Intersection(c.boundary,box.geom) AS viewport_city_geom
+      FROM cities c JOIN map_datasets d ON d.id=c.dataset_id CROSS JOIN box
+      WHERE c.dataset_id=ANY(:dataset_ids) AND d.status='active' AND d.coverage_mode='complete'
+        AND c.boundary && box.geom AND ST_Intersects(c.boundary,box.geom)
+    ),
     candidates AS MATERIALIZED (
       SELECT s.id AS street_id,s.dataset_id,s.city_id,substring(s.display_name,1,200) AS name,
         s.eligible_node_count AS eligible_nodes,
-        w.geometry AS source_geom,c.boundary AS city_geom,ST_NPoints(w.geometry) AS source_points,
+        w.geometry AS source_geom,cp.viewport_city_geom,ST_NPoints(w.geometry) AS source_points,
         sw.osm_way_id
       FROM streets s JOIN street_ways sw ON sw.dataset_id=s.dataset_id AND sw.street_id=s.id
       JOIN osm_ways w ON w.dataset_id=sw.dataset_id AND w.osm_way_id=sw.osm_way_id
-      JOIN cities c ON c.dataset_id=s.dataset_id AND c.id=s.city_id
+      JOIN city_parts cp ON cp.dataset_id=s.dataset_id AND cp.city_id=s.city_id
       CROSS JOIN box
       WHERE s.dataset_id=ANY(:dataset_ids) AND s.eligible_node_count>0
-        AND c.boundary && box.geom AND w.geometry && box.geom
+        AND w.geometry && box.geom
       ORDER BY s.dataset_id,s.city_id,s.id,sw.osm_way_id LIMIT :limit
-    ), clipped AS (
+    ), viewport_streets AS MATERIALIZED (
       SELECT candidates.*,
         CASE WHEN source_points<=:max_source_points THEN
-          CASE WHEN ST_Intersects(source_geom,box.geom) AND ST_Intersects(source_geom,city_geom) THEN
-            ST_SimplifyPreserveTopology(
-              ST_Intersection(ST_Intersection(source_geom,city_geom),box.geom),:tolerance)
-          END
-        END AS geom
+          CASE WHEN ST_Intersects(source_geom,box.geom) THEN ST_Intersection(source_geom,box.geom) END
+        END AS viewport_geom
       FROM candidates CROSS JOIN box
+    ), clipped AS MATERIALIZED (
+      SELECT viewport_streets.*,
+        CASE WHEN viewport_geom IS NOT NULL AND ST_Intersects(viewport_geom,viewport_city_geom) THEN
+          ST_Simplify(ST_Intersection(viewport_geom,viewport_city_geom),:tolerance)
+        END AS geom
+      FROM viewport_streets
     )
     SELECT street_id,dataset_id,city_id,name,eligible_nodes,osm_way_id AS way_id,
       COALESCE(ST_NPoints(geom),source_points) AS point_count,
