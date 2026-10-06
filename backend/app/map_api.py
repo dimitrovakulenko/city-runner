@@ -72,6 +72,9 @@ class StreetFeature(BaseModel):
     visited_nodes: int | None
     eligible_nodes: int | None
     completed: bool | None
+    manual_completed: bool
+    manual_reason: str | None
+    effective_completed: bool | None
 
 
 class MissingNode(BaseModel):
@@ -116,6 +119,8 @@ class ProgressDataset(BaseModel):
     failed_sources: int | None
     eligible_streets: int | None
     completed_streets: int | None
+    manual_completed_streets: int
+    effective_completed_streets: int | None
     eligible_nodes: int | None
 
 
@@ -224,7 +229,8 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
                 node_state = "not-requested"
                 if dataset_ids:
                     raw_streets = db.execute(text(_STREET_QUERY), {
-                        **params, "dataset_ids": dataset_ids, "limit": MAX_STREETS + 1,
+                        **params, "dataset_ids": dataset_ids, "account_id": account_id,
+                        "limit": MAX_STREETS + 1,
                         "tolerance": tolerance, "max_points": MAX_FEATURE_POINTS,
                         "max_source_points": MAX_STREET_SOURCE_POINTS,
                     }).mappings().all()
@@ -307,16 +313,19 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
                     coverage = _get_account_coverage(db, account_id, dataset_id)
                     status = _dataset_status(coverage, dataset_id, row["region"])
                     ready = status.state in {"ready", "not-matched"}
-                    counts = _progress_counts(db, account_id, dataset_id, rule) if ready else None
+                    counts = (_progress_counts(db, account_id, dataset_id, rule) if ready else
+                              {"manual_completed_streets": _manual_completed_count(db, account_id, dataset_id)})
                     result.append(ProgressDataset(
                         dataset_id=str(dataset_id), region=row["region"], state=status.state,
                         progress_revision=status.progress_revision,
                         visited_node_count=status.visited_node_count,
                         unsupported_sample_count=status.unsupported_sample_count,
                         pending_sources=status.pending_sources, failed_sources=status.failed_sources,
-                        eligible_streets=counts["eligible_streets"] if counts else None,
-                        completed_streets=counts["completed_streets"] if counts else None,
-                        eligible_nodes=counts["eligible_nodes"] if counts else None,
+                        eligible_streets=counts["eligible_streets"] if ready else None,
+                        completed_streets=counts["completed_streets"] if ready else None,
+                        manual_completed_streets=counts["manual_completed_streets"],
+                        effective_completed_streets=counts["effective_completed_streets"] if ready else None,
+                        eligible_nodes=counts["eligible_nodes"] if ready else None,
                     ))
                 unmapped = db.execute(text("""
                     SELECT COALESCE(sum(unmapped_points),0) FROM activities WHERE user_id=:account
@@ -388,11 +397,14 @@ def _street_feature(row, geometry, state, rule):
     visited = row["visited_nodes"] if ready else None
     eligible = row["eligible_nodes"] if ready else None
     threshold = (eligible if rule == "strict" or eligible < 10 else math.ceil(eligible * 0.9)) if ready else None
+    gps_completed = bool(visited >= threshold) if ready else None
+    manual_completed = bool(row["manual_completed"])
     return StreetFeature(
         street_id=str(row["street_id"]), dataset_id=str(row["dataset_id"]), city_id=str(row["city_id"]),
         way_id=str(row["way_id"]),
         name=row["name"], geometry=geometry, visited_nodes=visited, eligible_nodes=eligible,
-        completed=bool(visited >= threshold) if ready else None,
+        completed=gps_completed, manual_completed=manual_completed, manual_reason=row["manual_reason"],
+        effective_completed=True if manual_completed else gps_completed,
     )
 
 
@@ -483,11 +495,14 @@ _STREET_QUERY = """
     candidates AS MATERIALIZED (
       SELECT s.id AS street_id,s.dataset_id,s.city_id,substring(s.display_name,1,200) AS name,
         s.eligible_node_count AS eligible_nodes,
+        manual.reason AS manual_reason,(manual.reason IS NOT NULL) AS manual_completed,
         w.geometry AS source_geom,cp.viewport_city_geom,ST_NPoints(w.geometry) AS source_points,
         sw.osm_way_id
       FROM streets s JOIN street_ways sw ON sw.dataset_id=s.dataset_id AND sw.street_id=s.id
       JOIN osm_ways w ON w.dataset_id=sw.dataset_id AND w.osm_way_id=sw.osm_way_id
       JOIN city_parts cp ON cp.dataset_id=s.dataset_id AND cp.city_id=s.city_id
+      LEFT JOIN manual_street_completions manual ON manual.account_id=:account_id
+        AND manual.dataset_id=s.dataset_id AND manual.street_id=s.id
       CROSS JOIN box
       WHERE s.dataset_id=ANY(:dataset_ids) AND s.eligible_node_count>0
         AND w.geometry && box.geom
@@ -506,6 +521,7 @@ _STREET_QUERY = """
       FROM viewport_streets
     )
     SELECT street_id,dataset_id,city_id,name,eligible_nodes,osm_way_id AS way_id,
+      manual_completed,manual_reason,
       COALESCE(ST_NPoints(geom),source_points) AS point_count,
       CASE WHEN source_points<=:max_source_points AND NOT ST_IsEmpty(geom) AND ST_NPoints(geom)<=:max_points
         THEN ST_AsGeoJSON(geom,6) END AS geometry_json
@@ -555,11 +571,25 @@ def _progress_counts(db, account_id: str, dataset_id: int, rule: str):
         )
         SELECT count(*)::integer AS eligible_streets,
           count(*) FILTER (WHERE COALESCE(v.visited_nodes,0) >= {threshold})::integer AS completed_streets,
+          count(*) FILTER (WHERE manual.street_id IS NOT NULL)::integer AS manual_completed_streets,
+          count(*) FILTER (WHERE COALESCE(v.visited_nodes,0) >= {threshold}
+            OR manual.street_id IS NOT NULL)::integer AS effective_completed_streets,
           (SELECT count(DISTINCT sn.osm_node_id)::bigint FROM street_nodes sn
             WHERE sn.dataset_id=:dataset) AS eligible_nodes
         FROM streets s LEFT JOIN visited v ON v.dataset_id=s.dataset_id AND v.street_id=s.id
+        LEFT JOIN manual_street_completions manual ON manual.account_id=:account
+          AND manual.dataset_id=s.dataset_id AND manual.street_id=s.id
         WHERE s.dataset_id=:dataset AND s.eligible_node_count>0
     """), {"account": account_id, "dataset": dataset_id}).mappings().one()
+
+
+def _manual_completed_count(db, account_id: str, dataset_id: int) -> int:
+    return int(db.execute(text("""SELECT count(*) FROM manual_street_completions manual
+        JOIN streets street ON street.dataset_id=manual.dataset_id AND street.id=manual.street_id
+        WHERE manual.account_id=:account AND manual.dataset_id=:dataset
+          AND street.eligible_node_count>0"""), {
+        "account": account_id, "dataset": dataset_id,
+    }).scalar_one())
 
 
 _STREET_VISIT_QUERY = """

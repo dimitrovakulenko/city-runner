@@ -45,6 +45,8 @@ class CityItem(BaseModel):
     visited_nodes: int | None
     eligible_nodes: int | None
     completed_streets: int | None
+    manual_completed_streets: int
+    effective_completed_streets: int | None
     eligible_streets: int | None
 
 
@@ -68,6 +70,9 @@ class StreetItem(BaseModel):
     eligible_nodes: int | None
     threshold: int | None
     state: Literal["complete", "partial", "missing"] | None
+    manual_completed: bool
+    manual_reason: str | None
+    effective_state: Literal["complete", "partial", "missing"] | None
 
 
 class StreetPage(BaseModel):
@@ -102,6 +107,9 @@ class StreetDetail(BaseModel):
     eligible_nodes: int | None
     threshold: int | None
     state: Literal["complete", "partial", "missing"] | None
+    manual_completed: bool
+    manual_reason: str | None
+    effective_state: Literal["complete", "partial", "missing"] | None
     remaining_nodes: list[RemainingNode] | None
     remaining_nodes_page: PageInfo
 
@@ -147,18 +155,23 @@ def create_explorer_router(engine: Engine, current_user: Callable[..., str]) -> 
             }).mappings().all()
             total = int(rows[0]["total"]) if rows else _city_count(db, dataset_id, q)
             city_ids = [int(row["id"]) for row in rows]
-            progress = _city_progress(db, account_id, dataset_id, city_ids, rule) if (
-                coverage.status == "ready" and city_ids
-            ) else {}
+            progress = {}
+            if city_ids and coverage.status == "ready":
+                progress = _city_progress(db, account_id, dataset_id, city_ids, rule)
+            elif city_ids:
+                progress = _city_manual_counts(db, account_id, dataset_id, city_ids)
             items = []
             for row in rows:
                 stats = progress.get(int(row["id"]))
                 items.append(CityItem(
                     id=str(row["id"]), name=row["name"], admin_level=row["admin_level"],
-                    visited_nodes=stats["visited_nodes"] if stats else None,
-                    eligible_nodes=stats["eligible_nodes"] if stats else None,
-                    completed_streets=stats["completed_streets"] if stats else None,
-                    eligible_streets=stats["eligible_streets"] if stats else None,
+                    visited_nodes=stats["visited_nodes"] if stats and coverage.status == "ready" else None,
+                    eligible_nodes=stats["eligible_nodes"] if stats and coverage.status == "ready" else None,
+                    completed_streets=stats["completed_streets"] if stats and coverage.status == "ready" else None,
+                    manual_completed_streets=stats["manual_completed_streets"] if stats else 0,
+                    effective_completed_streets=stats["effective_completed_streets"]
+                    if stats and coverage.status == "ready" else None,
+                    eligible_streets=stats["eligible_streets"] if stats and coverage.status == "ready" else None,
                 ))
         return CityPage(dataset_id=str(dataset_id), dataset_state=dataset["state"], rule=rule,
                         coverage=coverage, items=items, page=page, page_size=page_size, total=total)
@@ -193,6 +206,8 @@ def create_explorer_router(engine: Engine, current_user: Callable[..., str]) -> 
                 id=str(row["id"]), dataset_id=str(dataset_id), city_id=str(city_id),
                 name=row["name"], visited_nodes=row["visited_nodes"],
                 eligible_nodes=row["eligible_nodes"], threshold=row["threshold"], state=row["state"],
+                manual_completed=bool(row["manual_completed"]), manual_reason=row["manual_reason"],
+                effective_state=row["effective_state"],
             ) for row in rows]
         return StreetPage(dataset_id=str(dataset_id), city_id=str(city_id),
                           dataset_state=dataset["state"], rule=rule, coverage=coverage,
@@ -227,10 +242,14 @@ def create_explorer_router(engine: Engine, current_user: Callable[..., str]) -> 
             else:
                 visited = eligible = threshold = state = None
                 remaining, total = None, None
+            manual = _manual_completion(db, account_id, dataset_id, street_id)
+            effective_state = "complete" if manual else state
         return StreetDetail(
             id=str(street_id), dataset_id=str(dataset_id), city_id=str(street["city_id"]),
             name=street["name"], dataset_state=dataset["state"], rule=rule, coverage=coverage,
             visited_nodes=visited, eligible_nodes=eligible, threshold=threshold, state=state,
+            manual_completed=manual is not None, manual_reason=manual["reason"] if manual else None,
+            effective_state=effective_state,
             remaining_nodes=remaining,
             remaining_nodes_page=PageInfo(page=page, page_size=page_size, total=total),
         )
@@ -403,8 +422,13 @@ def _city_progress(db, account_id: str, dataset_id: int, city_ids: list[int], ru
           GROUP BY s.id,s.city_id,s.eligible_node_count
         ), street_totals AS (
           SELECT sp.city_id,count(*) AS eligible_streets,
-            count(*) FILTER (WHERE visited_nodes >= {threshold}) AS completed_streets
-          FROM street_progress sp GROUP BY sp.city_id
+            count(*) FILTER (WHERE visited_nodes >= {threshold}) AS completed_streets,
+            count(*) FILTER (WHERE manual.street_id IS NOT NULL) AS manual_completed_streets,
+            count(*) FILTER (WHERE visited_nodes >= {threshold} OR manual.street_id IS NOT NULL)
+              AS effective_completed_streets
+          FROM street_progress sp LEFT JOIN manual_street_completions manual
+            ON manual.account_id=:account_id AND manual.dataset_id=:dataset AND manual.street_id=sp.id
+          GROUP BY sp.city_id
         ), city_nodes AS (
           SELECT s.city_id,count(DISTINCT sn.osm_node_id) AS eligible_nodes,
             count(DISTINCT sn.osm_node_id) FILTER (WHERE mn.node_id IS NOT NULL) AS visited_nodes
@@ -416,6 +440,8 @@ def _city_progress(db, account_id: str, dataset_id: int, city_ids: list[int], ru
         SELECT city.id AS city_id,COALESCE(n.visited_nodes,0) AS visited_nodes,
           COALESCE(n.eligible_nodes,0) AS eligible_nodes,
           COALESCE(t.completed_streets,0) AS completed_streets,
+          COALESCE(t.manual_completed_streets,0) AS manual_completed_streets,
+          COALESCE(t.effective_completed_streets,0) AS effective_completed_streets,
           COALESCE(t.eligible_streets,0) AS eligible_streets
         FROM cities city LEFT JOIN city_nodes n ON n.city_id=city.id
         LEFT JOIN street_totals t ON t.city_id=city.id
@@ -424,8 +450,23 @@ def _city_progress(db, account_id: str, dataset_id: int, city_ids: list[int], ru
         "city_ids": city_ids,
     }).mappings().all()
     return {int(row["city_id"]): {key: int(row[key]) for key in (
-        "visited_nodes", "eligible_nodes", "completed_streets", "eligible_streets",
+        "visited_nodes", "eligible_nodes", "completed_streets", "manual_completed_streets",
+        "effective_completed_streets", "eligible_streets",
     )} for row in rows}
+
+
+def _city_manual_counts(db, account_id: str, dataset_id: int, city_ids: list[int]):
+    rows = db.execute(text("""SELECT city.id AS city_id,count(manual.street_id)::integer AS manual_completed_streets
+        FROM cities city LEFT JOIN streets street ON street.dataset_id=city.dataset_id
+          AND street.city_id=city.id AND street.eligible_node_count>0
+        LEFT JOIN manual_street_completions manual ON manual.account_id=:account
+          AND manual.dataset_id=street.dataset_id AND manual.street_id=street.id
+        WHERE city.dataset_id=:dataset AND city.id=ANY(:city_ids)
+        GROUP BY city.id"""), {
+        "account": account_id, "dataset": dataset_id, "city_ids": city_ids,
+    }).mappings().all()
+    return {int(row["city_id"]): {"manual_completed_streets": int(row["manual_completed_streets"])}
+            for row in rows}
 
 
 def _threshold_sql(total: str, rule: Rule) -> str:
@@ -515,42 +556,62 @@ _MATCHED_NODES_SQL = """
 _STREET_SELECT_READY = f"""
     WITH matched_nodes AS MATERIALIZED ({_MATCHED_NODES_SQL}), counts AS (
       SELECT s.id,s.display_name AS name,s.eligible_node_count,
+        manual.reason AS manual_reason,
         count(DISTINCT sn.osm_node_id) FILTER (WHERE mn.node_id IS NOT NULL)::integer AS visited_nodes
       FROM streets s LEFT JOIN street_nodes sn ON sn.dataset_id=s.dataset_id AND sn.street_id=s.id
       LEFT JOIN matched_nodes mn ON mn.node_id=sn.osm_node_id
+      LEFT JOIN manual_street_completions manual ON manual.account_id=:account_id
+        AND manual.dataset_id=s.dataset_id AND manual.street_id=s.id
       WHERE s.dataset_id=:dataset_id AND s.city_id=:city_id AND s.eligible_node_count>0
         AND (:q='' OR strpos(lower(s.display_name),lower(:q))>0)
-      GROUP BY s.id,s.display_name,s.eligible_node_count
+      GROUP BY s.id,s.display_name,s.eligible_node_count,manual.reason
     ), classified AS (
-      SELECT id,name,eligible_node_count AS eligible_nodes,visited_nodes,
+      SELECT id,name,eligible_node_count AS eligible_nodes,visited_nodes,manual_reason,
         CASE WHEN :rule='strict' OR eligible_node_count<10 THEN eligible_node_count
              ELSE ceil(eligible_node_count*0.9)::integer END AS threshold,
         CASE WHEN visited_nodes >= CASE WHEN :rule='strict' OR eligible_node_count<10
                     THEN eligible_node_count ELSE ceil(eligible_node_count*0.9)::integer END
              THEN 'complete' WHEN visited_nodes=0 THEN 'missing' ELSE 'partial' END AS state
+        ,CASE WHEN manual_reason IS NOT NULL THEN 'complete'
+             WHEN visited_nodes >= CASE WHEN :rule='strict' OR eligible_node_count<10
+                    THEN eligible_node_count ELSE ceil(eligible_node_count*0.9)::integer END
+             THEN 'complete' WHEN visited_nodes=0 THEN 'missing' ELSE 'partial' END AS effective_state
       FROM counts
     ), filtered AS (
       SELECT *,count(*) OVER() AS total FROM classified
-      WHERE :filter='all' OR (:filter='completed' AND state='complete')
-        OR (:filter='partial' AND state='partial')
-        OR (:filter='incomplete' AND state IN ('partial','missing'))
+      WHERE :filter='all' OR (:filter='completed' AND effective_state='complete')
+        OR (:filter='partial' AND manual_reason IS NULL AND state='partial')
+        OR (:filter='incomplete' AND manual_reason IS NULL AND state IN ('partial','missing'))
     )
 """
 
 _STREET_LIST_QUERY_READY = _STREET_SELECT_READY + """
-    SELECT id,name,visited_nodes,eligible_nodes,threshold,state,total FROM filtered
+    SELECT id,name,visited_nodes,eligible_nodes,threshold,state,manual_reason,
+      (manual_reason IS NOT NULL) AS manual_completed,effective_state,total FROM filtered
     ORDER BY lower(name),id LIMIT :limit OFFSET :offset
 """
 
 _STREET_COUNT_READY = _STREET_SELECT_READY + "SELECT count(*) FROM filtered"
 
 _STREET_LIST_QUERY_PENDING = """
-    SELECT id,display_name AS name,NULL::integer AS visited_nodes,NULL::integer AS eligible_nodes,
-      NULL::integer AS threshold,NULL::text AS state,count(*) OVER() AS total
-    FROM streets WHERE dataset_id=:dataset_id AND city_id=:city_id AND eligible_node_count>0
+    SELECT s.id,s.display_name AS name,NULL::integer AS visited_nodes,NULL::integer AS eligible_nodes,
+      NULL::integer AS threshold,NULL::text AS state,manual.reason AS manual_reason,
+      (manual.reason IS NOT NULL) AS manual_completed,
+      CASE WHEN manual.reason IS NOT NULL THEN 'complete' END::text AS effective_state,
+      count(*) OVER() AS total
+    FROM streets s LEFT JOIN manual_street_completions manual ON manual.account_id=:account_id
+      AND manual.dataset_id=s.dataset_id AND manual.street_id=s.id
+    WHERE s.dataset_id=:dataset_id AND s.city_id=:city_id AND s.eligible_node_count>0
       AND (:q='' OR strpos(lower(display_name),lower(:q))>0)
-    ORDER BY lower(display_name),id LIMIT :limit OFFSET :offset
+    ORDER BY lower(s.display_name),s.id LIMIT :limit OFFSET :offset
 """
+
+
+def _manual_completion(db, account_id: str, dataset_id: int, street_id: int):
+    return db.execute(text("""SELECT reason FROM manual_street_completions
+        WHERE account_id=:account AND dataset_id=:dataset AND street_id=:street"""), {
+        "account": account_id, "dataset": dataset_id, "street": street_id,
+    }).mappings().first()
 
 _STREET_COUNT_PENDING = """
     SELECT count(*) FROM streets WHERE dataset_id=:dataset_id AND city_id=:city_id

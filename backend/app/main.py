@@ -11,6 +11,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from backend.app import auth
+from backend.app.corrections import create_corrections_router
 from backend.app.schemas import ActivityDetail, ActivityPage
 from backend.app.explorer import create_explorer_router
 from backend.app.map_api import create_map_router
@@ -115,6 +116,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
     app.include_router(create_upload_router(engine, current_user))
     app.include_router(create_map_router(engine, current_user))
     app.include_router(create_explorer_router(engine, current_user))
+    app.include_router(create_corrections_router(engine, current_user))
 
     @app.get("/api/activities", response_model=ActivityPage)
     def activities(
