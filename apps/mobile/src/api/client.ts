@@ -56,6 +56,7 @@ export function createApiRequest(options: {
   baseUrl: string;
   sessionStore?: SessionStore;
   fetchImpl?: FetchLike;
+  timeoutMs?: number;
 }) {
   const baseUrl = options.baseUrl.replace(/\/+$/, '');
   const sessionStore = options.sessionStore ?? noSessionStore;
@@ -77,43 +78,53 @@ export function createApiRequest(options: {
       headers.set('Authorization', `Bearer ${usedToken}`);
     }
 
-    let response: Response;
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (init.signal?.aborted) abort();
+    else init.signal?.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(abort, options.timeoutMs ?? 30_000);
     try {
-      response = await fetchImpl(`${baseUrl}${path}`, { ...init, headers });
-    } catch {
-      throw new ApiError('offline', 'Could not reach the server. Check your connection and retry.');
-    }
-    if (response.status === 401 && authenticated) {
-      const cleared = usedToken ? await sessionStore.clearIfCurrent(usedToken) : false;
-      if (!cleared) throw new ApiError('stale-session', 'Your session changed while this request was running.');
-      throw new ApiError('sign-in-required', 'Your session expired. Sign in again.', 401);
-    }
-    if (!response.ok) {
-      let message = `Request failed (${response.status}).`;
+      let response: Response;
       try {
-        const body = await response.json() as { detail?: unknown };
-        if (typeof body.detail === 'string') message = body.detail;
+        response = await fetchImpl(`${baseUrl}${path}`, { ...init, headers, signal: controller.signal });
       } catch {
-        // Keep the status-based message when the server returns no JSON body.
+        throw new ApiError('offline', 'Could not reach the server. Check your connection and retry.');
       }
-      throw new ApiError('http', message, response.status);
-    }
-    if (response.status === 204) {
+      if (response.status === 401 && authenticated) {
+        const cleared = usedToken ? await sessionStore.clearIfCurrent(usedToken) : false;
+        if (!cleared) throw new ApiError('stale-session', 'Your session changed while this request was running.');
+        throw new ApiError('sign-in-required', 'Your session expired. Sign in again.', 401);
+      }
+      if (!response.ok) {
+        let message = `Request failed (${response.status}).`;
+        try {
+          const body = await response.json() as { detail?: unknown };
+          if (typeof body.detail === 'string') message = body.detail;
+        } catch {
+          // Keep the status-based message when the server returns no JSON body.
+        }
+        throw new ApiError('http', message, response.status);
+      }
+      if (response.status === 204) {
+        if (authenticated && await sessionStore.getToken() !== usedToken) {
+          throw new ApiError('stale-session', 'Your session changed while this request was running.');
+        }
+        return undefined as T;
+      }
+      let result: T;
+      try {
+        result = await response.json() as T;
+      } catch {
+        throw new ApiError('http', 'The server returned an invalid response.', response.status);
+      }
       if (authenticated && await sessionStore.getToken() !== usedToken) {
         throw new ApiError('stale-session', 'Your session changed while this request was running.');
       }
-      return undefined as T;
+      return result;
+    } finally {
+      clearTimeout(timer);
+      init.signal?.removeEventListener('abort', abort);
     }
-    let result: T;
-    try {
-      result = await response.json() as T;
-    } catch {
-      throw new ApiError('http', 'The server returned an invalid response.', response.status);
-    }
-    if (authenticated && await sessionStore.getToken() !== usedToken) {
-      throw new ApiError('stale-session', 'Your session changed while this request was running.');
-    }
-    return result;
   }
 
   return request;

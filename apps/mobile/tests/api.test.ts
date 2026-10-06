@@ -98,3 +98,14 @@ test('auth controller can defer persistence until its login attempt is still cur
   assert.equal(store.current, null);
   assert.equal(result.token, 'opaque-session');
 });
+
+test('unreachable server requests time out without clearing the session', async () => {
+  const store = sessions('current');
+  const api = createActivityApi({ baseUrl: 'https://example.test', sessionStore: store, timeoutMs: 5,
+    fetchImpl: async (_url, init) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    }),
+  });
+  await assert.rejects(api.getMe(), (error: unknown) => error instanceof ApiError && error.kind === 'offline');
+  assert.equal(store.current, 'current');
+});
