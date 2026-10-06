@@ -32,6 +32,8 @@ D18 backend verification: 20 unchanged PoC tests, 31 backend unit tests and 62 d
 
 D18 mobile review and integrated checks passed 87 tests, typecheck and generated-type drift checks. Regressions cover sequential per-file submission, stopping an in-flight/resumed upload, queued resumes, restart/reselection, deleted items, reciprocal stale list/detail responses, concurrent manifest creation, account/picker races and foreground polling ownership. The generated types were checked against the implemented backend before wiring UI. D18 iOS and Android JavaScript exports passed with synthetic public OAuth IDs; neither establishes native build or device acceptance.
 
+[Hosted D18 CI on `94cfe5d`](https://github.com/dimitrovakulenko/city-runner/actions/runs/37509349402) passed backend units, generated-type drift, disposable PostGIS migrations/integration tests and mobile install/typecheck/tests.
+
 Integrated D16/D17 iOS and Android JavaScript exports passed with synthetic public OAuth IDs. Exports do not verify native builds, SDK execution or device gestures.
 
 ## Target and current gap
