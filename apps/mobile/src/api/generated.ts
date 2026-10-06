@@ -156,6 +156,26 @@ export type ManualCompletionBody = {
   reason: string;
 };
 
+export type ImportBatchCreate = {
+  request_id: string;
+  files: Array<ImportBatchFile>;
+};
+
+export type ImportBatchResponse = {
+  id: string;
+  state: 'open' | 'stopped';
+  created_at: string;
+  items: Array<ImportBatchItemResponse>;
+  counts: ImportBatchCounts;
+};
+
+export type ImportBatchPage = {
+  items: Array<ImportBatchResponse>;
+  page: number;
+  page_size: number;
+  total: number;
+};
+
 export type CityItem = {
   id: string;
   name: string;
@@ -202,6 +222,31 @@ export type DatasetStatus = {
   unsupported_sample_count: number | null;
   pending_sources: number | null;
   failed_sources: number | null;
+};
+
+export type ImportBatchCounts = {
+  awaiting_upload: number;
+  queued: number;
+  processing: number;
+  succeeded: number;
+  failed: number;
+  deleted: number;
+};
+
+export type ImportBatchFile = {
+  name: string;
+  format: 'gpx' | 'fit';
+};
+
+export type ImportBatchItemResponse = {
+  id: string;
+  name: string;
+  format: 'gpx' | 'fit';
+  status: 'awaiting_upload' | 'queued' | 'processing' | 'succeeded' | 'failed' | 'deleted';
+  source_id: string | null;
+  activity_id: string | null;
+  duplicate: boolean;
+  error: string | null;
 };
 
 export type LayerLimit = {
