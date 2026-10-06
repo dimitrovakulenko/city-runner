@@ -67,9 +67,10 @@ export function createApiRequest(options: {
     init: RequestInit = {},
     authenticated = true,
     tokenOverride?: string,
+    responseMode: 'json' | 'text' = 'json',
   ): Promise<T> {
     const headers = new Headers(init.headers);
-    headers.set('Accept', 'application/json');
+    headers.set('Accept', responseMode === 'text' ? 'application/gpx+xml, text/plain' : 'application/json');
     if (typeof init.body === 'string') headers.set('Content-Type', 'application/json');
     let usedToken: string | null = null;
     if (authenticated) {
@@ -114,7 +115,7 @@ export function createApiRequest(options: {
       }
       let result: T;
       try {
-        result = await response.json() as T;
+        result = (responseMode === 'text' ? await response.text() : await response.json()) as T;
       } catch {
         throw new ApiError('http', 'The server returned an invalid response.', response.status);
       }
