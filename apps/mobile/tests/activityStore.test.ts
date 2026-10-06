@@ -96,3 +96,18 @@ test('account reset clears private state and fences outstanding detail', async (
   assert.equal(store.getState().selectedId, null);
   assert.equal(store.getState().detail, null);
 });
+
+test('successful deletion clears only the deleted detail and reloads activity history', async () => {
+  const reads: string[] = [];
+  const store = new ActivityStore(fakeApi({
+    listActivities: async (input) => { reads.push(input?.query ?? ''); return page('refreshed'); },
+    getActivity: async (id) => detail(id),
+  }));
+  await store.loadPage('runs');
+  await store.selectActivity('deleted-id');
+  store.activityDeleted('deleted-id');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(store.getState().selectedId, null);
+  assert.deepEqual(store.getState().items.map((item) => item.name), ['refreshed']);
+  assert.deepEqual(reads, ['runs', 'runs']);
+});

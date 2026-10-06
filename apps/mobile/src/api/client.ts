@@ -42,8 +42,8 @@ export const noSessionStore: SessionStore = {
 };
 
 export interface ActivityApi {
-  listActivities(input?: { page?: number; pageSize?: number; query?: string }): Promise<ActivityPage>;
-  getActivity(id: string): Promise<ActivityDetail>;
+  listActivities(input?: { page?: number; pageSize?: number; query?: string }, signal?: AbortSignal): Promise<ActivityPage>;
+  getActivity(id: string, signal?: AbortSignal): Promise<ActivityDetail>;
   getMe(): Promise<MeResponse>;
   createChallenge(body: ChallengeRequest): Promise<ChallengeResponse>;
   exchange(body: ExchangeRequest, options?: { persist?: boolean }): Promise<ExchangeResponse>;
@@ -135,13 +135,13 @@ export function createActivityApi(options: Parameters<typeof createApiRequest>[0
   const request = createApiRequest(options);
   const sessionStore = options.sessionStore ?? noSessionStore;
   return {
-    listActivities({ page = 1, pageSize = 20, query = '' } = {}) {
+    listActivities({ page = 1, pageSize = 20, query = '' } = {}, signal) {
       const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
       if (query.trim()) params.set('q', query.trim());
-      return request<ActivityPage>(`/api/activities?${params.toString()}`);
+      return request<ActivityPage>(`/api/activities?${params.toString()}`, { signal });
     },
-    getActivity(id) {
-      return request<ActivityDetail>(`/api/activities/${encodeURIComponent(id)}`);
+    getActivity(id, signal) {
+      return request<ActivityDetail>(`/api/activities/${encodeURIComponent(id)}`, { signal });
     },
     getMe() {
       return request<MeResponse>('/api/me');

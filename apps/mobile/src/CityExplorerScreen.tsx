@@ -3,23 +3,34 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import type { CityExplorerStore, CityExplorerState, CityLoadState } from './cityExplorerStore';
 import type { RemainingNode } from './api/generated';
 import type { StreetFilter } from './api/cities';
+import type { CorrectionState, CorrectionStore } from './correctionStore';
 
 const FILTERS: StreetFilter[] = ['all', 'incomplete', 'partial', 'completed'];
 
-export function CityExplorerScreen({ store, enabled, fixtureMode, accountGeneration, onShowNode, onOpenActivity }: {
+export function CityExplorerScreen({ store, correctionStore, enabled, fixtureMode, accountGeneration, onShowNode, onOpenActivity, onMarkComplete, onUndoManual }: {
   store: CityExplorerStore;
+  correctionStore: CorrectionStore;
   enabled: boolean;
   fixtureMode: boolean;
   accountGeneration: number;
   onShowNode: (node: RemainingNode, rule: 'normal' | 'strict', generation: number) => void;
   onOpenActivity: (id: string, generation: number) => void;
+  onMarkComplete: (streetId: string, datasetId: string, reason: string, generation: number) => void;
+  onUndoManual: (streetId: string, datasetId: string, generation: number) => void;
 }) {
   const [state, setState] = useState<CityExplorerState>(store.getState());
+  const [correction, setCorrection] = useState<CorrectionState>(correctionStore.getState());
+  const [manualReason, setManualReason] = useState('');
+  const [manualConfirmation, setManualConfirmation] = useState(false);
   useEffect(() => {
     const unsubscribe = store.subscribe(setState);
     if (enabled && !fixtureMode) void store.refreshProgress();
     return unsubscribe;
   }, [accountGeneration, enabled, fixtureMode, store]);
+  useEffect(() => correctionStore.subscribe(setCorrection), [correctionStore]);
+  useEffect(() => {
+    setManualReason(''); setManualConfirmation(false); correctionStore.clearFeedback();
+  }, [accountGeneration, state.selectedDatasetId, state.selectedCityId, state.selectedStreetId, state.rule, correctionStore]);
 
   const citySelected = state.selectedCityId !== null;
   const streetSelected = state.selectedStreetId !== null;
@@ -41,6 +52,9 @@ export function CityExplorerScreen({ store, enabled, fixtureMode, accountGenerat
       {state.progress?.datasets_truncated && <Text style={styles.notice}>The active dataset list is limited. Some datasets are not shown.</Text>}
       {state.datasets.map((dataset) => <Pressable key={dataset.dataset_id} onPress={() => store.selectDataset(dataset.dataset_id)} style={[styles.dataset, state.selectedDatasetId === dataset.dataset_id && styles.selected]}>
         <Text style={styles.rowTitle}>{dataset.region}</Text><Text style={styles.copy}>Dataset {dataset.dataset_id} · {dataset.state}</Text>
+        {dataset.completed_streets !== null && dataset.eligible_streets !== null && <Text style={styles.copy}>GPS complete: {dataset.completed_streets} / {dataset.eligible_streets}</Text>}
+        {dataset.effective_completed_streets !== null && <Text style={styles.copy}>Effective complete: {dataset.effective_completed_streets}</Text>}
+        <Text style={styles.copy}>Manual labels: {dataset.manual_completed_streets}</Text>
       </Pressable>)}
       {state.progressStatus === 'ready' && state.datasets.length === 0 && <Message text="No active city datasets are available yet." />}
       {!!state.selectedDatasetId && <>
@@ -75,7 +89,23 @@ export function CityExplorerScreen({ store, enabled, fixtureMode, accountGenerat
           {state.detail && <>
             {coverageMessage(state.detail.coverage.status)}
             <Text style={styles.copy}>GPS status: {state.detail.state ?? (state.detail.coverage.status === 'ready' ? 'not available' : `coverage ${state.detail.coverage.status}`)}</Text>
+            <Text style={styles.copy}>Effective status: {state.detail.effective_state ?? (state.detail.coverage.status === 'ready' ? 'not available' : 'pending')}</Text>
+            {state.detail.manual_completed && <Text style={styles.manualLabel}>MANUALLY COMPLETED</Text>}
+            {state.detail.manual_reason && <Text style={styles.copy}>Manual reason: {state.detail.manual_reason}</Text>}
+            <Text style={styles.copy}>Manual completion does not change recorded GPS visits or remaining nodes.</Text>
             <Text style={styles.copy}>{state.detail.visited_nodes === null || state.detail.eligible_nodes === null ? 'Node progress pending.' : `${state.detail.visited_nodes} / ${state.detail.eligible_nodes} nodes visited`}</Text>
+            {enabled && !fixtureMode && !state.detail.manual_completed && !manualConfirmation && <Pressable disabled={correction.pending !== null} onPress={() => { correctionStore.clearFeedback(); setManualConfirmation(true); setManualReason(''); }} style={styles.smallButton}><Text style={styles.buttonText}>Mark manually complete</Text></Pressable>}
+            {enabled && !fixtureMode && !state.detail.manual_completed && manualConfirmation && <View style={styles.manualBox}>
+              <Text style={styles.copy}>Add a short reason (1–500 characters).</Text>
+              <TextInput value={manualReason} onChangeText={setManualReason} maxLength={500} editable={correction.pending === null} placeholder="Reason" style={styles.search} accessibilityLabel="Manual completion reason" />
+              <View style={styles.manualActions}>
+                <Pressable disabled={correction.pending !== null} onPress={() => { setManualConfirmation(false); setManualReason(''); correctionStore.clearFeedback(); }}><Text style={styles.link}>Cancel</Text></Pressable>
+                <Pressable disabled={correction.pending !== null || !manualReason.trim() || manualReason.trim().length > 500} onPress={() => onMarkComplete(state.detail!.id, state.detail!.dataset_id, manualReason, accountGeneration)}><Text style={styles.buttonText}>{correction.pending === 'manual-complete' ? 'Saving…' : 'Confirm'}</Text></Pressable>
+              </View>
+            </View>}
+            {enabled && !fixtureMode && state.detail.manual_completed && <Pressable disabled={correction.pending !== null} onPress={() => onUndoManual(state.detail!.id, state.detail!.dataset_id, accountGeneration)} style={styles.smallButton}><Text style={styles.buttonText}>{correction.pending === 'manual-undo' ? 'Undoing…' : 'Undo manual completion'}</Text></Pressable>}
+            {correction.error && correction.pending === null && <Text accessibilityRole="alert" style={styles.error}>{correction.error}</Text>}
+            {correction.message && <Text accessibilityRole="alert" style={styles.manualLabel}>{correction.message}</Text>}
             {state.detail.coverage.status === 'ready' && state.remainingNodes !== null && state.remainingNodes.length === 0 && <Message text="No remaining nodes." />}
             {state.detail.coverage.status !== 'ready' && <Message text="Remaining nodes are withheld until coverage is ready." />}
             {state.remainingNodes?.map((node) => <View key={node.id} style={styles.node}>
@@ -109,13 +139,17 @@ function coverageMessage(status: 'ready' | 'pending' | 'failed' | undefined) {
   if (!status || status === 'ready') return null;
   return <Text style={styles.notice}>{status === 'pending' ? 'Coverage matching is still pending. Counts and missing nodes are not available yet.' : 'Coverage matching failed. Retry later; GPS counts are unavailable.'}</Text>;
 }
-function cityProgress(city: { visited_nodes: number | null; eligible_nodes: number | null; completed_streets: number | null; eligible_streets: number | null }, coverage?: 'ready' | 'pending' | 'failed'): string {
-  if (city.visited_nodes === null || city.eligible_nodes === null || city.completed_streets === null || city.eligible_streets === null) return coverage === 'failed' ? 'Progress unavailable · matching failed' : 'Progress pending';
-  return `${city.visited_nodes} / ${city.eligible_nodes} nodes · ${city.completed_streets} / ${city.eligible_streets} streets complete`;
+function cityProgress(city: { visited_nodes: number | null; eligible_nodes: number | null; completed_streets: number | null; eligible_streets: number | null; effective_completed_streets: number | null; manual_completed_streets: number }, coverage?: 'ready' | 'pending' | 'failed'): string {
+  const gps = city.visited_nodes === null || city.eligible_nodes === null || city.completed_streets === null || city.eligible_streets === null
+    ? coverage === 'failed' ? 'GPS unavailable' : 'GPS pending'
+    : `${city.visited_nodes} / ${city.eligible_nodes} nodes · GPS ${city.completed_streets} / ${city.eligible_streets}`;
+  return `${gps} · effective ${city.effective_completed_streets ?? 'pending'} / ${city.eligible_streets ?? 'pending'} · manual ${city.manual_completed_streets}`;
 }
-function streetProgress(street: { state: 'complete' | 'partial' | 'missing' | null; visited_nodes: number | null; eligible_nodes: number | null }, coverage?: 'ready' | 'pending' | 'failed'): string {
-  if (street.state === null || street.visited_nodes === null || street.eligible_nodes === null) return coverage === 'failed' ? 'Progress unavailable · matching failed' : 'Progress pending';
-  return `${street.state} · ${street.visited_nodes} / ${street.eligible_nodes} nodes visited`;
+function streetProgress(street: { state: 'complete' | 'partial' | 'missing' | null; visited_nodes: number | null; eligible_nodes: number | null; effective_state: 'complete' | 'partial' | 'missing' | null; manual_completed: boolean }, coverage?: 'ready' | 'pending' | 'failed'): string {
+  const gps = street.state === null || street.visited_nodes === null || street.eligible_nodes === null
+    ? coverage === 'failed' ? 'GPS unavailable' : 'GPS pending'
+    : `GPS ${street.state} · ${street.visited_nodes} / ${street.eligible_nodes} nodes`;
+  return `${gps} · effective ${street.effective_state ?? 'pending'} · manual ${street.manual_completed ? 'yes' : 'no'}`;
 }
 function Message({ text, loading }: { text: string; loading?: boolean }) {
   return <View style={styles.message}>{loading && <ActivityIndicator color="#ef704f" />}<Text style={styles.copy}>{text}</Text></View>;
@@ -144,4 +178,5 @@ const styles = StyleSheet.create({
   link: { color: '#31594c', fontWeight: '700', paddingVertical: 8 }, more: { alignItems: 'center', padding: 8 }, message: { alignItems: 'center', padding: 12, gap: 6 }, notice: { color: '#665529', backgroundColor: '#fbf5df', padding: 9, borderRadius: 8, fontSize: 10, marginVertical: 5 },
   errorBox: { backgroundColor: '#fbece9', padding: 10, borderRadius: 8, marginVertical: 8 }, error: { color: '#a33d32', fontSize: 10 }, node: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: '#eef1ed', paddingVertical: 8 },
   smallButton: { paddingHorizontal: 8, paddingVertical: 6, backgroundColor: '#eef2ee', borderRadius: 8 }, section: { marginTop: 14, borderTopWidth: 1, borderTopColor: '#e6ebe5' }, contribution: { flexDirection: 'row', alignItems: 'center', gap: 8, borderBottomWidth: 1, borderBottomColor: '#eef1ed', paddingVertical: 8 },
+  manualLabel: { color: '#68519a', fontSize: 10, fontWeight: '800', marginTop: 5 }, manualBox: { backgroundColor: '#f2eff8', padding: 10, borderRadius: 9, marginTop: 8 }, manualActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 16 },
 });

@@ -11,11 +11,11 @@ import type {
 export type StreetFilter = 'all' | 'incomplete' | 'partial' | 'completed';
 
 export interface CityExplorerApi {
-  getProgress(rule: 'normal' | 'strict'): Promise<ProgressResponse>;
-  getCities(datasetId: string, query: { rule: 'normal' | 'strict'; q: string; page: number; pageSize: number }): Promise<CityPage>;
-  getStreets(cityId: string, query: { datasetId: string; rule: 'normal' | 'strict'; filter: StreetFilter; q: string; page: number; pageSize: number }): Promise<StreetPage>;
-  getStreet(streetId: string, query: { datasetId: string; rule: 'normal' | 'strict'; page: number; pageSize: number }): Promise<StreetDetail>;
-  getContributions(streetId: string, query: { datasetId: string; page: number; pageSize: number }): Promise<ContributionPage>;
+  getProgress(rule: 'normal' | 'strict', signal?: AbortSignal): Promise<ProgressResponse>;
+  getCities(datasetId: string, query: { rule: 'normal' | 'strict'; q: string; page: number; pageSize: number }, signal?: AbortSignal): Promise<CityPage>;
+  getStreets(cityId: string, query: { datasetId: string; rule: 'normal' | 'strict'; filter: StreetFilter; q: string; page: number; pageSize: number }, signal?: AbortSignal): Promise<StreetPage>;
+  getStreet(streetId: string, query: { datasetId: string; rule: 'normal' | 'strict'; page: number; pageSize: number }, signal?: AbortSignal): Promise<StreetDetail>;
+  getContributions(streetId: string, query: { datasetId: string; page: number; pageSize: number }, signal?: AbortSignal): Promise<ContributionPage>;
 }
 
 export function createFixtureCityExplorerApi(): CityExplorerApi {
@@ -26,27 +26,27 @@ export function createFixtureCityExplorerApi(): CityExplorerApi {
 export function createCityExplorerApi(options: { baseUrl: string; sessionStore: SessionStore; fetchImpl?: typeof fetch }): CityExplorerApi {
   const request = createApiRequest({ baseUrl: options.baseUrl, sessionStore: options.sessionStore, fetchImpl: options.fetchImpl });
   return {
-    getProgress(rule) {
-      return request<ProgressResponse>(`/api/progress?${new URLSearchParams({ rule })}`);
+    getProgress(rule, signal) {
+      return request<ProgressResponse>(`/api/progress?${new URLSearchParams({ rule })}`, { signal });
     },
-    getCities(datasetId, input) {
+    getCities(datasetId, input, signal) {
       const query = new URLSearchParams({ dataset_id: datasetId, rule: input.rule, page: String(input.page), page_size: String(input.pageSize) });
       if (input.q.trim()) query.set('q', input.q.trim());
-      return request<CityPage>(`/api/cities?${query}`);
+      return request<CityPage>(`/api/cities?${query}`, { signal });
     },
-    getStreets(cityId, input) {
+    getStreets(cityId, input, signal) {
       const query = new URLSearchParams({ dataset_id: input.datasetId, rule: input.rule, filter: input.filter,
         page: String(input.page), page_size: String(input.pageSize) });
       if (input.q.trim()) query.set('q', input.q.trim());
-      return request<StreetPage>(`/api/cities/${encodeURIComponent(cityId)}/streets?${query}`);
+      return request<StreetPage>(`/api/cities/${encodeURIComponent(cityId)}/streets?${query}`, { signal });
     },
-    getStreet(streetId, input) {
+    getStreet(streetId, input, signal) {
       const query = new URLSearchParams({ dataset_id: input.datasetId, rule: input.rule, page: String(input.page), page_size: String(input.pageSize) });
-      return request<StreetDetail>(`/api/streets/${encodeURIComponent(streetId)}?${query}`);
+      return request<StreetDetail>(`/api/streets/${encodeURIComponent(streetId)}?${query}`, { signal });
     },
-    getContributions(streetId, input) {
+    getContributions(streetId, input, signal) {
       const query = new URLSearchParams({ dataset_id: input.datasetId, page: String(input.page), page_size: String(input.pageSize) });
-      return request<ContributionPage>(`/api/streets/${encodeURIComponent(streetId)}/contributions?${query}`);
+      return request<ContributionPage>(`/api/streets/${encodeURIComponent(streetId)}/contributions?${query}`, { signal });
     },
   };
 }

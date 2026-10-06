@@ -137,10 +137,11 @@ export function ExploreScreen({ store, fixtureMode, enabled, accountGeneration, 
       <Map key={styleRevision} ref={mapRef} style={StyleSheet.absoluteFill} mapStyle={styleUrl} onDidFinishLoadingMap={() => { setStyleError(false); void readInitialViewport(); }} onDidFailLoadingMap={() => setStyleError(true)} onRegionIsChanging={() => { if (!fixtureMode && enabledRef.current) store.invalidateViewport(); }} onRegionDidChange={changeRegion}>
         <Camera key="explore-camera" initialViewState={{ center: state.viewport ? [(state.viewport.bbox[0] + state.viewport.bbox[2]) / 2, (state.viewport.bbox[1] + state.viewport.bbox[3]) / 2] : [3.72, 51.055], zoom: state.viewport?.zoom ?? 12 }} />
         {!!collections.tracks.features.length && <GeoJSONSource id="activity-tracks" data={collections.tracks}><Layer id="activity-tracks-line" type="line" style={{ lineColor: '#374f67', lineWidth: 3 }} /><Layer id="activity-track-points" type="circle" style={{ circleColor: '#374f67', circleRadius: 3 }} /></GeoJSONSource>}
-        {!!collections.streets.features.length && <GeoJSONSource id="coverage-streets" data={collections.streets}><Layer id="coverage-streets-line" type="line" style={{ lineColor: ['case', ['==', ['get', 'completed'], true], '#4b9567', ['==', ['get', 'completed'], false], '#e8874c', '#88948e'], lineWidth: 3 }} /></GeoJSONSource>}
+        {!!collections.streets.features.length && <GeoJSONSource id="coverage-streets" data={collections.streets}><Layer id="coverage-streets-line" type="line" style={{ lineColor: ['case', ['==', ['get', 'manual_completed'], true], '#7956a8', ['==', ['get', 'completed'], true], '#4b9567', ['==', ['get', 'completed'], false], '#e8874c', '#88948e'], lineWidth: 3 }} /></GeoJSONSource>}
         {!!collections.nodes.features.length && <GeoJSONSource id="missing-nodes" data={collections.nodes}><Layer id="missing-nodes-points" type="circle" style={{ circleColor: '#d8584a', circleRadius: 4, circleStrokeColor: '#ffffff', circleStrokeWidth: 1 }} /></GeoJSONSource>}
       </Map>
       {styleError && <View style={styles.mapUnavailable}><Text style={styles.sectionTitle}>Map is unavailable</Text><Text style={styles.copy}>The street map could not be loaded.</Text><Pressable onPress={() => setStyleRevision((value) => value + 1)}><Text style={styles.link}>Retry map</Text></Pressable></View>}
+      {!fixtureMode && enabled && <View style={styles.mapLegend}><Text style={styles.legendText}>GPS complete · green</Text><Text style={styles.manualLegend}>Manual · purple</Text><Text style={styles.incompleteLegend}>Incomplete · orange</Text></View>}
       {styleUrl && state.mapStatus === 'loading' && <View style={styles.mapLoading}><ActivityIndicator color="#ef704f" /></View>}
     </View>
   </View>;
@@ -162,8 +163,10 @@ function ProgressSummary({ state, fixtureMode }: { state: ExploreState; fixtureM
     {progress.datasets.map((dataset) => <View key={dataset.dataset_id} style={styles.dataset}>
       <Text style={styles.datasetName}>{dataset.region} · {dataset.state}</Text>
       {dataset.eligible_streets === null || dataset.completed_streets === null
-        ? <Text style={styles.copy}>Street progress is still being calculated.</Text>
-        : <Text style={styles.copy}>{dataset.completed_streets} / {dataset.eligible_streets} streets complete</Text>}
+        ? <Text style={styles.copy}>GPS street progress is still being calculated.</Text>
+        : <Text style={styles.copy}>GPS complete: {dataset.completed_streets} / {dataset.eligible_streets}</Text>}
+      <Text style={styles.copy}>Effective complete: {dataset.effective_completed_streets ?? 'pending'} / {dataset.eligible_streets ?? 'pending'}</Text>
+      <Text style={styles.copy}>Manual labels: {dataset.manual_completed_streets}</Text>
       {dataset.visited_node_count === null && <Text style={styles.copy}>Visited-node count pending.</Text>}
       {dataset.failed_sources ? <Text style={styles.error}>{dataset.failed_sources} source job(s) failed.</Text> : null}
     </View>)}
@@ -179,7 +182,8 @@ function toCollections(map: MapResponse | null): { tracks: FeatureCollection; st
   if (!map) return { tracks: collection([]), streets: collection([]), nodes: collection([]) };
   return {
     tracks: collection(map.tracks.map((track) => ({ type: 'Feature', properties: { id: track.activity_id }, geometry: track.geometry as unknown as Geometry }))),
-    streets: collection(map.streets.map((street) => ({ type: 'Feature', properties: { completed: street.completed, visited: street.visited_nodes, eligible: street.eligible_nodes, id: street.street_id }, geometry: street.geometry as unknown as Geometry }))),
+    streets: collection(map.streets.map((street) => ({ type: 'Feature', properties: { completed: street.completed, manual_completed: street.manual_completed,
+      effective_completed: street.effective_completed, manual_reason: street.manual_reason, visited: street.visited_nodes, eligible: street.eligible_nodes, id: street.street_id }, geometry: street.geometry as unknown as Geometry }))),
     nodes: collection(map.missing_nodes.map((node) => ({ type: 'Feature', properties: { id: node.node_id }, geometry: { type: 'Point', coordinates: [node.longitude, node.latitude] } }))),
   };
 }
@@ -200,4 +204,6 @@ const styles = StyleSheet.create({
   stateMessage: { paddingVertical: 14, gap: 7, alignItems: 'center' }, link: { color: '#31594c', padding: 7, fontWeight: '700' },
   mapPanel: { flex: 1, minHeight: 230, backgroundColor: '#dce5db', overflow: 'hidden' }, mapUnavailable: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 22, gap: 8 },
   mapLoading: { position: 'absolute', top: 12, right: 12, backgroundColor: '#fff', padding: 8, borderRadius: 10 },
+  mapLegend: { position: 'absolute', bottom: 12, left: 12, backgroundColor: '#fbfcfa', borderRadius: 8, padding: 8, gap: 3 },
+  legendText: { color: '#4b9567', fontSize: 9, fontWeight: '700' }, manualLegend: { color: '#7956a8', fontSize: 9, fontWeight: '700' }, incompleteLegend: { color: '#c7763e', fontSize: 9, fontWeight: '700' },
 });

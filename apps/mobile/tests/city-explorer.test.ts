@@ -16,18 +16,19 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const coverage = (status: 'ready' | 'pending' | 'failed' = 'ready', revision = '5') => ({ status, progress_revision: revision,
   pending_sources: 0, failed_sources: 0, pending_imports: 0, visited_node_count: status === 'ready' ? 2 : null, unsupported_sample_count: 0 });
 const dataset = (id: string): ProgressDataset => ({ dataset_id: id, region: id, state: 'ready', progress_revision: '5', visited_node_count: 2,
-  unsupported_sample_count: 0, pending_sources: 0, failed_sources: 0, eligible_streets: 1, completed_streets: 0, eligible_nodes: 2 });
+  unsupported_sample_count: 0, pending_sources: 0, failed_sources: 0, eligible_streets: 1, completed_streets: 0,
+  manual_completed_streets: 0, effective_completed_streets: 0, eligible_nodes: 2 });
 const progress = (datasets = [dataset('d1')], datasets_truncated = false): ProgressResponse => ({ state: 'ready', rule: 'normal', datasets, datasets_truncated, unmapped_points: 0, pending_imports: 0 });
 const cities = (datasetId: string, page = 1, revision = '5', ids = ['c1'], dataset_state: CityPage['dataset_state'] = 'active'): CityPage => ({
-  dataset_id: datasetId, dataset_state, rule: 'normal', coverage: coverage('ready', revision), items: ids.map((id) => ({ id, name: id, admin_level: '8', visited_nodes: 1, eligible_nodes: 2, completed_streets: 0, eligible_streets: 1 })), page, page_size: 50, total: ids.length,
+  dataset_id: datasetId, dataset_state, rule: 'normal', coverage: coverage('ready', revision), items: ids.map((id) => ({ id, name: id, admin_level: '8', visited_nodes: 1, eligible_nodes: 2, completed_streets: 0, manual_completed_streets: 0, effective_completed_streets: 0, eligible_streets: 1 })), page, page_size: 50, total: ids.length,
 });
 const streets = (datasetId: string, cityId = 'c1', ids = ['s1'], revision = '5'): StreetPage => ({
   dataset_id: datasetId, city_id: cityId, dataset_state: 'active', rule: 'normal', coverage: coverage('ready', revision), filter: 'all', filter_applied: true,
-  items: ids.map((id) => ({ id, dataset_id: datasetId, city_id: cityId, name: id, visited_nodes: 1, eligible_nodes: 2, threshold: 2, state: 'partial' })), page: 1, page_size: 50, total: ids.length,
+  items: ids.map((id) => ({ id, dataset_id: datasetId, city_id: cityId, name: id, visited_nodes: 1, eligible_nodes: 2, threshold: 2, state: 'partial', manual_completed: false, manual_reason: null, effective_state: 'partial' })), page: 1, page_size: 50, total: ids.length,
 });
 const streetDetail = (datasetId: string, id: string, page = 1, revision = '5', remaining: StreetDetail['remaining_nodes'] = [{ id: '9007199254740993', longitude: 3.7, latitude: 51.0 }]): StreetDetail => ({
   id, dataset_id: datasetId, city_id: 'c1', name: id, dataset_state: 'active', rule: 'normal', coverage: coverage('ready', revision),
-  visited_nodes: 1, eligible_nodes: 2, threshold: 2, state: 'partial', remaining_nodes: remaining, remaining_nodes_page: { page, page_size: 50, total: 2 },
+  visited_nodes: 1, eligible_nodes: 2, threshold: 2, state: 'partial', manual_completed: false, manual_reason: null, effective_state: 'partial', remaining_nodes: remaining, remaining_nodes_page: { page, page_size: 50, total: 2 },
 });
 const contributions = (datasetId: string, streetId: string, page = 1, revision = '5'): ContributionPage => ({
   dataset_id: datasetId, street_id: streetId, dataset_state: 'active', coverage: coverage('ready', revision), activities_available: true,
@@ -191,4 +192,56 @@ test('fixture city API rejects locally without invoking a real transport', async
   const fixture = createFixtureCityExplorerApi();
   await assert.rejects(fixture.getProgress('normal'), /fixture mode/);
   await assert.rejects(fixture.getCities('d1', { rule: 'normal', q: '', page: 1, pageSize: 50 }), /fixture mode/);
+});
+
+test('manual correction refresh reloads effective totals and selected detail without changing GPS progress', async () => {
+  let manual = false;
+  let progressReads = 0;
+  let detailReads = 0;
+  let contributionReads = 0;
+  const store = new CityExplorerStore(api({
+    async getProgress() {
+      progressReads++;
+      return progress([{ ...dataset('d1'), manual_completed_streets: manual ? 1 : 0, effective_completed_streets: manual ? 1 : 0 }]);
+    },
+    async getStreets(id, query) { return streets(query.datasetId, id); },
+    async getStreet(id, query) {
+      detailReads++;
+      return { ...streetDetail(query.datasetId, id, query.page), manual_completed: manual, manual_reason: manual ? 'walked and checked' : null,
+        effective_state: manual ? 'complete' : 'partial' };
+    },
+    async getContributions(id, query) { contributionReads++; return contributions(query.datasetId, id, query.page); },
+  }));
+  await selectCity(store); store.selectStreet('s1'); await tick();
+  manual = true;
+  await store.refreshAfterCorrection();
+  assert.ok(progressReads >= 2);
+  assert.ok(detailReads >= 2);
+  assert.ok(contributionReads >= 2);
+  assert.equal(store.getState().detail?.manual_completed, true);
+  assert.equal(store.getState().detail?.manual_reason, 'walked and checked');
+  assert.equal(store.getState().detail?.state, 'partial');
+  assert.equal(store.getState().detail?.visited_nodes, 1);
+  assert.equal(store.getState().remainingNodes?.[0]?.id, '9007199254740993');
+});
+
+test('account reset during correction refresh prevents later detail/contribution reads', async () => {
+  const progressResponse = deferred<ProgressResponse>();
+  let detailReads = 0;
+  let contributionReads = 0;
+  let progressReads = 0;
+  const store = new CityExplorerStore(api({
+    getProgress() { return ++progressReads === 1 ? Promise.resolve(progress()) : progressResponse.promise; },
+    async getStreet(id, query) { detailReads++; return streetDetail(query.datasetId, id, query.page); },
+    async getContributions(id, query) { contributionReads++; return contributions(query.datasetId, id, query.page); },
+  }));
+  await selectCity(store); store.selectStreet('s1'); await tick();
+  const beforeDetailReads = detailReads;
+  const beforeContributionReads = contributionReads;
+  const refreshing = store.refreshAfterCorrection();
+  store.reset();
+  progressResponse.resolve(progress());
+  await refreshing;
+  assert.equal(detailReads, beforeDetailReads);
+  assert.equal(contributionReads, beforeContributionReads);
 });

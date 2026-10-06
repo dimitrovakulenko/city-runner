@@ -12,10 +12,10 @@ export interface GpxFile {
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export interface ExploreApi {
-  getMap(bbox: [number, number, number, number], zoom: number, rule: 'normal' | 'strict'): Promise<MapResponse>;
-  getProgress(rule: 'normal' | 'strict'): Promise<ProgressResponse>;
-  upload(file: GpxFile): Promise<UploadResponse>;
-  getUpload(id: string): Promise<UploadStatusResponse>;
+  getMap(bbox: [number, number, number, number], zoom: number, rule: 'normal' | 'strict', signal?: AbortSignal): Promise<MapResponse>;
+  getProgress(rule: 'normal' | 'strict', signal?: AbortSignal): Promise<ProgressResponse>;
+  upload(file: GpxFile, signal?: AbortSignal): Promise<UploadResponse>;
+  getUpload(id: string, signal?: AbortSignal): Promise<UploadStatusResponse>;
 }
 
 export function createFixtureExploreApi(): ExploreApi {
@@ -47,20 +47,20 @@ export function createExploreApi(options: {
   const uploadRequest = createApiRequest({ baseUrl, sessionStore, fetchImpl: options.fetchImpl, timeoutMs: 120_000 });
 
   return {
-    getMap(bbox, zoom, rule) {
+    getMap(bbox, zoom, rule, signal) {
       const query = new URLSearchParams({ bbox: bbox.join(','), zoom: String(zoom), rule });
-      return request<MapResponse>(`/api/map?${query}`);
+      return request<MapResponse>(`/api/map?${query}`, { signal });
     },
-    getProgress(rule) {
-      return request<ProgressResponse>(`/api/progress?${new URLSearchParams({ rule })}`);
+    getProgress(rule, signal) {
+      return request<ProgressResponse>(`/api/progress?${new URLSearchParams({ rule })}`, { signal });
     },
-    upload(file) {
+    upload(file, signal) {
       const form = new FormData();
       form.append('file', { uri: file.uri, name: file.name, type: file.mimeType ?? 'application/gpx+xml' } as unknown as Blob);
-      return uploadRequest<UploadResponse>('/api/uploads', { method: 'POST', body: form });
+      return uploadRequest<UploadResponse>('/api/uploads', { method: 'POST', body: form, signal });
     },
-    getUpload(id) {
-      return request<UploadStatusResponse>(`/api/uploads/${encodeURIComponent(id)}`);
+    getUpload(id, signal) {
+      return request<UploadStatusResponse>(`/api/uploads/${encodeURIComponent(id)}`, { signal });
     },
   };
 }

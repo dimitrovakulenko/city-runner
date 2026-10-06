@@ -14,6 +14,9 @@ import { AuthPanel } from './src/auth/AuthPanel';
 import { mobileApi, authController } from './src/auth/runtime';
 import { secureSessionStore } from './src/auth/secureSession';
 import type { ActivityExplorerState } from './src/activityStore';
+import { createCorrectionApi } from './src/api/corrections';
+import { CorrectionStore } from './src/correctionStore';
+import type { CorrectionState } from './src/correctionStore';
 
 const fixtureMode = process.env.EXPO_PUBLIC_FIXTURE_MODE === 'true';
 const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8001';
@@ -21,12 +24,19 @@ const defaultMapStyle = 'https://tiles.openfreemap.org/styles/liberty';
 const activityStore = new ActivityStore(fixtureMode ? fixtureApi : mobileApi);
 const exploreStore = new ExploreStore(fixtureMode ? createFixtureExploreApi() : createExploreApi({ baseUrl: apiBaseUrl, sessionStore: secureSessionStore }));
 const cityExplorerStore = new CityExplorerStore(fixtureMode ? createFixtureCityExplorerApi() : createCityExplorerApi({ baseUrl: apiBaseUrl, sessionStore: secureSessionStore }));
+const correctionStore = new CorrectionStore(createCorrectionApi({ baseUrl: apiBaseUrl, sessionStore: secureSessionStore }), (operation, id) => {
+  if (operation === 'activity-delete') activityStore.activityDeleted(id);
+  void exploreStore.refreshAfterCorrection();
+  void cityExplorerStore.refreshAfterCorrection();
+});
 const demoStyle = 'https://demotiles.maplibre.org/style.json';
 
 export default function App() {
   const tablet = useWindowDimensions().width >= 850;
   const [page, setPage] = useState<'activities' | 'explore' | 'cities'>('activities');
   const [activity, setActivity] = useState<ActivityExplorerState>(activityStore.getState());
+  const [correction, setCorrection] = useState<CorrectionState>(correctionStore.getState());
+  const [deleteConfirmationFor, setDeleteConfirmationFor] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [hasSession, setHasSession] = useState<boolean | null>(fixtureMode ? true : null);
   const [accountGeneration, setAccountGeneration] = useState(0);
@@ -39,6 +49,8 @@ export default function App() {
   const styleUrl = fixtureMode ? demoStyle : process.env.EXPO_PUBLIC_MAP_STYLE_URL?.trim() || defaultMapStyle;
 
   useEffect(() => activityStore.subscribe(setActivity), []);
+  useEffect(() => correctionStore.subscribe(setCorrection), []);
+  useEffect(() => { correctionStore.clearFeedback(); setDeleteConfirmationFor(null); }, [activity.selectedId]);
   useEffect(() => {
     if (page !== 'activities' || (!fixtureMode && (hasSession !== true || authController.getState().status !== 'signed-in'))) return;
     const timer = setTimeout(() => void activityStore.loadPage(search), 250);
@@ -50,6 +62,7 @@ export default function App() {
     setAccountGeneration((value) => value + 1);
     knownSessionToken.current = undefined;
     activityStore.reset();
+    correctionStore.reset();
     exploreStore.reset();
     cityExplorerStore.reset();
     setSearch('');
@@ -71,6 +84,7 @@ export default function App() {
     setAccountGeneration((value) => value + 1);
     knownSessionToken.current = token;
     activityStore.reset();
+    correctionStore.reset();
     exploreStore.reset();
     cityExplorerStore.reset();
     setSearch('');
@@ -86,6 +100,21 @@ export default function App() {
   }, [selected]);
   const listFailure = activity.listStatus === 'offline' || activity.listStatus === 'error';
   const signedOut = activity.listStatus === 'sign-in-required' || hasSession === false;
+  const correctionsEnabled = !fixtureMode && hasSession === true && authController.getState().status === 'signed-in';
+  const deleteActivity = useCallback((id: string, generation: number) => {
+    if (generation !== accountChangeRequest.current || !correctionsEnabled || authController.getState().status !== 'signed-in' || activityStore.getState().selectedId !== id) return;
+    void correctionStore.deleteActivity(id);
+  }, [correctionsEnabled]);
+  const markStreetManually = useCallback((streetId: string, datasetId: string, reason: string, generation: number) => {
+    const current = cityExplorerStore.getState();
+    if (generation !== accountChangeRequest.current || !correctionsEnabled || authController.getState().status !== 'signed-in' || current.selectedStreetId !== streetId || current.selectedDatasetId !== datasetId) return;
+    void correctionStore.markComplete(streetId, datasetId, reason);
+  }, [correctionsEnabled]);
+  const undoStreetManually = useCallback((streetId: string, datasetId: string, generation: number) => {
+    const current = cityExplorerStore.getState();
+    if (generation !== accountChangeRequest.current || !correctionsEnabled || authController.getState().status !== 'signed-in' || current.selectedStreetId !== streetId || current.selectedDatasetId !== datasetId) return;
+    void correctionStore.undoManualCompletion(streetId, datasetId);
+  }, [correctionsEnabled]);
 
   return <SafeAreaView style={styles.safe}>
     <StatusBar barStyle="dark-content" />
@@ -101,7 +130,8 @@ export default function App() {
     {page === 'explore'
       ? <ExploreScreen store={exploreStore} fixtureMode={fixtureMode} enabled={fixtureMode || hasSession === true} accountGeneration={accountGeneration} tablet={tablet} />
       : page === 'cities'
-        ? <CityExplorerScreen store={cityExplorerStore} fixtureMode={fixtureMode} enabled={!fixtureMode && hasSession === true} accountGeneration={accountGeneration}
+        ? <CityExplorerScreen store={cityExplorerStore} correctionStore={correctionStore} fixtureMode={fixtureMode} enabled={!fixtureMode && hasSession === true} accountGeneration={accountGeneration}
+            onMarkComplete={markStreetManually} onUndoManual={undoStreetManually}
             onShowNode={(node, rule, generation) => {
               if (generation !== accountChangeRequest.current || hasSession !== true || authController.getState().status !== 'signed-in') return;
               exploreStore.setRule(rule); exploreStore.focusCoordinates(node.longitude, node.latitude); setPage('explore');
@@ -110,14 +140,25 @@ export default function App() {
               if (generation !== accountChangeRequest.current || hasSession !== true || authController.getState().status !== 'signed-in') return;
               void activityStore.selectActivity(id); setPage('activities');
             }} />
-        : <View style={[styles.activityShell, tablet && styles.activityTablet]}>
+      : <View style={[styles.activityShell, tablet && styles.activityTablet]}>
+          {correction.message && <Text accessibilityRole="alert" style={styles.notice}>{correction.message}</Text>}
           <View style={[styles.panel, tablet && styles.tabletPanel]}>
             <Text style={styles.heading}>{selected?.name ?? (selecting ? 'Activity detail' : 'Activities')}</Text>
             {selecting ? <>
               <Pressable onPress={() => activityStore.clearSelection()}><Text style={styles.link}>← All activities</Text></Pressable>
               {activity.detailStatus === 'loading' && <Message text="Loading activity…" loading />}
               {activity.detailError && <Message text={activity.detailError} action="Retry" onPress={() => { if (activity.selectedId) void activityStore.selectActivity(activity.selectedId); }} />}
-              {selected && <><Text style={styles.meta}>{selected.date} · {selected.type}</Text><Text style={styles.meta}>{selected.tracks.length} track segments preserved</Text></>}
+              {selected && <><Text style={styles.meta}>{selected.date} · {selected.type}</Text><Text style={styles.meta}>{selected.tracks.length} track segments preserved</Text>
+                {correctionsEnabled && deleteConfirmationFor !== selected.id && <Pressable disabled={correction.pending !== null} onPress={() => { correctionStore.clearFeedback(); setDeleteConfirmationFor(selected.id); }}><Text style={styles.dangerLink}>Delete activity</Text></Pressable>}
+                {correction.error && <Text accessibilityRole="alert" style={styles.error}>{correction.error}</Text>}
+                {correctionsEnabled && deleteConfirmationFor === selected.id && <View style={styles.confirmation}>
+                  <Text style={styles.meta}>Delete this activity? Progress it supported will be recalculated. Original-file cleanup is queued after deletion.</Text>
+                  <View style={styles.confirmationActions}>
+                    <Pressable disabled={correction.pending !== null} onPress={() => { setDeleteConfirmationFor(null); correctionStore.clearFeedback(); }}><Text style={styles.link}>Cancel</Text></Pressable>
+                    <Pressable disabled={correction.pending !== null} onPress={() => deleteActivity(selected.id, accountGeneration)}><Text style={styles.dangerLink}>{correction.pending === 'activity-delete' ? 'Deleting…' : 'Confirm delete'}</Text></Pressable>
+                  </View>
+                </View>}
+              </>}
             </> : <>
               <TextInput value={search} onChangeText={setSearch} placeholder="Search activities" style={styles.search} accessibilityLabel="Search activities" />
               <ScrollView style={styles.list}>
@@ -168,4 +209,9 @@ const styles = StyleSheet.create({
   message: { alignItems: 'center', padding: 18, gap: 8 }, footer: { color: '#9ba79f', fontSize: 8, fontWeight: '800', letterSpacing: 1, paddingVertical: 12 },
   mapPanel: { flex: 1, minHeight: 250, backgroundColor: '#dce5db', overflow: 'hidden' }, mapUnavailable: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, gap: 8 },
   mapCaption: { position: 'absolute', bottom: 15, left: 15, right: 15, backgroundColor: '#fbfcfa', borderRadius: 12, padding: 12 },
+  dangerLink: { color: '#a33d32', fontWeight: '800', paddingVertical: 8 },
+  error: { color: '#a33d32', fontSize: 11, paddingVertical: 6 },
+  notice: { color: '#31594c', backgroundColor: '#eaf0e7', padding: 10, fontSize: 11 },
+  confirmation: { backgroundColor: '#fbece9', borderRadius: 10, padding: 10, marginTop: 8 },
+  confirmationActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 18 },
 });

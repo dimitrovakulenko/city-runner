@@ -50,6 +50,7 @@ export class ExploreStore {
   private mapRequest = 0;
   private progressRequest = 0;
   private accountRevision = 0;
+  private accountController = new AbortController();
   private foregroundPolls = 0;
   private operationGeneration = 0;
   private pollOwner: number | null = null;
@@ -79,6 +80,8 @@ export class ExploreStore {
     this.mapRequest++;
     this.progressRequest++;
     this.accountRevision++;
+    this.accountController.abort();
+    this.accountController = new AbortController();
     this.operationGeneration++;
     this.pollOwner = null;
     this.foregroundOwner = null;
@@ -113,6 +116,11 @@ export class ExploreStore {
     await this.pollUploads();
   }
 
+  async refreshAfterCorrection(): Promise<void> {
+    if (this.state.viewport) await this.refreshViewport(this.state.viewport);
+    else await this.refreshProgress();
+  }
+
   async refreshViewport(viewport: Viewport): Promise<void> {
     this.viewportChangePending = false;
     this.update({ viewport, map: null, mapStatus: 'loading', progressStatus: 'loading', mapError: null, progressError: null });
@@ -121,7 +129,7 @@ export class ExploreStore {
     const accountRevision = this.accountRevision;
     const { rule } = this.state;
     await Promise.all([
-      this.api.getMap(viewport.bbox, viewport.zoom, rule).then((map) => {
+      this.api.getMap(viewport.bbox, viewport.zoom, rule, this.accountController.signal).then((map) => {
         if (mapRequest !== this.mapRequest || accountRevision !== this.accountRevision) return;
         this.update({ map, mapStatus: map.cities.length || map.tracks.length || map.streets.length || map.missing_nodes.length ? 'ready' : 'empty' });
       }).catch((error: unknown) => {
@@ -129,7 +137,7 @@ export class ExploreStore {
         if (errorKind(error) === 'sign-in-required') return this.clearForExpiredSession();
         this.update({ mapStatus: errorState(error), mapError: errorMessage(error) });
       }),
-      this.api.getProgress(rule).then((progress) => {
+      this.api.getProgress(rule, this.accountController.signal).then((progress) => {
         if (progressRequest !== this.progressRequest || accountRevision !== this.accountRevision) return;
         this.update({ progress, progressStatus: 'ready' });
         if (!hasPendingWork(progress)) {
@@ -150,7 +158,7 @@ export class ExploreStore {
     const rule = this.state.rule;
     this.update({ progressStatus: 'loading', progressError: null });
     try {
-      const progress = await this.api.getProgress(rule);
+      const progress = await this.api.getProgress(rule, this.accountController.signal);
       if (request !== this.progressRequest || accountRevision !== this.accountRevision) return;
       this.update({ progress, progressStatus: 'ready' });
       if (!hasPendingWork(progress)) {
@@ -176,7 +184,7 @@ export class ExploreStore {
     this.foregroundPolls = 0;
     this.update({ uploading: true, uploadError: null, foregroundPollingStopped: false });
     try {
-      const result: UploadResponse = await this.api.upload(file);
+      const result: UploadResponse = await this.api.upload(file, this.accountController.signal);
       if (revision !== this.accountRevision) return;
       const status: UploadStatusResponse = { id: result.id, status: result.status, job_id: result.job_id, activity_id: null, error: null };
       const item: UploadItem = { ...status, fileName: file.name, duplicate: result.duplicate, polls: 0,
@@ -203,7 +211,7 @@ export class ExploreStore {
           return;
         }
         try {
-          const status = await this.api.getUpload(item.id);
+          const status = await this.api.getUpload(item.id, this.accountController.signal);
           if (revision !== this.accountRevision) return;
           const polls = item.polls + 1;
           const activeStatus = status.status === 'queued' || status.status === 'processing';
@@ -257,7 +265,7 @@ export class ExploreStore {
     const request = ++this.mapRequest;
     const revision = this.accountRevision;
     try {
-      const map = await this.api.getMap(viewport.bbox, viewport.zoom, this.state.rule);
+      const map = await this.api.getMap(viewport.bbox, viewport.zoom, this.state.rule, this.accountController.signal);
       if (request !== this.mapRequest || revision !== this.accountRevision || this.viewportChangePending) return;
       this.update({ map, mapStatus: map.cities.length || map.tracks.length || map.streets.length || map.missing_nodes.length ? 'ready' : 'empty' });
     } catch (error) {

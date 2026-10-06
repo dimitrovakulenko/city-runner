@@ -43,6 +43,7 @@ export class ActivityStore {
   private state = INITIAL_STATE;
   private listRequest = 0;
   private detailRequest = 0;
+  private accountController = new AbortController();
   private listeners = new Set<(state: ActivityExplorerState) => void>();
 
   constructor(api: ActivityApi) { this.api = api; }
@@ -74,6 +75,8 @@ export class ActivityStore {
   reset(): void {
     this.listRequest += 1;
     this.detailRequest += 1;
+    this.accountController.abort();
+    this.accountController = new AbortController();
     this.update({ ...INITIAL_STATE });
   }
 
@@ -88,7 +91,7 @@ export class ActivityStore {
       ...(page === 1 ? { items: [] } : {}),
     });
     try {
-      const result = await this.api.listActivities({ page, pageSize: this.state.pageSize, query: normalizedQuery });
+      const result = await this.api.listActivities({ page, pageSize: this.state.pageSize, query: normalizedQuery }, this.accountController.signal);
       if (requestId !== this.listRequest) return;
       const items = page === 1 ? result.items : [...this.state.items, ...result.items];
       this.update({
@@ -118,7 +121,7 @@ export class ActivityStore {
     const requestId = ++this.detailRequest;
     this.update({ selectedId: id, detail: null, detailStatus: 'loading', detailError: null });
     try {
-      const detail = await this.api.getActivity(id);
+      const detail = await this.api.getActivity(id, this.accountController.signal);
       if (requestId !== this.detailRequest || this.state.selectedId !== id) return;
       this.update({ detail, detailStatus: 'ready' });
     } catch (error) {
@@ -136,5 +139,10 @@ export class ActivityStore {
   clearSelection(): void {
     this.detailRequest += 1;
     this.update({ selectedId: null, detail: null, detailStatus: 'idle', detailError: null });
+  }
+
+  activityDeleted(id: string): void {
+    if (this.state.selectedId === id) this.clearSelection();
+    void this.loadPage(this.state.query, 1);
   }
 }
