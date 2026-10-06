@@ -304,6 +304,7 @@ class CorrectionsPostgisTests(unittest.TestCase):
         process_private_object_cleanup(cleanup, self.store)
         self.assertFalse((Path(self.store.root) / object_a).exists())
         self.assertTrue((Path(self.store.root) / object_b).exists())
+        process_private_object_cleanup(cleanup, self.store)  # retry after deletion is already complete
         self.assertTrue((Path(self.store.root) / new_key).exists())
 
     def test_delete_during_upload_read_fences_worker_and_cleanup_is_durable(self):
@@ -459,6 +460,70 @@ class CorrectionsPostgisTests(unittest.TestCase):
             self.assertEqual(db.execute(text("SELECT status FROM jobs WHERE id=:id"), {
                 "id": matcher_job_id,
             }).scalar_one(), "cancelled")
+
+    def test_delete_rescans_sources_after_activity_lock_under_read_committed(self):
+        object_key = self.store.write(b"late source original")
+        with self.engine.begin() as db:
+            activity_id = db.execute(text("""INSERT INTO activities
+                (user_id,name,date,activity_type,processed,unmapped_points,tracks,timestamps)
+                VALUES (:account,'empty source set','2026-10-06','run',false,0,'[]'::json,'[]'::json)
+                RETURNING id"""), {"account": self.account}).scalar_one()
+
+        source_scan_done = threading.Event()
+        continue_delete = threading.Event()
+        paused = False
+
+        def after_execute(connection, cursor, statement, parameters, context, executemany):
+            nonlocal paused
+            if (threading.current_thread().name == "d17-empty-delete" and not paused
+                    and " ".join(statement.split()).lower().startswith(
+                        "select id,revision,private_object_key from activity_sources")):
+                paused = True
+                source_scan_done.set()
+                if not continue_delete.wait(5):
+                    raise TimeoutError("empty-source delete scan release timed out")
+
+        event.listen(self.engine, "after_cursor_execute", after_execute)
+        delete_errors = []
+        repeatable_read_engine = self.engine.execution_options(isolation_level="REPEATABLE READ")
+        deleter = threading.Thread(name="d17-empty-delete", daemon=True, target=lambda: self._capture_error(
+            delete_errors, lambda: delete_activity(repeatable_read_engine, self.account, int(activity_id))))
+        try:
+            deleter.start()
+            self.assertTrue(source_scan_done.wait(5))
+            with self.engine.begin() as db:
+                source_id = db.execute(text("""INSERT INTO activity_sources
+                    (account_id,activity_id,source_kind,private_object_key,status)
+                    VALUES (:account,:activity,'gpx',:key,'queued') RETURNING id"""), {
+                    "account": self.account, "activity": activity_id, "key": object_key,
+                }).scalar_one()
+                job_id = db.execute(text("""INSERT INTO jobs
+                    (account_id,kind,dedupe_key,payload,priority)
+                    VALUES (:account,'process_upload',:dedupe,CAST(:payload AS jsonb),100) RETURNING id"""), {
+                    "account": self.account, "dedupe": f"upload:{source_id}:r1",
+                    "payload": json.dumps({"source_id": source_id, "revision": 1}),
+                }).scalar_one()
+            continue_delete.set()
+            deleter.join(5)
+            self.assertFalse(deleter.is_alive())
+            self.assertEqual(delete_errors, [])
+        finally:
+            continue_delete.set()
+            event.remove(self.engine, "after_cursor_execute", after_execute)
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("SELECT count(*) FROM activities WHERE id=:id"), {
+                "id": activity_id,
+            }).scalar_one(), 0)
+            self.assertEqual(db.execute(text("SELECT count(*) FROM activity_sources WHERE id=:id"), {
+                "id": source_id,
+            }).scalar_one(), 0)
+            job = db.execute(text("SELECT status FROM jobs WHERE id=:id"), {"id": job_id}).scalar_one()
+            self.assertEqual(job, "cancelled")
+            cleanup = dict(db.execute(text("""SELECT * FROM jobs WHERE account_id=:account
+                AND kind='delete_private_object'"""), {"account": self.account}).mappings().one())
+        self.assertTrue((Path(self.store.root) / object_key).exists())
+        process_private_object_cleanup(cleanup, self.store)
+        self.assertFalse((Path(self.store.root) / object_key).exists())
 
     @staticmethod
     def _capture_error(errors, operation):
