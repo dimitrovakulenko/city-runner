@@ -16,6 +16,7 @@ from backend.app.schemas import ActivityDetail, ActivityPage
 from backend.app.explorer import create_explorer_router
 from backend.app.map_api import create_map_router
 from backend.app.uploads import create_upload_router
+from backend.app.import_batches import create_import_batch_router
 
 
 class ChallengeRequest(BaseModel):
@@ -114,6 +115,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
         return Response(status_code=204)
 
     app.include_router(create_upload_router(engine, current_user))
+    app.include_router(create_import_batch_router(engine, current_user))
     app.include_router(create_map_router(engine, current_user))
     app.include_router(create_explorer_router(engine, current_user))
     app.include_router(create_corrections_router(engine, current_user))
