@@ -34,6 +34,9 @@ SCHEMAS = (
     "StreetDetail",
     "ContributionPage",
     "ManualCompletionBody",
+    "ImportBatchCreate",
+    "ImportBatchResponse",
+    "ImportBatchPage",
 )
 
 
