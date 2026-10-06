@@ -15,6 +15,7 @@ from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.concurrency import run_in_threadpool
 
+from backend.app.coverage import queue_source_coverage
 from backend.app.gpx import GpxError, MAX_GPX_BYTES, parse_gpx
 from backend.app.jobs import complete, enqueue, fail
 from backend.app.storage import LocalObjectStore
@@ -301,5 +302,7 @@ def process_upload(engine: Engine, job: dict[str, Any], store: LocalObjectStore 
         })
         if result.rowcount != 1:
             raise RuntimeError("source revision changed")
+        queue_source_coverage(db, account_id=current_source["account_id"], source_id=source_id,
+                              source_revision=revision, activity_id=activity_id)
         if not complete(db, job_id=job_id, lease_token=lease_token):
             raise RuntimeError("job lease expired")

@@ -1,0 +1,11 @@
+# Coverage matching
+
+GPX matching uses only the original GPS samples in `activities.tracks`; it does not interpolate across segments or timestamp gaps. Each sample matches every original OSM node within 25 metres using the dataset's indexed PostGIS geography points. Samples inside city boundaries but farther than 25 metres from a node are supported but do not add coverage. `activities.unmapped_points` counts samples outside the union of active complete city boundaries once, even when several regional datasets are active.
+
+`match_coverage` jobs are enqueued in the same transaction that creates the activity and completes its upload job. Contributions are keyed by account, source, source revision, dataset and original OSM node. Per-street and account summaries can be rebuilt from those contributions. Reads must compare current successful source revisions with their matching job/run state; a missing or failed run makes that account/dataset pending or failed, so stale counts never become progress against a new denominator. An active complete dataset with no successful activities has ready zero progress; a missing or staged dataset is pending.
+
+Normal street completion requires every node when a street has fewer than ten nodes, otherwise at least 90% rounded up. Strict completion always requires every node. Missing geography and samples outside all supported city boundaries stay explicit; they are not presented as completed coverage.
+
+Run `python -m backend.app.coverage --dataset-id ID --max-sources 1000` to queue a bounded page of existing successfully ingested sources. The output includes `next_after_source_id` and `has_more`; pass the cursor back with `--after-source-id` until the scan is complete. New sources enqueue matches automatically for active complete datasets. Complete replacement datasets can be staged and matched for readiness, but activation/promotion remains a separate task; this slice never switches a live dataset.
+
+The worker handles `match_coverage` jobs with lease and exact source-revision checks. Matching runs in bounded batches and commits contributions, run state, account summaries, activity readiness and job completion atomically. A source revision update removes only that revision's contributions; deleting one source leaves overlapping support from other sources intact.

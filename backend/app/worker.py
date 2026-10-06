@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
+from backend.app.coverage import process_source_dataset
 from backend.app.jobs import claim, complete, fail
 from backend.app.uploads import process_upload
 
@@ -55,6 +56,7 @@ def main() -> None:
     handlers = {
         "dev.noop": _noop,
         "process_upload": lambda job: process_upload(engine, job),
+        "match_coverage": lambda job: process_source_dataset(engine, job),
     }
     try:
         if args.once:
