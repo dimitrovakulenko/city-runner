@@ -38,10 +38,11 @@ export function ExploreMap({ runtime, enabled, selected, focus, onStreet }: { ru
       for (const id of ['streets', 'tracks', 'missing', 'selected']) map.addSource(id, { type: 'geojson', data: EMPTY });
       map.addLayer({ id: 'street-outline', type: 'line', source: 'streets', paint: { 'line-color': '#fff', 'line-width': 4, 'line-opacity': 0.55 } });
       map.addLayer({ id: 'street-coverage', type: 'line', source: 'streets', paint: { 'line-color': ['case', ['==', ['get', 'complete'], true], '#21856e', ['==', ['get', 'known'], false], '#9ca89d', '#dda257'], 'line-width': ['case', ['==', ['get', 'complete'], true], 3, 1.8], 'line-opacity': ['case', ['==', ['get', 'complete'], true], 0.9, 0.55] } });
-      map.addLayer({ id: 'activity-tracks', type: 'line', source: 'tracks', paint: { 'line-color': '#459fac', 'line-width': 2.3, 'line-opacity': 0.6 } });
+      map.addLayer({ id: 'activity-track-outline', type: 'line', source: 'tracks', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fff', 'line-width': 8, 'line-opacity': 0.95 } });
+      map.addLayer({ id: 'activity-tracks', type: 'line', source: 'tracks', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#7c3aed', 'line-width': 5, 'line-opacity': 1 } });
       map.addLayer({ id: 'missing-nodes', type: 'circle', source: 'missing', minzoom: 17, layout: { visibility: 'none' }, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 17, 2, 19, 3.5], 'circle-color': '#e29f4b', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1 } });
-      map.addLayer({ id: 'selected-track-outline', type: 'line', source: 'selected', paint: { 'line-color': '#fff', 'line-width': 7 } });
-      map.addLayer({ id: 'selected-track', type: 'line', source: 'selected', paint: { 'line-color': '#164e40', 'line-width': 4 } });
+      map.addLayer({ id: 'selected-track-outline', type: 'line', source: 'selected', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fff', 'line-width': 11 } });
+      map.addLayer({ id: 'selected-track', type: 'line', source: 'selected', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#4c1d95', 'line-width': 7 } });
       map.on('click', 'street-coverage', (event) => { if (enabledRef.current && event.features?.[0]) streetRef.current(event.features[0]); });
       map.on('mouseenter', 'street-coverage', () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', 'street-coverage', () => { map.getCanvas().style.cursor = ''; });
@@ -70,7 +71,7 @@ export function ExploreMap({ runtime, enabled, selected, focus, onStreet }: { ru
     const map = mapRef.current; if (!ready || !map || !enabled) return;
     const b = map.getBounds(); void runtime.explore.refreshViewport({ bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()], zoom: map.getZoom() });
   }, [enabled, ready, runtime]);
-  useEffect(() => { const map = mapRef.current; if (ready && map) { map.setLayoutProperty('activity-tracks', 'visibility', showTracks ? 'visible' : 'none'); map.setLayoutProperty('missing-nodes', 'visibility', showMissing ? 'visible' : 'none'); } }, [ready, showTracks, showMissing]);
+  useEffect(() => { const map = mapRef.current; if (ready && map) { for (const layer of ['activity-track-outline', 'activity-tracks']) map.setLayoutProperty(layer, 'visibility', showTracks ? 'visible' : 'none'); map.setLayoutProperty('missing-nodes', 'visibility', showMissing ? 'visible' : 'none'); } }, [ready, showTracks, showMissing]);
   useEffect(() => { if (ready && enabled && focus) { setShowMissing(true); mapRef.current?.flyTo({ center: focus, zoom: 18, duration: 700 }); } }, [ready, enabled, focus]);
   return <section className="map-area" aria-label="Exploration map" data-ready={ready}><div ref={host} className="map-canvas" />
     <div className="map-heading"><span className="live-dot" /><span>Your exploration map</span><span className="map-heading-divider" />{enabled ? 'Lifetime coverage' : 'A new street is a new story'}</div>
