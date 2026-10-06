@@ -1,24 +1,23 @@
-# City Runner mobile shell
+# City Runner mobile
 
-Expo + React Native + TypeScript shell for Android, iPhone and tablets. Activity fixtures match `GET /api/activities` and `GET /api/activities/{id}` in `poc/activity_api.py`; IDs stay strings and tracks retain the API's segmented `[longitude, latitude]` shape. The demo has no backend connection or provider credentials.
+Expo + React Native client for the paginated activity API. Real mode uses `EXPO_PUBLIC_API_BASE_URL` (default `http://localhost:8000`) and the backend's opaque bearer session. The session adapter currently has no token configured, so real mode displays sign-in-required until D07 supplies native provider login and secure storage. Do not place bearer tokens in Expo public environment variables.
 
-The map uses MapLibre Native with the public MapLibre demo style. Use a licensed production style and tiles before release. MapLibre requires a native development build and cannot run in Expo Go.
+Fixtures are opt-in with `EXPO_PUBLIC_FIXTURE_MODE=true`; they are local sample data and do not simulate login. The map keeps each API track segment separate, including GPS gaps, and activity IDs remain strings.
 
-## Build and run
+## Checks and API types
 
-From this directory:
+Install the locked JavaScript dependencies with `npm ci`. Run `npm run typecheck` and `npm test` from this directory. Set up the repository Python environment once, then generate/check API types from FastAPI OpenAPI:
 
 ```sh
-npm install
-npm run android
-npm run ios
+python3 -m venv ../../.venv
+../../.venv/bin/pip install -r ../../backend/requirements.txt
+source ../../.venv/bin/activate
+npm run api:types
+npm run api:types:check
 ```
 
-Android requires Android Studio/SDK and an emulator or device. iOS requires macOS, Xcode and an iOS simulator or device. `npm run typecheck` checks TypeScript. `npm start` launches the development client server after a native build exists.
+The generated file is `src/api/generated.ts`; do not edit it manually.
 
-## Verification status
+## Native run
 
-- TypeScript: verified with `npm run typecheck`.
-- Expo SDK dependency check: verified online with `npx expo install --check`.
-- Android build: unverified. `npm run android -- --no-bundler` stops because Android SDK and `adb` are not installed on this host.
-- iOS build: unverified. `npm run ios -- --no-bundler` stops because CocoaPods is unavailable; Xcode is present, but CoreSimulator is unavailable on this host.
+Run `npm run android`, `npm run ios`, or `npm start` after a native development build exists. MapLibre requires a native build and cannot run in Expo Go. Native launch and secure-session integration remain unverified; D07 supplies the platform login/storage adapter.

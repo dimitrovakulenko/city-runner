@@ -7,7 +7,10 @@
     "start": "expo start --dev-client",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/tests/*.test.js",
+    "api:types": "python scripts/generate-api-types.py",
+    "api:types:check": "python scripts/generate-api-types.py --check"
   },
   "dependencies": {
     "@maplibre/maplibre-react-native": "^11.0.0",
