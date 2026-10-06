@@ -20,6 +20,7 @@ from backend.app.main import create_app
 from backend.app.storage import LocalObjectStore
 from backend.app.uploads import process_upload
 from backend.app.worker import run_once
+from backend.tests.test_fit import fit_fixture, semicircles
 
 
 DATABASE_URL = os.getenv("POSTGIS_TEST_DATABASE_URL")
@@ -179,6 +180,44 @@ class UploadIntegrationTests(unittest.TestCase):
         failed = self.client.get(f"/api/uploads/{response.json()['id']}", headers=self.alice_headers).json()
         self.assertEqual(failed["status"], "failed")
         self.assertEqual(failed["error"], "gpx_point_limit")
+
+    def test_fit_upload_keeps_format_identity_and_worker_imports_samples(self):
+        timestamp = 1_167_609_600
+        content = fit_fixture(records=((timestamp, semicircles(50.1), semicircles(4.2)),))
+        response = self.upload(content, filename="morning.FIT")
+        self.assertEqual(response.status_code, 202, response.text)
+        source_id = response.json()["id"]
+        object_key = self._source_object_key(source_id)
+        self.assertTrue(object_key.endswith(".fit"))
+        self.assertEqual(self.store.read(object_key), content)
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("SELECT source_kind FROM activity_sources WHERE id=:id"), {
+                "id": int(source_id),
+            }).scalar_one(), "fit")
+        self.assertTrue(self.process_next())
+        state = self.client.get(f"/api/uploads/{source_id}", headers=self.alice_headers).json()
+        self.assertEqual(state["status"], "succeeded")
+        detail = self.client.get(f"/api/activities/{state['activity_id']}",
+                                 headers=self.alice_headers).json()
+        self.assertEqual(detail["type"], "running")
+        self.assertAlmostEqual(detail["tracks"][0][0][0], 4.2, places=5)
+        self.assertAlmostEqual(detail["tracks"][0][0][1], 50.1, places=5)
+        self.assertEqual(detail["timestamps"][0][0], "2026-12-31T00:00:00Z")
+
+        duplicate = self.upload(content, filename="again.fit")
+        self.assertEqual(duplicate.status_code, 202)
+        self.assertTrue(duplicate.json()["duplicate"])
+        self.assertEqual(duplicate.json()["id"], source_id)
+
+        no_gps = self.upload(fit_fixture(records=()), filename="indoor.fit")
+        self.assertEqual(no_gps.status_code, 202)
+        self.assertTrue(self.process_next())
+        failed = self.client.get(f"/api/uploads/{no_gps.json()['id']}",
+                                 headers=self.alice_headers).json()
+        self.assertEqual(failed["status"], "failed")
+        self.assertEqual(failed["error"], "fit_no_track_points")
+        self.assertEqual(self.client.get("/api/activities", headers=self.alice_headers)
+                         .json()["total"], 1)
 
     def test_byte_limit_precedes_complete_multipart_parse(self):
         response = self.upload(b"x" * (10 * 1024 * 1024 + 1), filename="oversize.gpx")
