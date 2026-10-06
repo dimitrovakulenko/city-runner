@@ -4,7 +4,8 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, Security
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
@@ -49,8 +50,12 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
     engine = engine or create_engine(os.getenv("DATABASE_URL", "postgresql+psycopg://localhost/activities"), pool_pre_ping=True)
     app = FastAPI()
     app.state.engine = engine
+    bearer_docs = HTTPBearer(auto_error=False)
 
-    def bearer_token(authorization: str | None = Header(None)) -> str:
+    def bearer_token(
+        authorization: str | None = Header(None),
+        _credentials: HTTPAuthorizationCredentials | None = Security(bearer_docs),
+    ) -> str:
         if not authorization:
             raise HTTPException(status_code=401, detail="Unauthenticated.")
         scheme, separator, token = authorization.partition(" ")
@@ -59,7 +64,10 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
             raise HTTPException(status_code=401, detail="Unauthenticated.")
         return token.strip()
 
-    def current_user(authorization: str | None = Header(None)) -> str:
+    def current_user(
+        authorization: str | None = Header(None),
+        _credentials: HTTPAuthorizationCredentials | None = Security(bearer_docs),
+    ) -> str:
         if identity_resolver is not None:
             # Kept solely for the explicit test hook used by the activity tests.
             identity = identity_resolver()

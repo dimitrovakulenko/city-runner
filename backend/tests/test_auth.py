@@ -144,6 +144,17 @@ class AuthApiTests(unittest.TestCase):
         self.assertEqual(success.status_code, 200, success.text)
         self.assertEqual(self.exchange(challenge).status_code, 401)
 
+    def test_openapi_declares_bearer_security_only_for_protected_routes(self):
+        schema = self.client.get("/openapi.json").json()
+        bearer = schema["components"]["securitySchemes"]["HTTPBearer"]
+        self.assertEqual(bearer, {"type": "http", "scheme": "bearer"})
+        paths = schema["paths"]
+        self.assertEqual(paths["/api/me"]["get"]["security"], [{"HTTPBearer": []}])
+        self.assertEqual(paths["/api/cities"]["get"]["security"], [{"HTTPBearer": []}])
+        self.assertNotIn("security", paths["/api/auth/challenges"]["post"])
+        self.assertNotIn("security", paths["/api/auth/exchange"]["post"])
+        self.assertEqual(self.client.get("/api/me", headers={"Authorization": "Basic abc"}).status_code, 401)
+
     def test_expired_challenge_and_expired_session_are_rejected(self):
         challenge = self.challenge()
         with self.engine.begin() as db:
