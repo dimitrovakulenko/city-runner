@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Camera, GeoJSONSource, Layer, Map } from '@maplibre/maplibre-react-native';
 import type { Feature, MultiLineString } from 'geojson';
 import { ActivityStore } from './src/activityStore';
@@ -16,6 +16,7 @@ const store = new ActivityStore(api);
 const emptyState = store.getState();
 
 export default function App() {
+  const tablet = useWindowDimensions().width >= 850;
   const [state, setState] = useState<ActivityExplorerState>(emptyState);
   const [search, setSearch] = useState('');
 
@@ -41,9 +42,9 @@ export default function App() {
   const selecting = state.selectedId !== null;
   const failure = state.listStatus === 'offline' || state.listStatus === 'error';
 
-  return <SafeAreaView style={styles.safe}>
+  return <SafeAreaView style={[styles.safe, tablet && styles.tabletShell]}>
     <StatusBar barStyle="dark-content" />
-    <View style={styles.panel}>
+    <View style={[styles.panel, tablet && styles.tabletPanel]}>
       <Text style={styles.brand}>CITY RUNNER</Text>
       <Text style={styles.heading}>{selected ? selected.name : selecting ? 'Activity detail' : 'Activities'}</Text>
       {selecting ? <>
@@ -65,7 +66,7 @@ export default function App() {
           {state.listStatus === 'ready' && state.items.length < state.total && <Pressable style={styles.more} onPress={() => void store.loadMore()}><Text style={styles.link}>Load more</Text></Pressable>}
         </ScrollView>
       </>}
-      <Text style={styles.mode}>{isFixture ? 'FIXTURE MODE · LOCAL SAMPLE DATA' : 'API · SIGN-IN REQUIRED'}</Text>
+      <Text style={styles.mode}>{isFixture ? 'FIXTURE MODE · LOCAL SAMPLE DATA' : isAuthError ? 'API · SIGN-IN REQUIRED' : 'API'}</Text>
     </View>
     <View style={styles.mapPanel}>
       <Map style={StyleSheet.absoluteFill} mapStyle="https://demotiles.maplibre.org/style.json">
@@ -83,7 +84,9 @@ function Message({ text, action, onPress, loading }: { text: string; action?: st
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f4f6f3' },
+  tabletShell: { flexDirection: 'row' },
   panel: { flex: 1, paddingHorizontal: 22, paddingTop: 24, backgroundColor: '#fbfcfa' },
+  tabletPanel: { flex: 0, width: 390 },
   brand: { color: '#143e35', fontSize: 12, letterSpacing: 1.5, fontWeight: '900' },
   heading: { color: '#153c34', fontSize: 25, fontWeight: '800', marginTop: 22, marginBottom: 12 },
   link: { color: '#31594c', fontWeight: '700', paddingVertical: 8 },

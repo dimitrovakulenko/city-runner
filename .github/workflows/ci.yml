@@ -23,6 +23,8 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Run SQLite backend tests
         run: python -m unittest discover -s backend/tests
+      - name: Check generated mobile API types
+        run: python apps/mobile/scripts/generate-api-types.py --check
       - name: Install PostgreSQL and PostGIS
         run: |
           sudo apt-get update
@@ -44,4 +46,6 @@ jobs:
       - run: npm ci
         working-directory: apps/mobile
       - run: npm run typecheck
+        working-directory: apps/mobile
+      - run: npm test
         working-directory: apps/mobile
