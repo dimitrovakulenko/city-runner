@@ -281,6 +281,93 @@ class ExplorerPostgisTests(unittest.TestCase):
         self.assertEqual(with_queued["coverage"]["status"], "ready")
         self.assertEqual(with_queued["coverage"]["pending_imports"], 1)
 
+        pending_sorted = self.client.get(f"/api/cities/{self.city_id}/streets", params={
+            "dataset_id": self.dataset, "filter": "nearly-complete", "sort": "completion-desc",
+        }, headers=self.headers()).json()
+        self.assertFalse(pending_sorted["filter_applied"])
+        self.assertFalse(pending_sorted["sort_applied"])
+        self.assertEqual(pending_sorted["sort"], "completion-desc")
+        self.assertEqual([row["name"] for row in pending_sorted["items"]],
+                         ["Long Road", "Tiny Road"])
+
+    def test_street_discovery_filters_and_sorts_global_result_before_paging(self):
+        self.add_source(self.account, "Discovery run", LONG_NODES[:9], activity_id=9_007_199_254_745_001)
+        roads = {
+            "Alpha Road": [*LONG_NODES[:8], *TINY_NODES[:2]],
+            "Beta Road": [*LONG_NODES[:8], *TINY_NODES[:2]],
+            "Delta Road": [*LONG_NODES[:9], TINY_NODES[0]],
+            "Gamma Road": [*LONG_NODES[:7], *TINY_NODES],
+        }
+        with self.engine.begin() as db:
+            road_ids = {}
+            for name, nodes in roads.items():
+                road_ids[name] = db.execute(text("""INSERT INTO streets
+                    (dataset_id,city_id,normalized_name,display_name,eligible_node_count)
+                    VALUES (:dataset,:city,:normalized,:name,:eligible) RETURNING id"""), {
+                    "dataset": self.dataset, "city": self.city_id,
+                    "normalized": name.lower().replace(" ", "-"), "name": name, "eligible": len(nodes),
+                }).scalar_one()
+                for node_id in nodes:
+                    db.execute(text("INSERT INTO street_nodes(dataset_id,street_id,osm_node_id) "
+                                    "VALUES (:dataset,:street,:node)"), {
+                        "dataset": self.dataset, "street": road_ids[name], "node": node_id,
+                    })
+            db.execute(text("""INSERT INTO manual_street_completions(account_id,dataset_id,street_id,reason)
+                VALUES (:account,:dataset,:street,'completed manually')"""), {
+                "account": self.account, "dataset": self.dataset, "street": road_ids["Beta Road"],
+            })
+
+        path = f"/api/cities/{self.city_id}/streets"
+
+        def page(*, sort="name", page=1, page_size=100, rule="normal", filter="all", account=None):
+            response = self.client.get(path, params={"dataset_id": self.dataset, "sort": sort, "page": page,
+                "page_size": page_size, "rule": rule, "filter": filter}, headers=self.headers(account))
+            self.assertEqual(response.status_code, 200, response.text)
+            return response.json()
+
+        name_first = page(page=1, page_size=2)
+        name_second = page(page=2, page_size=2)
+        self.assertEqual([row["name"] for row in name_first["items"]], ["Alpha Road", "Beta Road"])
+        self.assertEqual([row["name"] for row in name_second["items"]], ["Delta Road", "Gamma Road"])
+        self.assertEqual((name_first["sort"], name_first["sort_applied"]), ("name", True))
+
+        descending = page(sort="completion-desc")
+        self.assertEqual([row["name"] for row in descending["items"]], [
+            "Delta Road", "Long Road", "Alpha Road", "Beta Road", "Gamma Road", "Tiny Road",
+        ])
+        self.assertEqual([row["name"] for row in page(sort="completion-desc", page=1, page_size=2)["items"]],
+                         ["Delta Road", "Long Road"])
+        self.assertEqual([row["name"] for row in page(sort="completion-desc", page=2, page_size=2)["items"]],
+                         ["Alpha Road", "Beta Road"])
+        ascending = page(sort="completion-asc")
+        self.assertEqual([row["name"] for row in ascending["items"]], [
+            "Tiny Road", "Gamma Road", "Alpha Road", "Beta Road", "Long Road", "Delta Road",
+        ])
+        remaining = page(sort="remaining-asc")
+        self.assertEqual([row["name"] for row in remaining["items"]], [
+            "Delta Road", "Alpha Road", "Beta Road", "Long Road", "Gamma Road", "Tiny Road",
+        ])
+
+        normal_nearly = page(filter="nearly-complete")
+        self.assertEqual([row["name"] for row in normal_nearly["items"]], ["Alpha Road", "Long Road"])
+        strict_nearly = page(rule="strict", filter="nearly-complete")
+        self.assertEqual([row["name"] for row in strict_nearly["items"]], [
+            "Alpha Road", "Delta Road", "Long Road",
+        ])
+        beta = self.client.get(f"/api/streets/{road_ids['Beta Road']}",
+            params={"dataset_id": self.dataset, "rule": "strict"}, headers=self.headers()).json()
+        self.assertEqual((beta["visited_nodes"], beta["state"], beta["manual_completed"],
+                          beta["effective_state"]), (8, "partial", True, "complete"))
+
+        other_order = page(sort="completion-desc", account=self.other)
+        self.assertEqual([row["name"] for row in other_order["items"]], [
+            "Alpha Road", "Beta Road", "Delta Road", "Gamma Road", "Long Road", "Tiny Road",
+        ])
+        self.assertTrue(all(row["visited_nodes"] == 0 for row in other_order["items"]))
+        invalid = self.client.get(path, params={"dataset_id": self.dataset, "sort": "completion-random"},
+                                  headers=self.headers())
+        self.assertEqual(invalid.status_code, 422)
+
     def test_live_support_ignores_failed_jobs_and_obsolete_source_revisions(self):
         activity_id = 9_007_199_254_744_001
         source_id = self.add_source(self.account, "Revision test run", [TINY_NODES[0]],
@@ -298,6 +385,12 @@ class ExplorerPostgisTests(unittest.TestCase):
         self.assertFalse(failed["activities_available"])
         self.assertEqual(failed["coverage"]["status"], "failed")
         self.assertIsNone(failed["total"])
+        fallback = self.client.get(f"/api/cities/{self.city_id}/streets", params={
+            "dataset_id": self.dataset, "filter": "nearly-complete", "sort": "remaining-asc",
+        }, headers=self.headers()).json()
+        self.assertFalse(fallback["filter_applied"])
+        self.assertFalse(fallback["sort_applied"])
+        self.assertEqual([row["name"] for row in fallback["items"]], ["Long Road", "Tiny Road"])
 
         with self.engine.begin() as db:
             db.execute(text("UPDATE jobs SET status='succeeded' WHERE id=:job"), {"job": job_id})

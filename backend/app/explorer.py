@@ -19,7 +19,8 @@ MAX_PAGE_SIZE = 100
 DEFAULT_PAGE_SIZE = 50
 STATEMENT_TIMEOUT_MS = 1500
 Rule = Literal["normal", "strict"]
-StreetFilter = Literal["all", "incomplete", "partial", "completed"]
+StreetFilter = Literal["all", "incomplete", "partial", "completed", "nearly-complete"]
+StreetSort = Literal["name", "completion-desc", "completion-asc", "remaining-asc"]
 
 
 class DatasetCoverage(BaseModel):
@@ -83,6 +84,8 @@ class StreetPage(BaseModel):
     coverage: DatasetCoverage
     filter: StreetFilter
     filter_applied: bool
+    sort: StreetSort
+    sort_applied: bool
     items: list[StreetItem]
     page: int
     page_size: int
@@ -182,6 +185,7 @@ def create_explorer_router(engine: Engine, current_user: Callable[..., str]) -> 
         dataset_id: int = Query(ge=1, le=MAX_BIGINT),
         rule: Rule = Query("normal"),
         filter: StreetFilter = Query("all"),
+        sort: StreetSort = Query("name"),
         page: int = Query(1, ge=1, le=1_000_000),
         page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=MAX_PAGE_SIZE),
         q: str | None = Query(None, max_length=200),
@@ -195,7 +199,7 @@ def create_explorer_router(engine: Engine, current_user: Callable[..., str]) -> 
             params = {
                 "dataset_id": dataset_id, "city_id": city_id, "account_id": account_id,
                 "q": q or "", "filter": filter, "rule": rule, "limit": page_size,
-                "offset": (page - 1) * page_size,
+                "offset": (page - 1) * page_size, "sort": sort,
             }
             query = _STREET_LIST_QUERY_READY if ready else _STREET_LIST_QUERY_PENDING
             rows = db.execute(text(query), params).mappings().all()
@@ -212,6 +216,7 @@ def create_explorer_router(engine: Engine, current_user: Callable[..., str]) -> 
         return StreetPage(dataset_id=str(dataset_id), city_id=str(city_id),
                           dataset_state=dataset["state"], rule=rule, coverage=coverage,
                           filter=filter, filter_applied=ready or filter == "all",
+                          sort=sort, sort_applied=ready or sort == "name",
                           items=items, page=page, page_size=page_size, total=total)
 
     @router.get("/api/streets/{street_id}", response_model=StreetDetail)
@@ -582,13 +587,19 @@ _STREET_SELECT_READY = f"""
       WHERE :filter='all' OR (:filter='completed' AND effective_state='complete')
         OR (:filter='partial' AND manual_reason IS NULL AND state='partial')
         OR (:filter='incomplete' AND manual_reason IS NULL AND state IN ('partial','missing'))
+        OR (:filter='nearly-complete' AND manual_reason IS NULL
+            AND visited_nodes::numeric / eligible_nodes >= 0.8 AND visited_nodes < threshold)
     )
 """
 
 _STREET_LIST_QUERY_READY = _STREET_SELECT_READY + """
     SELECT id,name,visited_nodes,eligible_nodes,threshold,state,manual_reason,
       (manual_reason IS NOT NULL) AS manual_completed,effective_state,total FROM filtered
-    ORDER BY lower(name),id LIMIT :limit OFFSET :offset
+    ORDER BY
+      CASE WHEN :sort='completion-desc' THEN visited_nodes::numeric / eligible_nodes END DESC,
+      CASE WHEN :sort='completion-asc' THEN visited_nodes::numeric / eligible_nodes END ASC,
+      CASE WHEN :sort='remaining-asc' THEN eligible_nodes-visited_nodes END ASC,
+      lower(name),id LIMIT :limit OFFSET :offset
 """
 
 _STREET_COUNT_READY = _STREET_SELECT_READY + "SELECT count(*) FROM filtered"

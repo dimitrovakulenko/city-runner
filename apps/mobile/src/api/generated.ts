@@ -113,8 +113,10 @@ export type StreetPage = {
   dataset_state: 'active' | 'importing' | 'retired';
   rule: 'normal' | 'strict';
   coverage: DatasetCoverage;
-  filter: 'all' | 'incomplete' | 'partial' | 'completed';
+  filter: 'all' | 'incomplete' | 'partial' | 'completed' | 'nearly-complete';
   filter_applied: boolean;
+  sort: 'name' | 'completion-desc' | 'completion-asc' | 'remaining-asc';
+  sort_applied: boolean;
   items: Array<StreetItem>;
   page: number;
   page_size: number;
