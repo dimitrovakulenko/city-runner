@@ -7,7 +7,7 @@ import re
 from collections.abc import Callable
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Request, status
 from pydantic import BaseModel
 from python_multipart.exceptions import MultipartParseError
 from sqlalchemy import Engine, text
@@ -16,6 +16,7 @@ from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.concurrency import run_in_threadpool
 
 from backend.app.coverage import queue_source_coverage
+from backend.app.fit import parse_fit
 from backend.app.gpx import GpxError, MAX_GPX_BYTES, parse_gpx
 from backend.app.jobs import complete, enqueue, fail
 from backend.app.storage import LocalObjectStore
@@ -45,7 +46,7 @@ class UploadBodyTooLarge(MultiPartException):
     pass
 
 
-async def _one_gpx_file(request: Request) -> bytes:
+async def _one_activity_file(request: Request, *, expected_format: str | None = None) -> tuple[bytes, str]:
     content_length = request.headers.get("content-length")
     if content_length:
         try:
@@ -76,15 +77,31 @@ async def _one_gpx_file(request: Request) -> bytes:
     try:
         items = form.multi_items()
         if len(items) != 1 or items[0][0] != "file" or not isinstance(items[0][1], UploadFile):
-            raise HTTPException(status_code=422, detail="Upload one GPX file in the 'file' field.")
+            raise HTTPException(status_code=422, detail="Upload one GPX or FIT file in the 'file' field.")
+        filename = items[0][1].filename or ""
+        extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        if expected_format is not None and expected_format not in {"gpx", "fit"}:
+            raise ValueError("unsupported expected format")
         content = await items[0][1].read(MAX_GPX_BYTES + 1)
         if len(content) > MAX_GPX_BYTES:
-            raise HTTPException(status_code=413, detail="GPX file exceeds the 10 MiB limit.")
+            raise HTTPException(status_code=413, detail="Activity file exceeds the 10 MiB limit.")
         if not content:
-            raise HTTPException(status_code=422, detail="GPX file is empty.")
-        return content
+            raise HTTPException(status_code=422, detail="Activity file is empty.")
+        actual_format = extension if extension in {"gpx", "fit"} else (
+            "fit" if len(content) >= 12 and content[8:12] == b".FIT" else "gpx"
+        )
+        if expected_format is not None and actual_format != expected_format:
+            raise HTTPException(status_code=422, detail="File does not match the batch item's format.")
+        return content, actual_format
     finally:
         await form.close()
+
+
+async def _one_gpx_file(request: Request) -> bytes:
+    content, extension = await _one_activity_file(request)
+    if extension != "gpx":
+        raise HTTPException(status_code=422, detail="Upload one GPX file in the 'file' field.")
+    return content
 
 
 def _job_state(job_status: str | None, source_status: str) -> str:
@@ -102,26 +119,29 @@ def _safe_error(value: str | None) -> str | None:
 
 
 def _persist_upload(engine: Engine, object_store: LocalObjectStore, account_id: str,
-                    content: bytes) -> dict[str, Any]:
+                    content: bytes, source_kind: str = "gpx") -> dict[str, Any]:
+    if source_kind not in {"gpx", "fit"}:
+        raise ValueError("unsupported source kind")
     content_hash = hashlib.sha256(content).hexdigest()
-    object_key = object_store.write(content)
+    object_key = object_store.write(content, extension=source_kind)
     duplicate = False
     try:
         with engine.begin() as db:
             row = db.execute(text("""INSERT INTO activity_sources
                 (account_id, source_kind, content_hash, revision, private_object_key, status)
-                VALUES (:account_id, 'gpx', :content_hash, 1, :object_key, 'queued')
+                VALUES (:account_id, :source_kind, :content_hash, 1, :object_key, 'queued')
                 ON CONFLICT (account_id, source_kind, content_hash) DO NOTHING
                 RETURNING id, revision, status"""), {
                 "account_id": account_id,
+                "source_kind": source_kind,
                 "content_hash": content_hash,
                 "object_key": object_key,
             }).mappings().first()
             if row is None:
                 duplicate = True
                 row = db.execute(text("""SELECT id, revision, status FROM activity_sources
-                    WHERE account_id=:account_id AND source_kind='gpx' AND content_hash=:content_hash"""), {
-                    "account_id": account_id, "content_hash": content_hash,
+                    WHERE account_id=:account_id AND source_kind=:source_kind AND content_hash=:content_hash"""), {
+                    "account_id": account_id, "source_kind": source_kind, "content_hash": content_hash,
                 }).mappings().one()
             dedupe_key = f"upload:{row['id']}:r{row['revision']}"
             job = enqueue(db, account_id=account_id, kind="process_upload", dedupe_key=dedupe_key,
@@ -160,12 +180,13 @@ def create_upload_router(engine: Engine, current_user: Callable[..., str],
                      }},
                  }}}})
     async def upload(request: Request, account_id: str = Depends(current_user)):
-        content = await _one_gpx_file(request)
+        content, source_kind = await _one_activity_file(request)
         object_store = get_store()
-        return await run_in_threadpool(_persist_upload, engine, object_store, account_id, content)
+        return await run_in_threadpool(_persist_upload, engine, object_store, account_id, content, source_kind)
 
     @router.get("/api/uploads/{source_id}", response_model=UploadStatusResponse)
-    def get_upload(source_id: int, account_id: str = Depends(current_user)):
+    def get_upload(source_id: int = Path(ge=1, le=9223372036854775807),
+                   account_id: str = Depends(current_user)):
         with engine.connect() as db:
             row = db.execute(text("""SELECT source.id, source.activity_id, source.status AS source_status,
                     source.last_error, job.id AS job_id, job.status AS job_status, job.last_error AS job_error
@@ -195,7 +216,7 @@ def _locked_context(db, job_id: int, lease_token: str, source_id: int, revision:
     }).mappings().first()
     if job is None:
         return None, None
-    source = db.execute(text("""SELECT id, account_id, activity_id, revision, private_object_key, status
+    source = db.execute(text("""SELECT id, account_id, activity_id, revision, private_object_key, status, source_kind
         FROM activity_sources WHERE id=:id FOR UPDATE"""), {"id": source_id}).mappings().first()
     if (source is None or source["account_id"] != job["account_id"] or job["kind"] != "process_upload"
             or source["revision"] != revision):
@@ -266,7 +287,8 @@ def process_upload(engine: Engine, job: dict[str, Any], store: LocalObjectStore 
                      account_id=account_id, revision=revision, error_code="source_unavailable", permanent=False)
         return
     try:
-        parsed = parse_gpx(content)
+        parser = parse_fit if source["source_kind"] == "fit" else parse_gpx
+        parsed = parser(content)
     except GpxError as exc:
         _mark_failed(engine, job_id=job_id, lease_token=lease_token, source_id=source_id,
                      account_id=account_id, revision=revision, error_code=exc.code, permanent=True)

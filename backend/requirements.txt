@@ -6,4 +6,5 @@ psycopg[binary]>=3.2,<4
 httpx2>=0.1
 PyJWT[crypto]>=2.10,<3
 defusedxml>=0.7,<1
+fitdecode==0.11.0
 python-multipart>=0.0.20,<1

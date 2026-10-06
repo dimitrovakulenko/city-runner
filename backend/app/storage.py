@@ -8,7 +8,7 @@ import uuid
 from pathlib import Path
 
 
-_OBJECT_KEY = re.compile(r"[0-9a-f]{32}\.gpx\Z")
+_OBJECT_KEY = re.compile(r"[0-9a-f]{32}\.(?:gpx|fit)\Z")
 MAX_OBJECT_BYTES = 10 * 1024 * 1024
 
 
@@ -19,8 +19,10 @@ class LocalObjectStore:
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chmod(self.root, 0o700)
 
-    def write(self, content: bytes) -> str:
-        key = f"{uuid.uuid4().hex}.gpx"
+    def write(self, content: bytes, *, extension: str = "gpx") -> str:
+        if extension not in {"gpx", "fit"}:
+            raise ValueError("unsupported source extension")
+        key = f"{uuid.uuid4().hex}.{extension}"
         path = self.root / key
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
         descriptor = os.open(path, flags, 0o600)
