@@ -17,12 +17,19 @@ import type { ActivityExplorerState } from './src/activityStore';
 import { createCorrectionApi } from './src/api/corrections';
 import { CorrectionStore } from './src/correctionStore';
 import type { CorrectionState } from './src/correctionStore';
+import * as Crypto from 'expo-crypto';
+import { createImportBatchApi, createFixtureImportBatchApi } from './src/api/importBatches';
+import { ImportStore } from './src/importStore';
 
 const fixtureMode = process.env.EXPO_PUBLIC_FIXTURE_MODE === 'true';
 const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8001';
 const defaultMapStyle = 'https://tiles.openfreemap.org/styles/liberty';
 const activityStore = new ActivityStore(fixtureMode ? fixtureApi : mobileApi);
 const exploreStore = new ExploreStore(fixtureMode ? createFixtureExploreApi() : createExploreApi({ baseUrl: apiBaseUrl, sessionStore: secureSessionStore }));
+const importStore = new ImportStore(fixtureMode ? createFixtureImportBatchApi() : createImportBatchApi({ baseUrl: apiBaseUrl, sessionStore: secureSessionStore }), Crypto.randomUUID, () => {
+  void exploreStore.refreshAfterCorrection();
+  void activityStore.loadPage();
+});
 const cityExplorerStore = new CityExplorerStore(fixtureMode ? createFixtureCityExplorerApi() : createCityExplorerApi({ baseUrl: apiBaseUrl, sessionStore: secureSessionStore }));
 const correctionStore = new CorrectionStore(createCorrectionApi({ baseUrl: apiBaseUrl, sessionStore: secureSessionStore }), (operation, id) => {
   if (operation === 'activity-delete') activityStore.activityDeleted(id);
@@ -64,6 +71,7 @@ export default function App() {
     activityStore.reset();
     correctionStore.reset();
     exploreStore.reset();
+    importStore.reset();
     cityExplorerStore.reset();
     setSearch('');
     setHasSession(false);
@@ -86,6 +94,7 @@ export default function App() {
     activityStore.reset();
     correctionStore.reset();
     exploreStore.reset();
+    importStore.reset();
     cityExplorerStore.reset();
     setSearch('');
     const signedIn = authController.getState().status === 'signed-in' && Boolean(token);
@@ -128,7 +137,7 @@ export default function App() {
       </View>
     </View>
     {page === 'explore'
-      ? <ExploreScreen store={exploreStore} fixtureMode={fixtureMode} enabled={fixtureMode || hasSession === true} accountGeneration={accountGeneration} tablet={tablet} />
+      ? <ExploreScreen store={exploreStore} importStore={importStore} fixtureMode={fixtureMode} enabled={fixtureMode || hasSession === true} accountGeneration={accountGeneration} tablet={tablet} />
       : page === 'cities'
         ? <CityExplorerScreen store={cityExplorerStore} correctionStore={correctionStore} fixtureMode={fixtureMode} enabled={!fixtureMode && hasSession === true} accountGeneration={accountGeneration}
             onMarkComplete={markStreetManually} onUndoManual={undoStreetManually}
