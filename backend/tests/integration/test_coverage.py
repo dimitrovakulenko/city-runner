@@ -422,6 +422,56 @@ class CoveragePostgisTests(unittest.TestCase):
                 "account": alice, "source": source_id, "dataset": self.dataset_id,
             }).scalar_one(), 1)
 
+    def test_requeue_after_matcher_activity_lock_does_not_deadlock(self):
+        alice = self.accounts[0]
+        source_id, activity_id = self.add_source(0, [[[0, 0]]])
+        job = claim(self.engine, kind="match_coverage")
+        activity_locked, release_matcher = threading.Event(), threading.Event()
+        requeue_started = threading.Event()
+        errors = []
+        original_samples = coverage_module._samples_from_tracks
+
+        def pause_after_activity_read(tracks):
+            if threading.current_thread().name == "coverage-matcher":
+                activity_locked.set()
+                if not release_matcher.wait(5):
+                    raise RuntimeError("coverage concurrency test timed out")
+            return original_samples(tracks)
+
+        def run_match():
+            try:
+                process_source_dataset(self.engine, job)
+            except BaseException as exc:
+                errors.append(exc)
+
+        def run_requeue():
+            requeue_started.set()
+            try:
+                requeue_dataset_coverage(self.engine, self.dataset_id, batch_size=1,
+                                         max_sources=1, after_source_id=source_id - 1)
+            except BaseException as exc:
+                errors.append(exc)
+
+        with patch.object(coverage_module, "_samples_from_tracks", side_effect=pause_after_activity_read):
+            matcher = threading.Thread(target=run_match, name="coverage-matcher")
+            matcher.start()
+            self.assertTrue(activity_locked.wait(5))
+            requeue = threading.Thread(target=run_requeue)
+            requeue.start()
+            self.assertTrue(requeue_started.wait(5))
+            time.sleep(0.05)
+            release_matcher.set()
+            matcher.join(5)
+            requeue.join(5)
+        self.assertFalse(matcher.is_alive())
+        self.assertFalse(requeue.is_alive())
+        self.assertEqual(errors, [])
+        with self.engine.connect() as db:
+            self.assertEqual(get_account_coverage(db, alice, self.dataset_id)["status"], "ready")
+            self.assertTrue(db.execute(text("SELECT processed FROM activities WHERE id=:id"), {
+                "id": activity_id,
+            }).scalar_one())
+
     def test_exhausted_coverage_job_is_failed_and_hides_counts(self):
         alice = self.accounts[0]
         source_id, _ = self.add_source(0, [[[0, 0]]])

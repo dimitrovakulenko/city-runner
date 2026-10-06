@@ -142,6 +142,7 @@ def queue_source_coverage(db: Connection, *, account_id: str, source_id: int,
 
     unmapped_points = _count_unsupported_samples(db, points)
     queued: list[dict[str, Any]] = []
+    pending_datasets: list[int] = []
     for dataset_id in datasets:
         key = f"source:{source_id}:r{source_revision}:dataset:{dataset_id}"
         job = enqueue(db, account_id=account_id, kind="match_coverage", dedupe_key=key,
@@ -180,10 +181,14 @@ def queue_source_coverage(db: Connection, *, account_id: str, source_id: int,
                 })
             elif existing["status"] == "succeeded" and existing["job_status"] == "succeeded":
                 continue
-        _pending_summary(db, account_id, dataset_id)
+        pending_datasets.append(dataset_id)
         queued.append({"dataset_id": dataset_id, "job_id": str(job["id"])})
     _refresh_activity_processing(db, account_id=account_id, source_id=source_id,
                                  source_revision=source_revision, activity_id=activity_id)
+    # Match workers lock the activity before the account summary. Keep this order
+    # when queueing so a requeue never holds the summary while waiting on activity.
+    for dataset_id in pending_datasets:
+        _pending_summary(db, account_id, dataset_id)
     return {"dataset_ids": list(datasets), "jobs": queued,
             "sample_count": len(points), "unmapped_points": unmapped_points}
 
@@ -373,7 +378,9 @@ def _active_dataset_count(db: Connection) -> int:
 
 def _refresh_activity_processing(db: Connection, *, account_id: str, source_id: int,
                                  source_revision: int, activity_id: int) -> None:
-    tracks = db.execute(text("SELECT tracks FROM activities WHERE id=:id AND user_id=:account_id"), {
+    # Acquire the activity lock before reading run/job truth so a concurrent
+    # matcher cannot commit success while this refresh still writes stale false.
+    tracks = db.execute(text("SELECT tracks FROM activities WHERE id=:id AND user_id=:account_id FOR UPDATE"), {
         "id": activity_id, "account_id": account_id,
     }).scalar_one()
     points = _samples_from_tracks(tracks)
