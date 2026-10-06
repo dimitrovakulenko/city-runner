@@ -4,9 +4,12 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response, Security
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Response, Security
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
+from starlette.responses import JSONResponse
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
@@ -17,6 +20,7 @@ from backend.app.explorer import create_explorer_router
 from backend.app.map_api import create_map_router
 from backend.app.uploads import create_upload_router
 from backend.app.import_batches import create_import_batch_router
+from backend.app.routes import create_routes_router
 
 
 class ChallengeRequest(BaseModel):
@@ -48,11 +52,18 @@ class MeResponse(BaseModel):
     id: str
 
 
-def create_app(engine: Engine | None = None, identity_resolver: Callable[..., Any] | None = None) -> FastAPI:
+def create_app(engine: Engine | None = None, identity_resolver: Callable[..., Any] | None = None,
+               routing_provider: Callable[..., Any] | None = None) -> FastAPI:
     engine = engine or create_engine(os.getenv("DATABASE_URL", "postgresql+psycopg://localhost/activities"), pool_pre_ping=True)
     app = FastAPI()
     app.state.engine = engine
     bearer_docs = HTTPBearer(auto_error=False)
+
+    @app.exception_handler(RequestValidationError)
+    async def safe_route_validation_error(request: Request, exc: RequestValidationError):
+        if request.url.path.startswith("/api/routes"):
+            return JSONResponse(status_code=422, content={"detail": "Invalid route request."})
+        return await request_validation_exception_handler(request, exc)
 
     def bearer_token(
         authorization: str | None = Header(None, include_in_schema=False),
@@ -116,6 +127,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
 
     app.include_router(create_upload_router(engine, current_user))
     app.include_router(create_import_batch_router(engine, current_user))
+    app.include_router(create_routes_router(engine, current_user, routing_provider))
     app.include_router(create_map_router(engine, current_user))
     app.include_router(create_explorer_router(engine, current_user))
     app.include_router(create_corrections_router(engine, current_user))

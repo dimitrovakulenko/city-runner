@@ -176,6 +176,73 @@ export type ImportBatchPage = {
   total: number;
 };
 
+export type RoutePreviewRequest = {
+  waypoints: Array<[number, number]>;
+  client_revision: number;
+};
+
+export type RoutePreviewResponse = {
+  client_revision: number;
+  geometry: RouteGeometry;
+  distance_m: number;
+  duration_s: number;
+  provider: string;
+  attribution: RouteAttribution;
+};
+
+export type RouteCreateRequest = {
+  waypoints: Array<[number, number]>;
+  name: string;
+};
+
+export type RouteUpdateRequest = {
+  waypoints: Array<[number, number]>;
+  name: string;
+  expected_revision: number;
+};
+
+export type RouteDetail = {
+  id: string;
+  name: string;
+  revision: number;
+  distance_m: number;
+  created_at: string;
+  updated_at: string;
+  waypoints: Array<[number, number]>;
+  geometry: RouteGeometry;
+  duration_s: number;
+  provider: string;
+  attribution: RouteAttribution;
+};
+
+export type RouteSummary = {
+  id: string;
+  name: string;
+  revision: number;
+  distance_m: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RoutePage = {
+  items: Array<RouteSummary>;
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type RouteGeometry = {
+  type: 'LineString';
+  coordinates: Array<[number, number]>;
+};
+
+export type RouteAttribution = {
+  text: string;
+  url: string;
+  fix_map_url: string;
+  waypoints_notice: string;
+};
+
 export type CityItem = {
   id: string;
   name: string;

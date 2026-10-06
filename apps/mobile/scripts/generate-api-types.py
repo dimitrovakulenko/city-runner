@@ -37,12 +37,23 @@ SCHEMAS = (
     "ImportBatchCreate",
     "ImportBatchResponse",
     "ImportBatchPage",
+    "RoutePreviewRequest",
+    "RoutePreviewResponse",
+    "RouteCreateRequest",
+    "RouteUpdateRequest",
+    "RouteDetail",
+    "RouteSummary",
+    "RoutePage",
+    "RouteGeometry",
+    "RouteAttribution",
 )
 
 
 def render(schema: dict[str, Any]) -> str:
     if "$ref" in schema:
         return schema["$ref"].rsplit("/", 1)[-1]
+    if "const" in schema:
+        return repr(schema["const"])
     if "enum" in schema:
         return " | ".join(repr(value) for value in schema["enum"])
     if "anyOf" in schema:
