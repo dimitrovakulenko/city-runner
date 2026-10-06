@@ -5,7 +5,7 @@ import { loadGoogleProvider } from './GoogleProvider';
 import { secureSessionStore } from './secureSession';
 
 export const mobileApi = createActivityApi({
-  baseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000',
+  baseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8001',
   sessionStore: secureSessionStore,
 });
 
