@@ -105,7 +105,8 @@ export class ImportStore {
       batch.items.forEach((item, index) => { const file = selection.accepted[index]; if (file && item.status === 'awaiting_upload') local.set(item.id, file); });
       this.files.set(batch.id, local);
       this.upsertBatch(batch);
-      await this.uploadAwaiting(batch.id);
+      if (this.uploadOwner) this.resumeRequested.add(batch.id);
+      else await this.uploadAwaiting(batch.id);
     } catch (error) { if (revision === this.revision) this.update({ error: message(error) }); }
   }
 

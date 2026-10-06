@@ -132,3 +132,36 @@ test('manifest creation is serialized and a failed upload has a direct retry wit
   await expect(page.getByText('Already imported', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Choose activity files' })).toBeEnabled();
 });
+
+test('tab navigation during manifest creation cannot strand a second batch or overlap uploads', async ({ page }) => {
+  await signIn(page, 'bob'); await page.getByRole('button', { name: 'Imports', exact: true }).click();
+  let releaseManifest!: () => void; const manifestGate = new Promise<void>((resolve) => { releaseManifest = resolve; });
+  let releaseUpload!: () => void; const uploadGate = new Promise<void>((resolve) => { releaseUpload = resolve; });
+  const ids: string[] = []; let held = false; let uploading = false; let active = 0;
+  await page.route('**/api/import-batches', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    const response = await route.fetch(); ids.push((await response.json()).id);
+    if (ids.length === 1) { held = true; await manifestGate; }
+    await route.fulfill({ response });
+  });
+  await page.route('**/api/import-batches/*/items/*/upload', async (route) => {
+    expect(++active).toBe(1);
+    if (!uploading) { uploading = true; await uploadGate; }
+    const response = page.waitForResponse((response) => response.url() === route.request().url());
+    await route.continue(); await response; active--;
+  });
+  const select = async (filename: string) => {
+    const chooser = page.waitForEvent('filechooser'); await page.getByRole('button', { name: 'Choose activity files' }).click();
+    await (await chooser).setFiles(`tests/.fixtures/${filename}`);
+  };
+  await select('browser.gpx'); await expect.poll(() => held).toBe(true);
+  await page.getByRole('button', { name: 'Activities', exact: true }).click();
+  await page.getByRole('button', { name: 'Imports', exact: true }).click();
+  await select('browser.fit'); await expect.poll(() => uploading).toBe(true);
+  releaseManifest(); await expect(page.getByText('Ready to upload', { exact: true })).toBeVisible(); releaseUpload();
+  await expect.poll(async () => Promise.all(ids.map(async (id) => {
+    const response = await page.request.get(`/api/import-batches/${id}`, { headers: { Authorization: 'Bearer web-synthetic-bob' } });
+    return (await response.json()).counts.awaiting_upload;
+  }))).toEqual([0, 0]);
+  await expect(page.getByRole('button', { name: 'Choose activity files' })).toBeEnabled();
+});

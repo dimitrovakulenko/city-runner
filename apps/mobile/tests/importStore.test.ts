@@ -101,6 +101,28 @@ test('account reset fences delayed manifest creation and response cannot upload 
   assert.deepEqual(fake.uploaded, []);
 });
 
+test('a manifest created during another upload queues its files and drains sequentially', async () => {
+  const fake = fakeApi(batch([])); const batches = new Map<string, ImportBatchResponse>(); const uploaded: string[] = [];
+  fake.api.createBatch = async (body) => {
+    const created = { ...batch(body.files.map((file) => item(file.name, 'awaiting_upload', file.name))), id: body.request_id };
+    batches.set(created.id, created); return clone(created);
+  };
+  fake.api.getBatch = async (id) => clone(batches.get(id)!);
+  let release!: () => void; let active = 0;
+  fake.api.uploadItem = async (id, itemId) => {
+    assert.equal(++active, 1); uploaded.push(itemId);
+    if (uploaded.length === 1) await new Promise<void>((resolve) => { release = resolve; });
+    const current = batches.get(id)!; const row = current.items.find((entry) => entry.id === itemId)!; row.status = 'queued';
+    Object.assign(current, batch(current.items), { id }); active--; return clone(row);
+  };
+  let request = 0; const store = new ImportStore(fake.api, () => `batch-${++request}`);
+  const first = store.createFromSelection([{ uri: 'a', name: 'one.gpx' }]); await tick();
+  await store.createFromSelection([{ uri: 'b', name: 'two.fit' }]);
+  assert.deepEqual(uploaded, ['one.gpx']); release(); await first;
+  assert.deepEqual(uploaded, ['one.gpx', 'two.fit']);
+  assert.equal(store.getState().batches.every((entry) => entry.counts.awaiting_upload === 0), true);
+});
+
 test('foreground manifest polling does not overlap slow requests and account reset releases the old owner safely', async () => {
   const fake = fakeApi(batch([item('item-1', 'processing')]));
   await fake.api.listBatches(1);
