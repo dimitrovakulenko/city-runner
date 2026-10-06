@@ -5,7 +5,10 @@ import type { Feature, MultiLineString } from 'geojson';
 import { ActivityStore } from './src/activityStore';
 import { ExploreScreen } from './src/ExploreScreen';
 import { ExploreStore } from './src/exploreStore';
+import { CityExplorerScreen } from './src/CityExplorerScreen';
+import { CityExplorerStore } from './src/cityExplorerStore';
 import { createExploreApi, createFixtureExploreApi } from './src/api/explore';
+import { createCityExplorerApi, createFixtureCityExplorerApi } from './src/api/cities';
 import { fixtureApi } from './src/api/fixture';
 import { AuthPanel } from './src/auth/AuthPanel';
 import { mobileApi, authController } from './src/auth/runtime';
@@ -17,11 +20,12 @@ const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:800
 const defaultMapStyle = 'https://tiles.openfreemap.org/styles/liberty';
 const activityStore = new ActivityStore(fixtureMode ? fixtureApi : mobileApi);
 const exploreStore = new ExploreStore(fixtureMode ? createFixtureExploreApi() : createExploreApi({ baseUrl: apiBaseUrl, sessionStore: secureSessionStore }));
+const cityExplorerStore = new CityExplorerStore(fixtureMode ? createFixtureCityExplorerApi() : createCityExplorerApi({ baseUrl: apiBaseUrl, sessionStore: secureSessionStore }));
 const demoStyle = 'https://demotiles.maplibre.org/style.json';
 
 export default function App() {
   const tablet = useWindowDimensions().width >= 850;
-  const [page, setPage] = useState<'activities' | 'explore'>('activities');
+  const [page, setPage] = useState<'activities' | 'explore' | 'cities'>('activities');
   const [activity, setActivity] = useState<ActivityExplorerState>(activityStore.getState());
   const [search, setSearch] = useState('');
   const [hasSession, setHasSession] = useState<boolean | null>(fixtureMode ? true : null);
@@ -47,6 +51,7 @@ export default function App() {
     knownSessionToken.current = undefined;
     activityStore.reset();
     exploreStore.reset();
+    cityExplorerStore.reset();
     setSearch('');
     setHasSession(false);
     void secureSessionStore.getToken().then((token) => {
@@ -67,6 +72,7 @@ export default function App() {
     knownSessionToken.current = token;
     activityStore.reset();
     exploreStore.reset();
+    cityExplorerStore.reset();
     setSearch('');
     const signedIn = authController.getState().status === 'signed-in' && Boolean(token);
     setHasSession(signedIn);
@@ -89,11 +95,22 @@ export default function App() {
       <View style={styles.tabs}>
         <Tab title="Activities" selected={page === 'activities'} onPress={() => setPage('activities')} />
         <Tab title="Explore" selected={page === 'explore'} onPress={() => setPage('explore')} />
+        <Tab title="Cities" selected={page === 'cities'} onPress={() => setPage('cities')} />
       </View>
     </View>
     {page === 'explore'
       ? <ExploreScreen store={exploreStore} fixtureMode={fixtureMode} enabled={fixtureMode || hasSession === true} accountGeneration={accountGeneration} tablet={tablet} />
-      : <View style={[styles.activityShell, tablet && styles.activityTablet]}>
+      : page === 'cities'
+        ? <CityExplorerScreen store={cityExplorerStore} fixtureMode={fixtureMode} enabled={!fixtureMode && hasSession === true} accountGeneration={accountGeneration}
+            onShowNode={(node, rule, generation) => {
+              if (generation !== accountChangeRequest.current || hasSession !== true || authController.getState().status !== 'signed-in') return;
+              exploreStore.setRule(rule); exploreStore.focusCoordinates(node.longitude, node.latitude); setPage('explore');
+            }}
+            onOpenActivity={(id, generation) => {
+              if (generation !== accountChangeRequest.current || hasSession !== true || authController.getState().status !== 'signed-in') return;
+              void activityStore.selectActivity(id); setPage('activities');
+            }} />
+        : <View style={[styles.activityShell, tablet && styles.activityTablet]}>
           <View style={[styles.panel, tablet && styles.tabletPanel]}>
             <Text style={styles.heading}>{selected?.name ?? (selecting ? 'Activity detail' : 'Activities')}</Text>
             {selecting ? <>

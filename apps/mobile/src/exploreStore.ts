@@ -94,6 +94,15 @@ export class ExploreStore {
     this.update({ map: null, mapStatus: 'loading', mapError: null });
   }
 
+  focusCoordinates(longitude: number, latitude: number, zoom = 18): void {
+    const span = 0.0015;
+    this.mapRequest++;
+    this.progressRequest++;
+    this.viewportChangePending = false;
+    this.update({ viewport: { bbox: [longitude - span, latitude - span, longitude + span, latitude + span], zoom },
+      map: null, mapStatus: 'loading', mapError: null });
+  }
+
   async retry(): Promise<void> {
     this.foregroundPolls = 0;
     const uploads = this.state.uploads.map((item) => item.status === 'queued' || item.status === 'processing'
