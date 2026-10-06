@@ -220,6 +220,17 @@ test('logout does not claim local sign-out when secure storage cannot be read or
   });
   assert.equal(remoteLogoutCalls, 0);
 
+  const knownAccountStorage = new MemorySecureStore();
+  knownAccountStorage.value = 'session';
+  const knownAccountStore = createSecureSessionStore(knownAccountStorage);
+  const knownAccountController = new AuthController(api(), identity(), knownAccountStore);
+  await knownAccountController.restore();
+  knownAccountStorage.getItemAsync = async () => { throw new Error('Keychain unavailable'); };
+  assert.deepEqual(await knownAccountController.logout(), {
+    status: 'signed-in', account: { id: 'account-1' },
+    error: 'Could not access the saved session. Retry sign out.',
+  });
+
   const deleteFailureStorage = new MemorySecureStore();
   deleteFailureStorage.value = 'session';
   deleteFailureStorage.deleteItemAsync = async () => { throw new Error('Keychain locked'); };

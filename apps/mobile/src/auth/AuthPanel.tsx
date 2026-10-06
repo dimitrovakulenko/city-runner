@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AuthController, AuthState } from './controller';
+
+declare const require: (id: string) => {
+  GoogleSignInButton: React.ComponentType<{
+    signInBehavior: 'none';
+    onPress: () => void;
+    size: 'wide';
+    accessibilityLabel: string;
+  }>;
+};
 
 export function AuthPanel({
   controller,
@@ -48,18 +57,43 @@ export function AuthPanel({
     </View>;
   }
 
-  const message = state.status === 'restoring'
-    ? 'Restoring session…'
-    : state.status === 'unavailable'
-      ? 'Sign-in is unavailable. Check setup or try again later.'
-      : state.error ?? 'Sign in to continue.';
+  const googleConfigured = Boolean(process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim())
+    && (Platform.OS !== 'ios' || Boolean(process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim()))
+    && (Platform.OS === 'ios' || Platform.OS === 'android');
+  const recoveryMessage = state.status === 'unavailable'
+    ? state.error
+    : state.status === 'signed-out' && state.error
+      ? state.error
+    : !googleConfigured
+      ? 'Google sign-in is unavailable. Check setup or try again later.'
+      : state.status === 'signed-out' ? 'Sign in to continue.' : 'Restoring session…';
   return <View style={styles.container}>
-    <Text accessibilityRole={state.status === 'unavailable' ? 'alert' : 'text'}>{message}</Text>
-    {state.status !== 'restoring' ? <Pressable accessibilityRole="button"
-      onPress={() => void controller.signIn()} style={styles.button}>
-      <Text>Continue with Google</Text>
-    </Pressable> : null}
+    <Text accessibilityRole={state.status === 'unavailable' || !googleConfigured ? 'alert' : 'text'}>
+      {state.status === 'restoring' ? 'Restoring session…' : recoveryMessage}
+    </Text>
+    {state.status === 'unavailable' ? <>
+      <Pressable accessibilityRole="button" onPress={() => void controller.restore()} style={styles.button}>
+        <Text>Retry session</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={() => void controller.logout()} style={styles.button}>
+        <Text>Retry sign out</Text>
+      </Pressable>
+    </> : null}
+    {state.status !== 'restoring' && googleConfigured ? <GoogleSignInButton onPress={() => void controller.signIn()} /> : null}
   </View>;
+}
+
+function GoogleSignInButton({ onPress }: { onPress: () => void }) {
+  if (!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim()
+    || (Platform.OS === 'ios' && !process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID?.trim())
+    || (Platform.OS !== 'ios' && Platform.OS !== 'android')) return null;
+  const { GoogleSignInButton: NativeButton } = require('react-native-nitro-google-signin');
+  return <NativeButton
+    signInBehavior="none"
+    onPress={onPress}
+    size="wide"
+    accessibilityLabel="Continue with Google"
+  />;
 }
 
 const styles = StyleSheet.create({

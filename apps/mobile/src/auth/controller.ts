@@ -152,6 +152,7 @@ export class AuthController {
 
   async logout(): Promise<AuthState> {
     if (this.logoutInFlight) return this.state;
+    const previousAccount = this.state.status === 'signed-in' ? this.state : null;
     this.logoutInFlight = true;
     if (this.state.status === 'signing-in') this.cancelSignIn();
     const generation = this.beginOperation();
@@ -161,7 +162,9 @@ export class AuthController {
     } catch {
       this.logoutInFlight = false;
       const error = 'Could not access the saved session. Retry sign out.';
-      if (generation === this.generation) this.setState({ status: 'unavailable', error });
+      if (generation === this.generation) this.setState(previousAccount
+        ? { ...previousAccount, error }
+        : { status: 'unavailable', error });
       return this.state;
     }
     if (!token) {
