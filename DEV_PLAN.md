@@ -1,6 +1,6 @@
 # City Runner development plan
 
-Updated 5 October 2026; original baseline main `f3e67ba`. This is the execution plan for a working development application. [PROJECT.md](PROJECT.md) owns product requirements; [BUILD_PLAN.md](BUILD_PLAN.md) owns architecture and risks; [BACKLOG.md](BACKLOG.md) owns work-package status. D IDs below subdivide the existing T packages, not additional scope or estimates. Current execution states are recorded below.
+Updated 6 October 2026; original baseline main `f3e67ba`. This is the execution plan for a working development application. [PROJECT.md](PROJECT.md) owns product requirements; [BUILD_PLAN.md](BUILD_PLAN.md) owns architecture and risks; [BACKLOG.md](BACKLOG.md) owns work-package status. D IDs below subdivide the existing T packages, not additional scope or estimates. Current execution states are recorded below.
 
 ## Execution record
 
@@ -11,13 +11,16 @@ Updated 5 October 2026; original baseline main `f3e67ba`. This is the execution 
 | D03 | Done: feasibility dossier; provider approval remains open | `cb6a26e`, [provider dossier](docs/provider-feasibility.md); no outreach/access claims |
 | D04 | Done: reviewed contract and typed activity responses | `336f86f`, [backend contract](docs/backend-contract.md); baseline API tests pass; source ownership, nonce and map-version invariants pinned |
 | D05 | Server implementation verified; native/provider acceptance pending | `4219f5d`, Luna High; 11 backend tests and four disposable PostGIS checks passed, including concurrent first login, single-use challenge and legacy-owner migration; real credentials/native login remain open |
+| D06 | Client implementation verified; native acceptance pending | `2dece0a`, `3d7ea59`, Luna Medium; generated activity/auth types, pagination/search/detail, explicit fixture mode and session isolation; 11 client tests and typecheck passed; D07 still supplies login and secure storage |
 | D09 | Done: reviewed and verified; Luna Medium | `d2aea13`; 12 disposable PostGIS checks passed across auth/jobs/activities, including lease recovery, stale acknowledgements, parallel claims, bounded recovery, rollback, priority/retry/cancellation and sanitized logs; CLI completed a synthetic job in one attempt |
 | D10 | Done: reviewed and verified; Luna High | `515f0da`, [GPX import](docs/gpx-import.md); bounded authenticated multipart upload, private originals, per-account dedupe, atomic source/job completion and stale-worker protection; actual HTTP + worker CLI smoke passed |
 | D11 | Done: reviewed and verified; Luna | `2068abb`, [OSM import](docs/osm-import.md); versioned XML import, boundary holes/components, shared original nodes and indexed lookups; public Gent snapshot validated 3,108 streets and 51,134 distinct nodes; samples and replacement versions stay staged |
+| D12 | Done: matching and summaries reviewed and verified; Luna High | `1d55e48`, `51502e6`, [coverage](docs/coverage.md); indexed 25 m sample matching, source/revision/lease fencing, overlap-preserving deletion and bounded requeue; both matcher/requeue lock interleavings verified; replacement activation remains deferred |
+| D13 | Done: bounded map/progress APIs reviewed and verified; Luna | `4fd00d7`, `acf9dd7`, [map API](docs/map-api.md); owner-scoped segmented geometry, live lifetime coverage, close-zoom missing nodes, consistent versions, explicit truncation and pending states; public Gent fresh-import check passed |
 
 Other D tasks remain todo. The coordinator owns these status updates.
 
-Combined verification on 5 October: 20 PoC tests, 24 backend unit tests, 26 disposable PostGIS tests and mobile typecheck passed. Actual localhost HTTP verified authentication/isolation, multipart import, duplicate handling, worker execution, preserved segments/timestamps, allocation after a legacy BIGINT ID and safe permanent failure. These tests use synthetic activities; the public Gent import uses OSM only. Native UI, real provider login/sync and the production coverage/map loop remain pending. Next independent slice: D12 coverage and D06 mobile API wiring, followed by D13 viewport APIs.
+Combined verification on 6 October: 20 PoC tests, 24 backend unit tests, 41 disposable PostGIS tests, 11 mobile client tests, mobile typecheck and generated-type drift check passed. Actual localhost HTTP verified authenticated GPX upload → ingestion worker → coverage worker → viewport/progress, including BIGINT IDs, gaps/timestamps, two-account isolation, pending geography, duplicates, shared nodes, overlapping-source deletion and safe malformed failure. Activities were synthetic; Gent used public OSM only. Native UI and real provider login/sync remain pending. Next slice: D07 native Google login and D14 connected Explore/import UI, with independent D15 city/street APIs. M1 is not yet complete.
 
 ## Target and current gap
 
@@ -28,12 +31,12 @@ Build a complete personal exploration loop: **sign in → import history → ins
 | Existing code | Keep | Missing for a real app |
 | --- | --- | --- |
 | `poc/` | GPX parsing, matching fixtures, coverage rules, working browser comparison | Single-user SQLite and full scans cannot be the shared application backend |
-| `backend/` | FastAPI, Alembic, PostgreSQL/PostGIS, owner-scoped activities, verified provider tokens, bearer sessions, durable GPX ingestion and shared regional OSM | Coverage/map/planner APIs, hosted S3 source storage, real provider credentials and native login flow |
-| `apps/mobile/` | Expo/React Native, MapLibre Native, activity layout and segmented tracks | Backend connection, real accounts, upload, streets/cities, planner, location; all current activities are fixtures |
+| `backend/` | FastAPI, Alembic, PostgreSQL/PostGIS, owner-scoped activities, verified provider tokens, bearer sessions, durable GPX ingestion, shared regional OSM, node matching and viewport/progress APIs | City/street detail, manual overrides, planner, replacement activation, hosted S3 source storage and real provider credentials |
+| `apps/mobile/` | Expo/React Native, MapLibre Native, generated activity client, paginated search/detail and segmented tracks; fixtures explicitly opt-in | Native login/secure storage, upload, coverage layers, streets/cities, planner and location; default mode requires sign-in |
 | `infra/` | Terraform Lightsail/private S3 and Caddy/systemd templates | Worker deployment, executable installation procedure, secrets, backups/restore, deployed acceptance |
-| Tests | PoC, activity/auth checks and repeatable PostGIS integration CI | Native builds/UI checks and production end-to-end import |
+| Tests | PoC, backend/client checks, repeatable PostGIS CI and actual HTTP import/matching/map checks | Native builds/UI checks, real identity/provider acceptance and deployed end-to-end checks |
 
-Previous verification: 20 PoC tests and 3 backend tests passed; temporary PostgreSQL/PostGIS migration/API checks and manual Chrome PoC import/map checks passed. Mobile type checking and JS bundle export passed. **Native builds/UI, real cloud sync and production end-to-end functionality remain unverified.** JS export is not native acceptance.
+Earlier manual Chrome checks covered the PoC import/map only. Current production API verification is recorded above. **Native builds/UI, real cloud sync and deployed end-to-end functionality remain unverified.** JS export is not native acceptance.
 
 ## Explicit transition out of the PoC
 
