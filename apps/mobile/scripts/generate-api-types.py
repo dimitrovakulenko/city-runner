@@ -25,6 +25,10 @@ SCHEMAS = (
     "ExchangeRequest",
     "ExchangeResponse",
     "MeResponse",
+    "MapResponse",
+    "ProgressResponse",
+    "UploadResponse",
+    "UploadStatusResponse",
 )
 
 
@@ -63,9 +67,27 @@ missing = [name for name in SCHEMAS if name not in components]
 if missing:
     raise SystemExit(f"OpenAPI is missing expected schemas: {', '.join(missing)}")
 
+
+def dependencies(value: Any) -> set[str]:
+    if isinstance(value, dict):
+        names = {value["$ref"].rsplit("/", 1)[-1]} if "$ref" in value else set()
+        return names | set().union(*(dependencies(part) for part in value.values()))
+    if isinstance(value, list):
+        return set().union(*(dependencies(part) for part in value))
+    return set()
+
+
+schema_names = set(SCHEMAS)
+pending = list(SCHEMAS)
+while pending:
+    for name in dependencies(components[pending.pop()]):
+        if name not in schema_names:
+            schema_names.add(name)
+            pending.append(name)
+
 definitions = [
     f"export type {name} = {render(components[name])};"
-    for name in SCHEMAS
+    for name in (*SCHEMAS, *sorted(schema_names - set(SCHEMAS)))
 ]
 generated = (
     "// Generated from backend/app/main.py OpenAPI. Do not edit by hand.\n\n"

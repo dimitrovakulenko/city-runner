@@ -46,17 +46,17 @@ export interface ActivityApi {
   getActivity(id: string): Promise<ActivityDetail>;
   getMe(): Promise<MeResponse>;
   createChallenge(body: ChallengeRequest): Promise<ChallengeResponse>;
-  exchange(body: ExchangeRequest): Promise<ExchangeResponse>;
+  exchange(body: ExchangeRequest, options?: { persist?: boolean }): Promise<ExchangeResponse>;
   logout(): Promise<void>;
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
-export function createActivityApi(options: {
+export function createApiRequest(options: {
   baseUrl: string;
   sessionStore?: SessionStore;
   fetchImpl?: FetchLike;
-}): ActivityApi {
+}) {
   const baseUrl = options.baseUrl.replace(/\/+$/, '');
   const sessionStore = options.sessionStore ?? noSessionStore;
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
@@ -69,7 +69,7 @@ export function createActivityApi(options: {
   ): Promise<T> {
     const headers = new Headers(init.headers);
     headers.set('Accept', 'application/json');
-    if (init.body !== undefined) headers.set('Content-Type', 'application/json');
+    if (typeof init.body === 'string') headers.set('Content-Type', 'application/json');
     let usedToken: string | null = null;
     if (authenticated) {
       usedToken = tokenOverride ?? await sessionStore.getToken();
@@ -116,6 +116,12 @@ export function createActivityApi(options: {
     return result;
   }
 
+  return request;
+}
+
+export function createActivityApi(options: Parameters<typeof createApiRequest>[0]): ActivityApi {
+  const request = createApiRequest(options);
+  const sessionStore = options.sessionStore ?? noSessionStore;
   return {
     listActivities({ page = 1, pageSize = 20, query = '' } = {}) {
       const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
@@ -133,11 +139,11 @@ export function createActivityApi(options: {
         method: 'POST', body: JSON.stringify(body),
       }, false);
     },
-    exchange(body) {
+    exchange(body, options) {
       return request<ExchangeResponse>('/api/auth/exchange', {
         method: 'POST', body: JSON.stringify(body),
       }, false).then(async (result) => {
-        await sessionStore.setToken(result.token);
+        if (options?.persist !== false) await sessionStore.setToken(result.token);
         return result;
       });
     },

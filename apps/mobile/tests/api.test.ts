@@ -88,3 +88,13 @@ test('provider exchange sends no bearer and stores the returned opaque token', a
   assert.equal(store.current, 'opaque-session');
   assert.equal(result.token, 'opaque-session');
 });
+
+test('auth controller can defer persistence until its login attempt is still current', async () => {
+  const store = sessions(null);
+  const api = createActivityApi({ baseUrl: 'https://example.test', sessionStore: store,
+    fetchImpl: async () => Response.json({ token: 'opaque-session', expires_at: 'soon', account: { id: 'account-1' } }),
+  });
+  const result = await api.exchange({ challenge_id: 'challenge', id_token: 'provider-proof' }, { persist: false });
+  assert.equal(store.current, null);
+  assert.equal(result.token, 'opaque-session');
+});

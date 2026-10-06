@@ -16,8 +16,12 @@
     "@maplibre/maplibre-react-native": "^11.0.0",
     "expo": "^57.0.0",
     "expo-dev-client": "~57.0.19",
+    "expo-document-picker": "~57.0.3",
+    "expo-secure-store": "~57.0.4",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-native": "0.86.3",
+    "react-native-nitro-google-signin": "^2.3.0",
+    "react-native-nitro-modules": "^0.37.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.0",
