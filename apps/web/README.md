@@ -37,4 +37,6 @@ rtk proxy env WEB_TEST_PRODUCTION=1 POSTGIS_ADMIN_DATABASE_URL=postgresql+psycop
 
 Run `build` before the production check. Each run starts the real API and worker, migrates a new UUID-named disposable database, imports synthetic OSM/activities through production handlers and drops that database afterwards. Fixture sessions exist only in that local test database; the application has no fixture login. Existing databases and private PoC files are never opened. Playwright uses installed Chrome without downloading a browser or native SDK.
 
+For a clean local UI preview, start `tests/serve-fixture.py` with `WEB_PREVIEW_EMPTY=1` and proxy to its port 8003. This creates no synthetic streets or activities. Open the browser signed out; seeded accounts and horizontal test geometry are reserved for the automated walkthroughs.
+
 Verified locally: 8 adapter tests and 3 Chrome walkthroughs against both Vite development and the production bundle. Checks cover rendered maps, responsive layout, private signed-out state, account isolation, real activity/street/correction calls, GPX/FIT stop/resume with waiting-file reselection after reload, accepted-job recovery and terminal deletion. Real Google consent, deployment and desktop packaging are outside this acceptance.

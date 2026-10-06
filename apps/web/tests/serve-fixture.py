@@ -78,13 +78,15 @@ try:
                     'digest': hashlib.sha256(('web-synthetic-' + account).encode()).hexdigest(), 'id': 'web-test-' + account,
                     'expires': datetime.now(timezone.utc) + timedelta(hours=4)})
         osm = Path(temporary) / 'synthetic.osm'; osm.write_bytes(geography())
-        import_osm_xml(engine, osm, region='Demo Region', city_relation_ids=[900], source_timestamp='2026-10-06T00:00:00Z',
-            coverage_mode='complete', coverage_evidence='Synthetic browser QA only')
+        if os.environ.get('WEB_PREVIEW_EMPTY') != '1':
+            import_osm_xml(engine, osm, region='Demo Region', city_relation_ids=[900], source_timestamp='2026-10-06T00:00:00Z',
+                coverage_mode='complete', coverage_evidence='Synthetic browser QA only')
         app = create_app(engine)
         handlers = {'process_upload': lambda job: process_upload(engine, job), 'match_coverage': lambda job: process_source_dataset(engine, job),
             'delete_private_object': lambda job: process_private_object_cleanup(job)}
         with TestClient(app) as client:
-            for name, rows in [('Morning loop [synthetic]', [0, 1]), ('A little further [synthetic]', [3, 4]), ('Evening stroll [synthetic]', [6])]:
+            seeds = [] if os.environ.get('WEB_PREVIEW_EMPTY') == '1' else [('Morning loop [synthetic]', [0, 1]), ('A little further [synthetic]', [3, 4]), ('Evening stroll [synthetic]', [6])]
+            for name, rows in seeds:
                 response = client.post('/api/uploads', headers={'Authorization': 'Bearer web-synthetic-alice'}, files={'file': ('seed.gpx', gpx(name, rows), 'application/gpx+xml')})
                 response.raise_for_status()
             while run_once(engine, handlers): pass
