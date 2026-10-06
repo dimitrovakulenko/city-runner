@@ -21,3 +21,5 @@ Requires `dataset_id`; accepts `rule` and paging parameters. Returns street prog
 ## `GET /api/streets/{street_id}/contributions`
 
 Requires `dataset_id` and paging parameters. Returns distinct owner activities with current successful source/run/job support for eligible nodes in the street. Overlapping source records for one activity appear once; results contain activity metadata and supported-node counts, never raw GPS. While coverage is pending or failed, `activities_available` is false and `total` is null.
+
+Coverage readiness is separate from ingestion: `coverage.pending_imports` counts queued/processing uploads even when existing matched coverage is ready. Clients should continue bounded status checks while either ingestion or matching is pending. Swagger uses its **Authorize** bearer control; enter the token without the `Bearer ` prefix.

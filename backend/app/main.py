@@ -53,7 +53,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
     bearer_docs = HTTPBearer(auto_error=False)
 
     def bearer_token(
-        authorization: str | None = Header(None),
+        authorization: str | None = Header(None, include_in_schema=False),
         _credentials: HTTPAuthorizationCredentials | None = Security(bearer_docs),
     ) -> str:
         if not authorization:
@@ -65,7 +65,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
         return token.strip()
 
     def current_user(
-        authorization: str | None = Header(None),
+        authorization: str | None = Header(None, include_in_schema=False),
         _credentials: HTTPAuthorizationCredentials | None = Security(bearer_docs),
     ) -> str:
         if identity_resolver is not None:

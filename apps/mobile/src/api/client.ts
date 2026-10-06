@@ -33,7 +33,7 @@ export interface SessionStore {
   clearIfCurrent(token: string): Promise<boolean>;
 }
 
-// D07 replaces this adapter with the platform secure-storage implementation.
+// Default for callers without a configured session store; the app injects SecureStore.
 export const noSessionStore: SessionStore = {
   async getToken() { return null; },
   async setToken() { throw new Error('Secure session storage is not configured.'); },

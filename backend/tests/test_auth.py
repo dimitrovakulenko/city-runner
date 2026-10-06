@@ -151,6 +151,8 @@ class AuthApiTests(unittest.TestCase):
         paths = schema["paths"]
         self.assertEqual(paths["/api/me"]["get"]["security"], [{"HTTPBearer": []}])
         self.assertEqual(paths["/api/cities"]["get"]["security"], [{"HTTPBearer": []}])
+        self.assertFalse(any(parameter["name"].lower() == "authorization"
+                             for parameter in paths["/api/cities"]["get"].get("parameters", [])))
         self.assertNotIn("security", paths["/api/auth/challenges"]["post"])
         self.assertNotIn("security", paths["/api/auth/exchange"]["post"])
         self.assertEqual(self.client.get("/api/me", headers={"Authorization": "Basic abc"}).status_code, 401)
