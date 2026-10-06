@@ -71,6 +71,12 @@ export class ActivityStore {
     });
   }
 
+  reset(): void {
+    this.listRequest += 1;
+    this.detailRequest += 1;
+    this.update({ ...INITIAL_STATE });
+  }
+
   async loadPage(query = this.state.query, page = 1): Promise<void> {
     const requestId = ++this.listRequest;
     const normalizedQuery = query.trim();

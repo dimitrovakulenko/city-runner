@@ -83,3 +83,16 @@ test('detail 401 clears private list state and invalidates a pending search', as
   assert.deepEqual(store.getState().items, []);
   assert.equal(store.getState().detail, null);
 });
+
+test('account reset clears private state and fences outstanding detail', async () => {
+  const pending = deferred<ActivityDetail>();
+  const store = new ActivityStore(fakeApi({ getActivity: () => pending.promise }));
+  await store.loadPage();
+  const oldRequest = store.selectActivity('private-id');
+  store.reset();
+  pending.resolve(detail('private-id'));
+  await oldRequest;
+  assert.deepEqual(store.getState().items, []);
+  assert.equal(store.getState().selectedId, null);
+  assert.equal(store.getState().detail, null);
+});

@@ -65,7 +65,6 @@ export function createActivityApi(options: {
     path: string,
     init: RequestInit = {},
     authenticated = true,
-    retryOnSessionChange = true,
     tokenOverride?: string,
   ): Promise<T> {
     const headers = new Headers(init.headers);
@@ -86,9 +85,6 @@ export function createActivityApi(options: {
     }
     if (response.status === 401 && authenticated) {
       const cleared = usedToken ? await sessionStore.clearIfCurrent(usedToken) : false;
-      if (!cleared && retryOnSessionChange) {
-        return request<T>(path, init, authenticated, false);
-      }
       if (!cleared) throw new ApiError('stale-session', 'Your session changed while this request was running.');
       throw new ApiError('sign-in-required', 'Your session expired. Sign in again.', 401);
     }
@@ -102,12 +98,22 @@ export function createActivityApi(options: {
       }
       throw new ApiError('http', message, response.status);
     }
-    if (response.status === 204) return undefined as T;
+    if (response.status === 204) {
+      if (authenticated && await sessionStore.getToken() !== usedToken) {
+        throw new ApiError('stale-session', 'Your session changed while this request was running.');
+      }
+      return undefined as T;
+    }
+    let result: T;
     try {
-      return await response.json() as T;
+      result = await response.json() as T;
     } catch {
       throw new ApiError('http', 'The server returned an invalid response.', response.status);
     }
+    if (authenticated && await sessionStore.getToken() !== usedToken) {
+      throw new ApiError('stale-session', 'Your session changed while this request was running.');
+    }
+    return result;
   }
 
   return {
@@ -138,7 +144,7 @@ export function createActivityApi(options: {
     async logout() {
       const token = await sessionStore.getToken();
       if (!token) throw new ApiError('sign-in-required', 'Sign in to log out.', 401);
-      await request<void>('/api/auth/session', { method: 'DELETE' }, true, false, token);
+      await request<void>('/api/auth/session', { method: 'DELETE' }, true, token);
       await sessionStore.clearIfCurrent(token);
     },
   };

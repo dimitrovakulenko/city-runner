@@ -38,22 +38,30 @@ test('requires a session and preserves large string IDs and track segments', asy
   assert.deepEqual(actual.timestamps, activity.timestamps);
 });
 
-test('old-token 401 retries with, and preserves, a replacement session', async () => {
+test('old-token 401 does not replay under or clear a replacement session', async () => {
   const store = sessions('old');
   let calls = 0;
   const api = createActivityApi({ baseUrl: 'https://example.test', sessionStore: store, fetchImpl: async (_url, init) => {
     calls++;
-    if (calls === 1) {
-      assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer old');
-      store.current = 'new';
-      return new Response(null, { status: 401 });
-    }
-    assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer new');
-    return Response.json({ id: '7', name: 'run', date: 'today', type: 'running', processed: true, unmapped_points: 0, tracks: [], timestamps: [], bounds: null });
+    assert.equal(new Headers(init?.headers).get('Authorization'), 'Bearer old');
+    store.current = 'new';
+    return new Response(null, { status: 401 });
   } });
-  await api.getActivity('7');
-  assert.equal(calls, 2);
+  await assert.rejects(api.getActivity('7'), (error: unknown) => error instanceof ApiError && error.kind === 'stale-session');
+  assert.equal(calls, 1);
   assert.equal(store.current, 'new');
+});
+
+test('delayed old-token success is rejected after account replacement', async () => {
+  const store = sessions('account-a');
+  let finish!: (response: Response) => void;
+  const response = new Promise<Response>((resolve) => { finish = resolve; });
+  const api = createActivityApi({ baseUrl: 'https://example.test', sessionStore: store, fetchImpl: async () => response });
+  const oldRequest = api.getActivity('7');
+  store.current = 'account-b';
+  finish(Response.json({ id: '7', name: 'private from A', date: 'today', type: 'running', processed: true, unmapped_points: 0, tracks: [], timestamps: [], bounds: null }));
+  await assert.rejects(oldRequest, (error: unknown) => error instanceof ApiError && error.kind === 'stale-session');
+  assert.equal(store.current, 'account-b');
 });
 
 test('current-token 401 conditionally clears session', async () => {
