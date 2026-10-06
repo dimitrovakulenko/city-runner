@@ -25,6 +25,7 @@ test('signed-out browser is private, responsive and shows an honest sign-in fail
 test('real backend drives activities, street contributions, manual completion and private account isolation', async ({ page }) => {
   await signIn(page);
   await expect(page.getByText('Morning loop [synthetic]', { exact: true })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Missing nodes' })).not.toBeChecked();
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
   await page.getByRole('button', { name: /Morning loop \[synthetic\]/ }).click();
   await expect(page.getByRole('heading', { name: 'Morning loop [synthetic]' })).toBeVisible();
@@ -40,7 +41,17 @@ test('real backend drives activities, street contributions, manual completion an
   await page.getByRole('button', { name: 'Mark manually complete' }).click();
   await expect(page.getByRole('button', { name: 'Undo manual completion' })).toBeVisible();
   await expect(page.getByText('GPS nodes visited', { exact: false })).toContainText('0 / 5');
+  await page.route('**/api/map?**', async (route) => {
+    const response = await route.fetch(); const body = await response.json();
+    for (const limit of Object.values(body.limits) as Array<{ truncated: boolean }>) limit.truncated = false;
+    body.limits.missing_nodes.truncated = true;
+    await route.fulfill({ response, json: body });
+  });
   await page.getByRole('button', { name: /Remaining node 1/ }).click();
+  await expect(page.getByRole('checkbox', { name: 'Missing nodes' })).toBeChecked();
+  await expect(page.locator('.map-message')).toContainText('Some results are limited');
+  await page.getByRole('checkbox', { name: 'Missing nodes' }).uncheck();
+  await expect(page.locator('.map-message')).not.toContainText('Some results are limited');
   await page.screenshot({ path: 'test-results/web-street.png', fullPage: true });
   await page.getByRole('button', { name: 'Undo manual completion' }).click();
   await expect(page.getByRole('button', { name: 'Mark manually complete' })).toBeVisible();
@@ -66,17 +77,20 @@ test('browser GPX/FIT uploads pause, resume, survive reload and remain deleted a
   await expect(page.getByRole('button', { name: 'Resume uploading', exact: true })).toBeVisible();
   release();
   await expect(page.getByText('1 imported', { exact: true })).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText('awaiting upload', { exact: true })).toBeVisible();
+  await expect(page.getByText('Ready to upload', { exact: true })).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: 'Imports', exact: true }).click();
   await expect(page.getByText('1 imported', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Resume uploading', exact: true }).click();
   const waitingFile = page.getByRole('button', { name: 'Select file', exact: true });
   await expect(waitingFile).toBeEnabled();
-  await expect(page.getByText('awaiting upload', { exact: true })).toBeVisible();
+  await expect(page.getByText('File needed', { exact: true })).toBeVisible();
   const reselect = page.waitForEvent('filechooser'); await waitingFile.click();
   await (await reselect).setFiles('tests/.fixtures/browser.fit');
+  await expect(page.getByText('Ready to upload', { exact: true })).toBeVisible();
+  await expect(page.getByText('1 of 2 files uploaded', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Resume uploading', exact: true }).click();
   await expect(page.getByText('2 imported', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('progressbar', { name: 'Files uploaded' })).toHaveAttribute('value', '2');
   await page.screenshot({ path: 'test-results/web-imports.png', fullPage: true });
   await page.reload();
   await page.getByRole('button', { name: 'Imports', exact: true }).click();
@@ -88,6 +102,33 @@ test('browser GPX/FIT uploads pause, resume, survive reload and remain deleted a
   await page.getByRole('dialog').getByRole('button', { name: 'Delete activity', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByRole('button', { name: 'Imports', exact: true }).click();
-  await expect(page.getByText('deleted', { exact: true })).toBeVisible();
+  await expect(page.getByText('Deleted', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Select file', exact: true })).toHaveCount(0);
+  const corrupt = page.waitForEvent('filechooser'); await page.getByRole('button', { name: 'Choose activity files' }).click();
+  await (await corrupt).setFiles('tests/.fixtures/corrupt.fit');
+  await expect(page.getByText('This file cannot be processed. Choose a corrected file and start a new import.', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: 'Retry processing', exact: true })).toHaveCount(0);
+});
+
+test('manifest creation is serialized and a failed upload has a direct retry with retained files', async ({ page }) => {
+  await signIn(page, 'bob'); await page.getByRole('button', { name: 'Imports', exact: true }).click();
+  let release!: () => void; const held = new Promise<void>((resolve) => { release = resolve; }); let waiting = false;
+  await page.route('**/api/import-batches', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue();
+    const response = await route.fetch(); waiting = true; await held; await route.fulfill({ response });
+  });
+  let aborted = false;
+  await page.route('**/api/import-batches/*/items/*/upload', async (route) => {
+    if (!aborted) { aborted = true; await route.abort('failed'); } else await route.continue();
+  });
+  const chooser = page.waitForEvent('filechooser'); await page.getByRole('button', { name: 'Choose activity files' }).click();
+  await (await chooser).setFiles(['tests/.fixtures/browser.gpx', 'tests/.fixtures/browser.fit']);
+  await expect.poll(() => waiting).toBe(true);
+  await expect(page.getByRole('button', { name: 'Preparing files…', exact: false })).toBeDisabled();
+  release();
+  await expect(page.getByRole('button', { name: 'Retry uploading', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Retry uploading', exact: true }).click();
+  await expect(page.getByText('2 imported', { exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Already imported', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Choose activity files' })).toBeEnabled();
 });

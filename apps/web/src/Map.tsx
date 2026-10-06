@@ -15,7 +15,7 @@ export function ExploreMap({ runtime, enabled, selected, focus, onStreet }: { ru
   const enabledRef = useRef(enabled); enabledRef.current = enabled;
   const streetRef = useRef(onStreet); streetRef.current = onStreet;
   const [ready, setReady] = useState(false); const [error, setError] = useState<string | null>(null);
-  const [showTracks, setShowTracks] = useState(true); const [showMissing, setShowMissing] = useState(true);
+  const [showTracks, setShowTracks] = useState(true); const [showMissing, setShowMissing] = useState(false);
   const state = useStore(runtime.explore);
   useEffect(() => {
     if (!host.current) return;
@@ -36,10 +36,10 @@ export function ExploreMap({ runtime, enabled, selected, focus, onStreet }: { ru
     };
     map.on('load', () => {
       for (const id of ['streets', 'tracks', 'missing', 'selected']) map.addSource(id, { type: 'geojson', data: EMPTY });
-      map.addLayer({ id: 'street-outline', type: 'line', source: 'streets', paint: { 'line-color': '#fff', 'line-width': 6, 'line-opacity': 0.9 } });
-      map.addLayer({ id: 'street-coverage', type: 'line', source: 'streets', paint: { 'line-color': ['case', ['==', ['get', 'complete'], true], '#21856e', ['==', ['get', 'known'], false], '#9ca89d', '#dda257'], 'line-width': 3.5, 'line-opacity': 0.9 } });
-      map.addLayer({ id: 'activity-tracks', type: 'line', source: 'tracks', paint: { 'line-color': '#459fac', 'line-width': 2.8, 'line-opacity': 0.65 } });
-      map.addLayer({ id: 'missing-nodes', type: 'circle', source: 'missing', paint: { 'circle-radius': 4, 'circle-color': '#e29f4b', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1.5 } });
+      map.addLayer({ id: 'street-outline', type: 'line', source: 'streets', paint: { 'line-color': '#fff', 'line-width': 4, 'line-opacity': 0.55 } });
+      map.addLayer({ id: 'street-coverage', type: 'line', source: 'streets', paint: { 'line-color': ['case', ['==', ['get', 'complete'], true], '#21856e', ['==', ['get', 'known'], false], '#9ca89d', '#dda257'], 'line-width': ['case', ['==', ['get', 'complete'], true], 3, 1.8], 'line-opacity': ['case', ['==', ['get', 'complete'], true], 0.9, 0.55] } });
+      map.addLayer({ id: 'activity-tracks', type: 'line', source: 'tracks', paint: { 'line-color': '#459fac', 'line-width': 2.3, 'line-opacity': 0.6 } });
+      map.addLayer({ id: 'missing-nodes', type: 'circle', source: 'missing', minzoom: 17, layout: { visibility: 'none' }, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 17, 2, 19, 3.5], 'circle-color': '#e29f4b', 'circle-stroke-color': '#fff', 'circle-stroke-width': 1 } });
       map.addLayer({ id: 'selected-track-outline', type: 'line', source: 'selected', paint: { 'line-color': '#fff', 'line-width': 7 } });
       map.addLayer({ id: 'selected-track', type: 'line', source: 'selected', paint: { 'line-color': '#164e40', 'line-width': 4 } });
       map.on('click', 'street-coverage', (event) => { if (enabledRef.current && event.features?.[0]) streetRef.current(event.features[0]); });
@@ -71,12 +71,12 @@ export function ExploreMap({ runtime, enabled, selected, focus, onStreet }: { ru
     const b = map.getBounds(); void runtime.explore.refreshViewport({ bbox: [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()], zoom: map.getZoom() });
   }, [enabled, ready, runtime]);
   useEffect(() => { const map = mapRef.current; if (ready && map) { map.setLayoutProperty('activity-tracks', 'visibility', showTracks ? 'visible' : 'none'); map.setLayoutProperty('missing-nodes', 'visibility', showMissing ? 'visible' : 'none'); } }, [ready, showTracks, showMissing]);
-  useEffect(() => { if (ready && enabled && focus) mapRef.current?.flyTo({ center: focus, zoom: 18, duration: 700 }); }, [ready, enabled, focus]);
+  useEffect(() => { if (ready && enabled && focus) { setShowMissing(true); mapRef.current?.flyTo({ center: focus, zoom: 18, duration: 700 }); } }, [ready, enabled, focus]);
   return <section className="map-area" aria-label="Exploration map" data-ready={ready}><div ref={host} className="map-canvas" />
     <div className="map-heading"><span className="live-dot" /><span>Your exploration map</span><span className="map-heading-divider" />{enabled ? 'Lifetime coverage' : 'A new street is a new story'}</div>
-    {enabled && <div className="map-layers"><Icon name="layers" size={17} /><label><input type="checkbox" checked={showTracks} onChange={(event) => setShowTracks(event.target.checked)} />Activity tracks</label><label><input type="checkbox" checked={showMissing} onChange={(event) => setShowMissing(event.target.checked)} />Missing nodes</label></div>}
+    {enabled && <div className="map-layers"><Icon name="layers" size={17} /><label><input type="checkbox" checked={showTracks} onChange={(event) => setShowTracks(event.target.checked)} />Activity tracks</label><label title="Zoom close to inspect individual missing GPS nodes"><input type="checkbox" checked={showMissing} onChange={(event) => setShowMissing(event.target.checked)} />Missing nodes</label></div>}
     <div className="map-legend"><span><i className="legend-line completed" />Completed</span><span><i className="legend-line remaining" />Remaining</span><span><i className="legend-line track" />Activity</span></div>
-    {enabled && <div className="map-message" role="status">{state.mapStatus === 'loading' ? 'Updating this view…' : state.mapError ?? (state.map?.geography_state === 'geography_pending' ? 'Street coverage is not available in this area yet.' : state.map?.node_state === 'not-requested' ? 'Zoom in to see missing nodes.' : 'Coverage uses your original GPS samples.')}{state.map && (state.map.dataset_truncated || Object.values(state.map.limits).some((limit) => limit.truncated)) && ' Some results are limited; zoom in.'}</div>}
+    {enabled && <div className="map-message" role="status">{state.mapStatus === 'loading' ? 'Updating this view…' : state.mapError ?? (state.map?.geography_state === 'geography_pending' ? 'Street coverage is not available in this area yet.' : showMissing && (state.viewport?.zoom ?? 0) < 17 ? 'Zoom closer to see individual missing nodes.' : 'Coverage uses your original GPS samples.')}{state.map && (state.map.dataset_truncated || Object.entries(state.map.limits).some(([layer, limit]) => (layer !== 'missing_nodes' || showMissing && (state.viewport?.zoom ?? 0) >= 17) && limit.truncated)) && ' Some results are limited; zoom in.'}</div>}
     {error && <div className="map-error" role="alert">{error}<button aria-label="Dismiss map message" onClick={() => setError(null)}><Icon name="close" size={15} /></button></div>}
   </section>;
 }

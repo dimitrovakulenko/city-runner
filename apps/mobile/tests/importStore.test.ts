@@ -62,6 +62,18 @@ test('restart recovers manifest but uploads no awaiting file until its exact fil
   assert.equal(await store.reselect('batch-1', 'item-2', { uri: 'accepted', name: 'accepted.gpx' }), false);
 });
 
+test('reselecting a paused file reports it ready without uploading until explicit resume', async () => {
+  const fake = fakeApi(batch([item('item-1', 'awaiting_upload', 'run.fit')], 'stopped'));
+  const store = new ImportStore(fake.api, () => 'unused'); await store.loadPage();
+  assert.equal(store.hasSelectedFile('batch-1', 'item-1'), false);
+  assert.equal(await store.reselect('batch-1', 'item-1', { uri: 'file', name: 'run.fit' }), true);
+  assert.equal(store.hasSelectedFile('batch-1', 'item-1'), true);
+  assert.deepEqual(fake.uploaded, []);
+  await store.resume('batch-1'); assert.deepEqual(fake.uploaded, ['item-1']);
+  assert.equal(store.hasSelectedFile('batch-1', 'item-1'), false);
+  store.reset(); assert.equal(store.hasSelectedFile('batch-1', 'item-1'), false);
+});
+
 test('deleted manifest items stay terminal and retry only invokes the source retry endpoint', async () => {
   const deleted = item('deleted-1', 'deleted', 'old.gpx', { source_id: 'source-deleted' });
   const failed = item('failed-1', 'failed', 'bad.fit', { source_id: 'source-failed' });

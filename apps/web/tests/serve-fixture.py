@@ -95,12 +95,14 @@ try:
             while run_once(engine, handlers): pass
         (fixtures / 'browser.gpx').write_bytes(gpx('Browser GPX [synthetic]', [2]))
         (fixtures / 'browser.fit').write_bytes(fit_fixture(records=[(1167609600 + offset, semicircles(51.044 + 5 * .002), semicircles(3.716 + offset * .004)) for offset in range(5)]))
+        valid_fit = (fixtures / 'browser.fit').read_bytes()
+        (fixtures / 'corrupt.fit').write_bytes(valid_fit[:-1] + bytes([valid_fit[-1] ^ 1]))
         def work():
             while not stop.is_set():
                 if not run_once(engine, handlers): stop.wait(.15)
         worker = threading.Thread(target=work, daemon=True); worker.start()
         try:
-            uvicorn.run(app, host='127.0.0.1', port=8003, log_level='warning')
+            uvicorn.run(app, host='127.0.0.1', port=int(os.environ.get('WEB_TEST_API_PORT', '8003')), log_level='warning')
         finally:
             stop.set()
             worker.join(timeout=5)

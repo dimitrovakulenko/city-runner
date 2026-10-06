@@ -27,6 +27,8 @@ Latest merged-main local verification: 20 PoC tests, 25 backend unit tests, 51 d
 
 Latest D18 verification: 31 backend unit tests, 62 disposable PostGIS tests and 87 mobile tests passed, with the 20 PoC tests unchanged; mobile typecheck, generated types and both JavaScript exports passed. Actual HTTP and worker CLI verified synthetic FIT/GPX imports, durable manifests, duplicate replay, stop/resume, expired-lease recovery, API restart, failed-source retry, account isolation and terminal deletion. Safari Swagger verified 401 without authentication and 200 with persisted per-file states/counts. [Hosted D18 CI](https://github.com/dimitrovakulenko/city-runner/actions/runs/37509349402) passed backend and mobile checks. No native acceptance or provider sync is inferred from these checks.
 
+Browser UI/polish verification: 8 web adapter tests, strict web build, 4 production-bundle Chrome checks and a public-Gent walkthrough passed. Synthetic GPX/FIT uploads reached original-node street completion while the default account stayed empty. Checks include sequential upload progress, stop/reselection/resume, failed-upload retry, serialized manifest creation, corrupt-file guidance, account isolation and terminal deletion. FIT sport/date naming and paused-file readiness passed 32 backend units, 62 disposable PostGIS tests and 88 shared mobile tests; mobile typecheck, generated-type check and both JavaScript exports passed. Real browser Google consent awaits a registered web OAuth client ID; Android/iOS testing belongs to the separate team.
+
 ## Work packages
 
 | Task | Scope and requirements | Status | Estimate | Completion evidence |

@@ -64,7 +64,7 @@ def prepare_gent(engine, path, fixtures):
                     records.append((first + len(records) * 5, semicircles(lat), semicircles(lon)))
             content = fit_fixture(records=records, events=events)
         (fixtures / filename).write_bytes(content)
-        routes.append({'kind': kind, 'filename': filename, 'name': name if kind == 'gpx' else 'Unknown activity',
+        routes.append({'kind': kind, 'filename': filename, 'name': name if kind == 'gpx' else 'Run · 2026-10-06',
             'street_id': str(street['id']), 'street_name': street['display_name'], 'city_id': str(street['city_id']),
             'eligible_nodes': street['eligible_node_count'], 'segments': segments})
     metadata = {'dataset_id': str(dataset), 'checksum': CHECKSUM, 'totals': totals, 'routes': routes}
