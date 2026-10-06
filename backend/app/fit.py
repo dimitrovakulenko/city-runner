@@ -151,8 +151,10 @@ def parse_fit(content: bytes, *, max_bytes: int = MAX_GPX_BYTES,
         if not segments:
             raise GpxError("fit_no_track_points")
         date = first_timestamp[:10] if first_timestamp else "unknown"
+        label = {"running": "Run", "cycling": "Ride", "walking": "Walk"}.get(
+            activity_type, activity_type.replace("_", " ").capitalize() if activity_type != "unknown" else "FIT activity")
         return ParsedGpx(
-            name="Unknown activity", activity_type=activity_type, date=date,
+            name=f"{label} · {date}" if date != "unknown" else f"{label} (FIT)", activity_type=activity_type, date=date,
             tracks=segments, timestamps=timestamp_segments, point_count=sum(map(len, segments)),
         )
     except GpxError:

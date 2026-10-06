@@ -46,6 +46,7 @@ export class ImportStore {
 
   getState(): ImportState { return this.state; }
   getAccountGeneration(): number { return this.revision; }
+  hasSelectedFile(batchId: string, itemId: string): boolean { return this.files.get(batchId)?.has(itemId) ?? false; }
   setError(error: string): void { this.update({ error }); }
   subscribe(listener: (state: ImportState) => void): () => void { this.listeners.add(listener); return () => this.listeners.delete(listener); }
   private update(patch: Partial<ImportState>): void { this.state = { ...this.state, ...patch }; for (const listener of this.listeners) listener(this.state); }
@@ -104,7 +105,8 @@ export class ImportStore {
       batch.items.forEach((item, index) => { const file = selection.accepted[index]; if (file && item.status === 'awaiting_upload') local.set(item.id, file); });
       this.files.set(batch.id, local);
       this.upsertBatch(batch);
-      await this.uploadAwaiting(batch.id);
+      if (this.uploadOwner) this.resumeRequested.add(batch.id);
+      else await this.uploadAwaiting(batch.id);
     } catch (error) { if (revision === this.revision) this.update({ error: message(error) }); }
   }
 
@@ -150,6 +152,7 @@ export class ImportStore {
     }
     const local = this.files.get(batchId) ?? new Map<string, GpxFile>();
     local.set(itemId, candidate); this.files.set(batchId, local);
+    this.update({ error: null });
     await this.uploadAwaiting(batchId, itemId);
     return true;
   }
@@ -157,6 +160,7 @@ export class ImportStore {
   async retry(batchId: string, itemId: string): Promise<void> {
     const item = this.findItem(batchId, itemId);
     if (!item || item.status !== 'failed' || !item.source_id) return;
+    this.update({ error: null });
     const revision = this.revision;
     try { await this.api.retryUpload(item.source_id, this.controller.signal); if (revision === this.revision) await this.refreshBatch(batchId); }
     catch (error) { if (revision === this.revision) this.update({ error: message(error) }); }

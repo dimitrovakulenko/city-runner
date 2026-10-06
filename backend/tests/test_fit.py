@@ -73,6 +73,12 @@ def semicircles(degrees):
 
 
 class FitParserTests(unittest.TestCase):
+    def test_names_fit_activities_from_available_sport_and_date(self):
+        record = ((1_167_609_600, semicircles(50), semicircles(4)),)
+        self.assertEqual(parse_fit(fit_fixture(records=record)).name, "Run · 2026-12-31")
+        self.assertEqual(parse_fit(fit_fixture(records=record, sport=None)).name, "FIT activity · 2026-12-31")
+        self.assertEqual(parse_fit(fit_fixture(records=((1, semicircles(50), semicircles(4)),))).name, "Run (FIT)")
+
     def test_converts_coordinates_preserves_timestamps_and_timer_gaps(self):
         t0 = 1_167_609_600
         data = fit_fixture(

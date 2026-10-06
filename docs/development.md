@@ -24,3 +24,7 @@ The PostGIS integration runner creates a UUID-named `city_runner_test_*` databas
 From `apps/mobile`, run `rtk npm ci` followed by `rtk npm run typecheck` and `rtk npm test`. `npm ci` uses the checked-in `package-lock.json`.
 
 The production API uses port 8001 so the PoC can remain on 8000. Run the worker alongside it, including for queued private-file cleanup after [activity deletion](corrections.md). Follow [mobile login](mobile-login.md), [Explore/import](mobile-explore.md) and [city/street browsing](mobile-cities.md) to connect a development build; Android emulator uses `http://10.0.2.2:8001`. OAuth configuration and native SDK/runtime installation remain acceptance gates. The PoC browser is still a comparison reference.
+
+## Browser UI
+
+From `apps/web`, run `rtk npm ci` and `rtk npm run dev`; open `http://127.0.0.1:5173`. The same-origin `/api` proxy targets the production API on port 8001. Start the API and worker as above. The [browser client README](../apps/web/README.md) covers web Google OAuth configuration, shared client contracts, resumable file imports and disposable synthetic Chrome checks. Run `rtk npm test` and `rtk npm run build` for adapter tests, typechecking and production assets.

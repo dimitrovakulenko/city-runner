@@ -1,0 +1,29 @@
+{
+  "name": "@city-runner/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "preview": "vite preview --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:browser": "playwright test",
+    "test:gent": "playwright test --config playwright.gent.config.ts"
+  },
+  "dependencies": {
+    "maplibre-gl": "6.12.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "~19.2.0",
+    "@types/react-dom": "~19.2.0",
+    "tsx": "4.23.15",
+    "typescript": "~6.0.3",
+    "vite": "8.3.3"
+  }
+}

@@ -62,6 +62,18 @@ test('restart recovers manifest but uploads no awaiting file until its exact fil
   assert.equal(await store.reselect('batch-1', 'item-2', { uri: 'accepted', name: 'accepted.gpx' }), false);
 });
 
+test('reselecting a paused file reports it ready without uploading until explicit resume', async () => {
+  const fake = fakeApi(batch([item('item-1', 'awaiting_upload', 'run.fit')], 'stopped'));
+  const store = new ImportStore(fake.api, () => 'unused'); await store.loadPage();
+  assert.equal(store.hasSelectedFile('batch-1', 'item-1'), false);
+  assert.equal(await store.reselect('batch-1', 'item-1', { uri: 'file', name: 'run.fit' }), true);
+  assert.equal(store.hasSelectedFile('batch-1', 'item-1'), true);
+  assert.deepEqual(fake.uploaded, []);
+  await store.resume('batch-1'); assert.deepEqual(fake.uploaded, ['item-1']);
+  assert.equal(store.hasSelectedFile('batch-1', 'item-1'), false);
+  store.reset(); assert.equal(store.hasSelectedFile('batch-1', 'item-1'), false);
+});
+
 test('deleted manifest items stay terminal and retry only invokes the source retry endpoint', async () => {
   const deleted = item('deleted-1', 'deleted', 'old.gpx', { source_id: 'source-deleted' });
   const failed = item('failed-1', 'failed', 'bad.fit', { source_id: 'source-failed' });
@@ -87,6 +99,28 @@ test('account reset fences delayed manifest creation and response cannot upload 
   store.reset(); release(batch([item('item-1', 'awaiting_upload')])); await pending;
   assert.equal(store.getState().batches.length, 0);
   assert.deepEqual(fake.uploaded, []);
+});
+
+test('a manifest created during another upload queues its files and drains sequentially', async () => {
+  const fake = fakeApi(batch([])); const batches = new Map<string, ImportBatchResponse>(); const uploaded: string[] = [];
+  fake.api.createBatch = async (body) => {
+    const created = { ...batch(body.files.map((file) => item(file.name, 'awaiting_upload', file.name))), id: body.request_id };
+    batches.set(created.id, created); return clone(created);
+  };
+  fake.api.getBatch = async (id) => clone(batches.get(id)!);
+  let release!: () => void; let active = 0;
+  fake.api.uploadItem = async (id, itemId) => {
+    assert.equal(++active, 1); uploaded.push(itemId);
+    if (uploaded.length === 1) await new Promise<void>((resolve) => { release = resolve; });
+    const current = batches.get(id)!; const row = current.items.find((entry) => entry.id === itemId)!; row.status = 'queued';
+    Object.assign(current, batch(current.items), { id }); active--; return clone(row);
+  };
+  let request = 0; const store = new ImportStore(fake.api, () => `batch-${++request}`);
+  const first = store.createFromSelection([{ uri: 'a', name: 'one.gpx' }]); await tick();
+  await store.createFromSelection([{ uri: 'b', name: 'two.fit' }]);
+  assert.deepEqual(uploaded, ['one.gpx']); release(); await first;
+  assert.deepEqual(uploaded, ['one.gpx', 'two.fit']);
+  assert.equal(store.getState().batches.every((entry) => entry.counts.awaiting_upload === 0), true);
 });
 
 test('foreground manifest polling does not overlap slow requests and account reset releases the old owner safely', async () => {
