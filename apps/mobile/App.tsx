@@ -1,81 +1,136 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StatusBar, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { Camera, GeoJSONSource, Layer, Map } from '@maplibre/maplibre-react-native';
 import type { Feature, MultiLineString } from 'geojson';
 import { ActivityStore } from './src/activityStore';
-import { createActivityApi, noSessionStore } from './src/api/client';
+import { ExploreScreen } from './src/ExploreScreen';
+import { ExploreStore } from './src/exploreStore';
+import { createExploreApi, createFixtureExploreApi } from './src/api/explore';
 import { fixtureApi } from './src/api/fixture';
+import { AuthPanel } from './src/auth/AuthPanel';
+import { mobileApi, authController } from './src/auth/runtime';
+import { secureSessionStore } from './src/auth/secureSession';
 import type { ActivityExplorerState } from './src/activityStore';
 
 const fixtureMode = process.env.EXPO_PUBLIC_FIXTURE_MODE === 'true';
-const api = fixtureMode ? fixtureApi : createActivityApi({
-  baseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000',
-  sessionStore: noSessionStore,
-});
-const store = new ActivityStore(api);
-const emptyState = store.getState();
+const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8001';
+const defaultMapStyle = 'https://tiles.openfreemap.org/styles/liberty';
+const activityStore = new ActivityStore(fixtureMode ? fixtureApi : mobileApi);
+const exploreStore = new ExploreStore(fixtureMode ? createFixtureExploreApi() : createExploreApi({ baseUrl: apiBaseUrl, sessionStore: secureSessionStore }));
+const demoStyle = 'https://demotiles.maplibre.org/style.json';
 
 export default function App() {
   const tablet = useWindowDimensions().width >= 850;
-  const [state, setState] = useState<ActivityExplorerState>(emptyState);
+  const [page, setPage] = useState<'activities' | 'explore'>('activities');
+  const [activity, setActivity] = useState<ActivityExplorerState>(activityStore.getState());
   const [search, setSearch] = useState('');
+  const [hasSession, setHasSession] = useState<boolean | null>(fixtureMode ? true : null);
+  const [accountGeneration, setAccountGeneration] = useState(0);
+  const [mapError, setMapError] = useState(false);
+  const [mapRevision, setMapRevision] = useState(0);
+  const accountChangeRequest = useRef(0);
+  const knownSessionToken = useRef<string | null | undefined>(undefined);
+  const selected = activity.detail;
+  const selecting = activity.selectedId !== null;
+  const styleUrl = fixtureMode ? demoStyle : process.env.EXPO_PUBLIC_MAP_STYLE_URL?.trim() || defaultMapStyle;
 
+  useEffect(() => activityStore.subscribe(setActivity), []);
   useEffect(() => {
-    const unsubscribe = store.subscribe(setState);
-    return unsubscribe;
+    if (page !== 'activities' || (!fixtureMode && (hasSession !== true || authController.getState().status !== 'signed-in'))) return;
+    const timer = setTimeout(() => void activityStore.loadPage(search), 250);
+    return () => clearTimeout(timer);
+  }, [page, search, hasSession]);
+
+  const changeAccount = useCallback(() => {
+    const request = ++accountChangeRequest.current;
+    setAccountGeneration((value) => value + 1);
+    knownSessionToken.current = undefined;
+    activityStore.reset();
+    exploreStore.reset();
+    setSearch('');
+    setHasSession(false);
+    void secureSessionStore.getToken().then((token) => {
+      if (request !== accountChangeRequest.current) return;
+      const signedIn = authController.getState().status === 'signed-in' && Boolean(token);
+      knownSessionToken.current = signedIn ? token : null;
+      setHasSession(signedIn);
+      if (signedIn) void activityStore.loadPage();
+    }).catch(() => {
+      if (request === accountChangeRequest.current) setHasSession(false);
+    });
   }, []);
 
-  useEffect(() => {
-    const timer = setTimeout(() => void store.loadPage(search), 250);
-    return () => clearTimeout(timer);
-  }, [search]);
+  useEffect(() => fixtureMode ? undefined : secureSessionStore.subscribe((token) => {
+    if (token === knownSessionToken.current && authController.getState().status === 'signed-in') return;
+    accountChangeRequest.current++;
+    setAccountGeneration((value) => value + 1);
+    knownSessionToken.current = token;
+    activityStore.reset();
+    exploreStore.reset();
+    setSearch('');
+    const signedIn = authController.getState().status === 'signed-in' && Boolean(token);
+    setHasSession(signedIn);
+    if (signedIn) void activityStore.loadPage();
+  }), [changeAccount]);
 
   const track = useMemo<Feature<MultiLineString> | null>(() => {
-    if (!state.detail) return null;
-    const lines = state.detail.tracks.filter((segment) => segment.length > 1);
-    return lines.length ? { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: lines } } : null;
-  }, [state.detail]);
+    if (!selected) return null;
+    const segments = selected.tracks.filter((segment) => segment.length > 1);
+    return segments.length ? { type: 'Feature', properties: {}, geometry: { type: 'MultiLineString', coordinates: segments } } : null;
+  }, [selected]);
+  const listFailure = activity.listStatus === 'offline' || activity.listStatus === 'error';
+  const signedOut = activity.listStatus === 'sign-in-required' || hasSession === false;
 
-  const isAuthError = state.listStatus === 'sign-in-required';
-  const isFixture = fixtureMode;
-  const selected = state.detail;
-  const selecting = state.selectedId !== null;
-  const failure = state.listStatus === 'offline' || state.listStatus === 'error';
-
-  return <SafeAreaView style={[styles.safe, tablet && styles.tabletShell]}>
+  return <SafeAreaView style={styles.safe}>
     <StatusBar barStyle="dark-content" />
-    <View style={[styles.panel, tablet && styles.tabletPanel]}>
+    {!fixtureMode && <AuthPanel controller={authController} onAccountChange={changeAccount} />}
+    <View style={styles.navigation}>
       <Text style={styles.brand}>CITY RUNNER</Text>
-      <Text style={styles.heading}>{selected ? selected.name : selecting ? 'Activity detail' : 'Activities'}</Text>
-      {selecting ? <>
-        <Pressable onPress={() => store.clearSelection()}><Text style={styles.link}>← All activities</Text></Pressable>
-        {selected && <View style={styles.detail}><Text style={styles.meta}>{selected.date} · {selected.type}</Text><Text style={styles.meta}>{selected.tracks.length} track segments</Text></View>}
-        {state.detailStatus === 'loading' && <Message text="Loading activity…" loading />}
-        {state.detailStatus === 'offline' || state.detailStatus === 'error' ? <Message text={state.detailError ?? 'Could not load activity.'} action="Retry" onPress={() => void store.retryDetail()} /> : null}
-      </> : <>
-        <TextInput value={search} onChangeText={setSearch} placeholder="Search activities" style={styles.search} accessibilityLabel="Search activities" />
-        <ScrollView style={styles.list}>
-          {state.listStatus === 'loading' && <Message text="Loading activities…" loading />}
-          {state.listStatus === 'loading-more' && <ActivityIndicator />}
-          {isAuthError && <Message text="Sign-in required. Native sign-in is not available yet." />}
-          {failure && <Message text={state.listError ?? 'Connection failed.'} action="Retry" onPress={() => void store.retryList()} />}
-          {state.listStatus === 'empty' && <Message text="No activities found." />}
-          {state.items.map((activity) => <Pressable key={activity.id} style={styles.row} onPress={() => void store.selectActivity(activity.id)}>
-            <Text style={styles.rowTitle}>{activity.name}</Text><Text style={styles.meta}>{activity.date} · {activity.type}</Text>
-          </Pressable>)}
-          {state.listStatus === 'ready' && state.items.length < state.total && <Pressable style={styles.more} onPress={() => void store.loadMore()}><Text style={styles.link}>Load more</Text></Pressable>}
-        </ScrollView>
-      </>}
-      <Text style={styles.mode}>{isFixture ? 'FIXTURE MODE · LOCAL SAMPLE DATA' : isAuthError ? 'API · SIGN-IN REQUIRED' : 'API'}</Text>
+      <View style={styles.tabs}>
+        <Tab title="Activities" selected={page === 'activities'} onPress={() => setPage('activities')} />
+        <Tab title="Explore" selected={page === 'explore'} onPress={() => setPage('explore')} />
+      </View>
     </View>
-    <View style={styles.mapPanel}>
-      <Map style={StyleSheet.absoluteFill} mapStyle="https://demotiles.maplibre.org/style.json">
-        <Camera key={selected?.id ?? 'overview'} initialViewState={{ center: selected?.bounds ? [(selected.bounds[0][0] + selected.bounds[1][0]) / 2, (selected.bounds[0][1] + selected.bounds[1][1]) / 2] : [3.72, 51.055], zoom: selected ? 13 : 12 }} />
-        {track && <GeoJSONSource id="selected-track" data={track}><Layer id="selected-track-line" type="line" style={{ lineColor: '#ef704f', lineWidth: 4 }} /></GeoJSONSource>}
-      </Map>
-      {!selected && <View style={styles.mapMessage}><Text style={styles.mapText}>{isAuthError ? 'Sign in to view your routes' : 'Select an activity to view its route'}</Text></View>}
-    </View>
+    {page === 'explore'
+      ? <ExploreScreen store={exploreStore} fixtureMode={fixtureMode} enabled={fixtureMode || hasSession === true} accountGeneration={accountGeneration} tablet={tablet} />
+      : <View style={[styles.activityShell, tablet && styles.activityTablet]}>
+          <View style={[styles.panel, tablet && styles.tabletPanel]}>
+            <Text style={styles.heading}>{selected?.name ?? (selecting ? 'Activity detail' : 'Activities')}</Text>
+            {selecting ? <>
+              <Pressable onPress={() => activityStore.clearSelection()}><Text style={styles.link}>← All activities</Text></Pressable>
+              {activity.detailStatus === 'loading' && <Message text="Loading activity…" loading />}
+              {activity.detailError && <Message text={activity.detailError} action="Retry" onPress={() => { if (activity.selectedId) void activityStore.selectActivity(activity.selectedId); }} />}
+              {selected && <><Text style={styles.meta}>{selected.date} · {selected.type}</Text><Text style={styles.meta}>{selected.tracks.length} track segments preserved</Text></>}
+            </> : <>
+              <TextInput value={search} onChangeText={setSearch} placeholder="Search activities" style={styles.search} accessibilityLabel="Search activities" />
+              <ScrollView style={styles.list}>
+                {activity.listStatus === 'loading' && <Message text="Loading activities…" loading />}
+                {signedOut && <Message text="Sign in to view your activities." />}
+                {listFailure && <Message text={activity.listError ?? 'Could not load activities.'} action="Retry" onPress={() => void activityStore.retryList()} />}
+                {activity.listStatus === 'empty' && <Message text="No activities found." />}
+                {activity.items.map((item) => <Pressable key={item.id} style={styles.row} onPress={() => void activityStore.selectActivity(item.id)}>
+                  <Text style={styles.rowTitle}>{item.name}</Text><Text style={styles.meta}>{item.date} · {item.type}</Text>
+                </Pressable>)}
+                {activity.listStatus === 'ready' && activity.items.length < activity.total && <Pressable style={styles.more} onPress={() => void activityStore.loadMore()}><Text style={styles.link}>Load more</Text></Pressable>}
+                {activity.listStatus === 'loading-more' && <Message text="Loading more activities…" loading />}
+              </ScrollView>
+            </>}
+            <Text style={styles.footer}>{fixtureMode ? 'FIXTURE MODE · SAMPLE ACTIVITIES' : signedOut ? 'SIGN-IN REQUIRED' : 'PRIVATE ACTIVITY HISTORY'}</Text>
+          </View>
+          <View style={styles.mapPanel}>
+            <Map key={mapRevision} style={StyleSheet.absoluteFill} mapStyle={styleUrl} onDidFinishLoadingMap={() => setMapError(false)} onDidFailLoadingMap={() => setMapError(true)}>
+              <Camera key={selected?.id ?? 'activity-overview'} initialViewState={{ center: selected?.bounds ? [(selected.bounds[0][0] + selected.bounds[1][0]) / 2, (selected.bounds[0][1] + selected.bounds[1][1]) / 2] : [3.72, 51.055], zoom: selected ? 13 : 12 }} />
+              {track && <GeoJSONSource id="selected-activity" data={track}><Layer id="selected-activity-line" type="line" style={{ lineColor: '#ef704f', lineWidth: 4 }} /></GeoJSONSource>}
+            </Map>
+            {mapError && <View style={styles.mapUnavailable}><Text style={styles.rowTitle}>Map is unavailable</Text><Pressable onPress={() => setMapRevision((value) => value + 1)}><Text style={styles.link}>Retry map</Text></Pressable></View>}
+            {selected && <View style={styles.mapCaption}><Text style={styles.rowTitle}>{selected.name}</Text><Text style={styles.meta}>{selected.tracks.length} separate GPS segments</Text></View>}
+          </View>
+        </View>}
   </SafeAreaView>;
+}
+
+function Tab({ title, selected, onPress }: { title: string; selected: boolean; onPress: () => void }) {
+  return <Pressable onPress={onPress} style={[styles.tab, selected && styles.tabSelected]}><Text style={[styles.tabText, selected && styles.tabTextSelected]}>{title}</Text></Pressable>;
 }
 
 function Message({ text, action, onPress, loading }: { text: string; action?: string; onPress?: () => void; loading?: boolean }) {
@@ -84,22 +139,16 @@ function Message({ text, action, onPress, loading }: { text: string; action?: st
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#f4f6f3' },
-  tabletShell: { flexDirection: 'row' },
-  panel: { flex: 1, paddingHorizontal: 22, paddingTop: 24, backgroundColor: '#fbfcfa' },
-  tabletPanel: { flex: 0, width: 390 },
-  brand: { color: '#143e35', fontSize: 12, letterSpacing: 1.5, fontWeight: '900' },
-  heading: { color: '#153c34', fontSize: 25, fontWeight: '800', marginTop: 22, marginBottom: 12 },
-  link: { color: '#31594c', fontWeight: '700', paddingVertical: 8 },
-  search: { backgroundColor: '#f0f3f0', borderRadius: 10, padding: 12, marginBottom: 8 },
-  list: { flex: 1 },
-  row: { borderBottomWidth: 1, borderBottomColor: '#eef1ed', paddingVertical: 13 },
-  rowTitle: { color: '#24463b', fontWeight: '700', fontSize: 14, marginBottom: 5 },
-  meta: { color: '#8d9b92', fontSize: 11, textTransform: 'capitalize' },
-  more: { alignItems: 'center', padding: 8 },
-  message: { alignItems: 'center', gap: 8, padding: 20 },
-  detail: { paddingVertical: 16, gap: 7 },
-  mode: { color: '#9ba79f', fontSize: 8, fontWeight: '800', letterSpacing: 1, paddingVertical: 12 },
-  mapPanel: { flex: 1, minHeight: 230, backgroundColor: '#dce5db', overflow: 'hidden' },
-  mapMessage: { position: 'absolute', alignSelf: 'center', top: 20, backgroundColor: '#fbfcfa', padding: 10, borderRadius: 10 },
-  mapText: { color: '#31594c', fontSize: 11 },
+  navigation: { paddingHorizontal: 18, paddingTop: 10, backgroundColor: '#fbfcfa' },
+  brand: { color: '#143e35', fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
+  tabs: { flexDirection: 'row', gap: 8, marginTop: 10 }, tab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 9, backgroundColor: '#f0f3f0' },
+  tabSelected: { backgroundColor: '#173e35' }, tabText: { color: '#607168', fontWeight: '700', fontSize: 11 }, tabTextSelected: { color: '#fff' },
+  activityShell: { flex: 1 }, activityTablet: { flexDirection: 'row', padding: 16, gap: 14 },
+  panel: { flex: 1, paddingHorizontal: 20, paddingTop: 16, backgroundColor: '#fbfcfa' }, tabletPanel: { flex: 0, width: 370, borderRadius: 18 },
+  heading: { color: '#153c34', fontSize: 24, fontWeight: '800', marginBottom: 12 }, link: { color: '#31594c', fontWeight: '700', paddingVertical: 8 },
+  search: { backgroundColor: '#f0f3f0', borderRadius: 10, padding: 12, marginBottom: 8 }, list: { flex: 1 }, row: { borderBottomWidth: 1, borderBottomColor: '#eef1ed', paddingVertical: 13 },
+  rowTitle: { color: '#24463b', fontWeight: '700', fontSize: 13, marginBottom: 4 }, meta: { color: '#8d9b92', fontSize: 11 }, more: { alignItems: 'center', padding: 9 },
+  message: { alignItems: 'center', padding: 18, gap: 8 }, footer: { color: '#9ba79f', fontSize: 8, fontWeight: '800', letterSpacing: 1, paddingVertical: 12 },
+  mapPanel: { flex: 1, minHeight: 250, backgroundColor: '#dce5db', overflow: 'hidden' }, mapUnavailable: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, gap: 8 },
+  mapCaption: { position: 'absolute', bottom: 15, left: 15, right: 15, backgroundColor: '#fbfcfa', borderRadius: 12, padding: 12 },
 });
