@@ -12,6 +12,7 @@ from sqlalchemy import Engine, text
 from backend.app.coverage import rebuild_account_coverage
 from backend.app.jobs import enqueue
 from backend.app.storage import LocalObjectStore
+from backend.app.owner_guard import owner_lock
 
 MAX_BIGINT = 9_223_372_036_854_775_807
 
@@ -50,6 +51,7 @@ def create_corrections_router(engine: Engine, current_user: Callable[..., str]) 
         if not reason or len(reason) > 500:
             raise HTTPException(status_code=422, detail="Reason must contain 1 to 500 nonblank characters.")
         with engine.begin() as db:
+            owner_lock(db, account_id)
             _writable_street(db, dataset_id, street_id)
             changed = db.execute(text("""INSERT INTO manual_street_completions
                     (account_id,dataset_id,street_id,reason)
@@ -71,6 +73,7 @@ def create_corrections_router(engine: Engine, current_user: Callable[..., str]) 
         account_id: str = Depends(current_user),
     ):
         with engine.begin() as db:
+            owner_lock(db, account_id)
             _writable_street(db, dataset_id, street_id)
             removed = db.execute(text("""DELETE FROM manual_street_completions
                 WHERE account_id=:account AND dataset_id=:dataset AND street_id=:street"""), {
@@ -122,6 +125,7 @@ class _RetryDelete(Exception):
 
 def _delete_activity_once(engine: Engine, account_id: str, activity_id: int) -> bool:
     with _read_committed_transaction(engine) as db:
+        owner_lock(db, account_id)
         # Discover IDs without locking source rows so the shared lock order starts with jobs.
         sources = db.execute(text("""SELECT id,revision FROM activity_sources
             WHERE account_id=:account AND activity_id=:activity ORDER BY id"""), {
@@ -225,9 +229,18 @@ def _delete_activity_once(engine: Engine, account_id: str, activity_id: int) -> 
     return True
 
 
-def process_private_object_cleanup(job: dict, store: LocalObjectStore | None = None) -> None:
+def process_private_object_cleanup(job: dict, store: LocalObjectStore | None = None, *,
+                                   engine: Engine | None = None) -> None:
     payload = job.get("payload")
     key = payload.get("object_key") if isinstance(payload, dict) else None
     if not isinstance(key, str):
         raise ValueError("invalid_cleanup_payload")
-    (store or LocalObjectStore()).delete(key)
+    account_id = job.get("account_id")
+    if not isinstance(account_id, str):
+        raise ValueError("invalid_cleanup_account")
+    if engine is None:
+        (store or LocalObjectStore()).delete(key, owner_id=account_id)
+    else:
+        with engine.begin() as db:
+            owner_lock(db, account_id)
+            (store or LocalObjectStore()).delete(key, owner_id=account_id)

@@ -19,7 +19,8 @@ from backend.app.coverage import queue_source_coverage
 from backend.app.fit import parse_fit
 from backend.app.gpx import GpxError, MAX_GPX_BYTES, parse_gpx
 from backend.app.jobs import complete, enqueue, fail
-from backend.app.storage import LocalObjectStore
+from backend.app.storage import LocalObjectStore, cleanup_unreferenced_original
+from backend.app.owner_guard import owner_lock
 
 
 MAX_UPLOAD_REQUEST_BYTES = MAX_GPX_BYTES + 64 * 1024
@@ -123,10 +124,12 @@ def _persist_upload(engine: Engine, object_store: LocalObjectStore, account_id: 
     if source_kind not in {"gpx", "fit"}:
         raise ValueError("unsupported source kind")
     content_hash = hashlib.sha256(content).hexdigest()
-    object_key = object_store.write(content, extension=source_kind)
+    object_key = None
     duplicate = False
     try:
         with engine.begin() as db:
+            owner_lock(db, account_id)
+            object_key = object_store.write(content, extension=source_kind, owner_id=account_id)
             row = db.execute(text("""INSERT INTO activity_sources
                 (account_id, source_kind, content_hash, revision, private_object_key, status)
                 VALUES (:account_id, :source_kind, :content_hash, 1, :object_key, 'queued')
@@ -143,6 +146,7 @@ def _persist_upload(engine: Engine, object_store: LocalObjectStore, account_id: 
                     WHERE account_id=:account_id AND source_kind=:source_kind AND content_hash=:content_hash"""), {
                     "account_id": account_id, "source_kind": source_kind, "content_hash": content_hash,
                 }).mappings().one()
+                object_store.delete(object_key, owner_id=account_id)
             dedupe_key = f"upload:{row['id']}:r{row['revision']}"
             job = enqueue(db, account_id=account_id, kind="process_upload", dedupe_key=dedupe_key,
                           payload={"source_id": row["id"], "revision": row["revision"]}, priority=100)
@@ -154,16 +158,11 @@ def _persist_upload(engine: Engine, object_store: LocalObjectStore, account_id: 
         }
     except BaseException:
         try:
-            object_store.delete(object_key)
-        except OSError:
+            if object_key:
+                cleanup_unreferenced_original(engine, object_store, account_id, object_key)
+        except Exception:
             pass
         raise
-    finally:
-        if duplicate:
-            try:
-                object_store.delete(object_key)
-            except OSError:
-                pass
 
 
 def create_upload_router(engine: Engine, current_user: Callable[..., str],
@@ -227,6 +226,8 @@ def _locked_context(db, job_id: int, lease_token: str, source_id: int, revision:
 def _mark_failed(engine: Engine, *, job_id: int, lease_token: str, source_id: int,
                  account_id: str | None, revision: int, error_code: str, permanent: bool) -> bool:
     with engine.begin() as db:
+        if account_id:
+            owner_lock(db, account_id)
         job, source = _locked_context(db, job_id, lease_token, source_id, revision)
         if job is None:
             return False
@@ -263,6 +264,7 @@ def process_upload(engine: Engine, job: dict[str, Any], store: LocalObjectStore 
         return
 
     with engine.begin() as db:
+        owner_lock(db, str(job.get("account_id", "")))
         locked_job, source = _locked_context(db, job_id, lease_token, source_id, revision)
         if locked_job is None:
             return
@@ -281,7 +283,7 @@ def process_upload(engine: Engine, job: dict[str, Any], store: LocalObjectStore 
 
     object_store = store or LocalObjectStore()
     try:
-        content = object_store.read(object_key)
+        content = object_store.read(object_key, owner_id=account_id)
     except (OSError, ValueError):
         _mark_failed(engine, job_id=job_id, lease_token=lease_token, source_id=source_id,
                      account_id=account_id, revision=revision, error_code="source_unavailable", permanent=False)
@@ -297,6 +299,7 @@ def process_upload(engine: Engine, job: dict[str, Any], store: LocalObjectStore 
     import json
 
     with engine.begin() as db:
+        owner_lock(db, str(job.get("account_id", "")))
         locked_job, current_source = _locked_context(db, job_id, lease_token, source_id, revision)
         if locked_job is None:
             return

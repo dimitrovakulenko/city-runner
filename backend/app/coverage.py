@@ -13,6 +13,7 @@ from typing import Any
 from sqlalchemy import Connection, Engine, create_engine, text
 
 from backend.app.jobs import complete, enqueue, fail
+from backend.app.owner_guard import owner_lock
 
 
 DEFAULT_BATCH_SIZE = 1000
@@ -407,6 +408,7 @@ def _refresh_activity_processing(db: Connection, *, account_id: str, source_id: 
 def _record_failure(engine: Engine, job: dict[str, Any], payload: tuple[int, int, int], code: str) -> None:
     source_id, source_revision, dataset_id = payload
     with engine.begin() as db:
+        owner_lock(db, str(job.get("account_id", "")))
         locked_job, source, run = _locked_context(db, int(job["id"]), str(job["lease_token"]),
                                                   source_id, source_revision, dataset_id)
         if locked_job is None:
@@ -444,6 +446,7 @@ def process_source_dataset(engine: Engine, job: dict[str, Any], *,
     lease_token = str(job["lease_token"])
     try:
         with engine.begin() as db:
+            owner_lock(db, str(job.get("account_id", "")))
             locked_job, source, run = _locked_context(db, job_id, lease_token,
                                                       source_id, source_revision, dataset_id)
             if locked_job is None:
@@ -576,6 +579,13 @@ def requeue_dataset_coverage(engine: Engine, dataset_id: int, *, batch_size: int
             if not sources:
                 break
             for source in sources:
+                owner_lock(db, source["account_id"])
+                current = db.execute(text("""SELECT revision,activity_id,status FROM activity_sources
+                    WHERE id=:id AND account_id=:account"""), {
+                    "id": source["id"], "account": source["account_id"],
+                }).mappings().first()
+                if current is None or current["status"] != "succeeded" or current["revision"] != source["revision"]:
+                    continue
                 queue_source_coverage(db, account_id=source["account_id"], source_id=source["id"],
                                       source_revision=source["revision"], activity_id=source["activity_id"],
                                       dataset_ids=[dataset_id], priority=10)

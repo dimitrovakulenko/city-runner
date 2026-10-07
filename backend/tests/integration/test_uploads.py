@@ -120,7 +120,7 @@ class UploadIntegrationTests(unittest.TestCase):
         self.assertFalse(other.json()["duplicate"])
         self.assertNotEqual(other.json()["id"], result["id"])
 
-        stored_path = self.storage_root / self._source_object_key(result["id"])
+        stored_path = self.store._owner_dir(self.account_id) / self._source_object_key(result["id"])
         self.assertEqual(stat.S_IMODE(self.storage_root.stat().st_mode), 0o700)
         self.assertEqual(stat.S_IMODE(stored_path.stat().st_mode), 0o600)
         self.assertNotIn(str(self.storage_root), response.text)
@@ -189,7 +189,7 @@ class UploadIntegrationTests(unittest.TestCase):
         source_id = response.json()["id"]
         object_key = self._source_object_key(source_id)
         self.assertTrue(object_key.endswith(".fit"))
-        self.assertEqual(self.store.read(object_key), content)
+        self.assertEqual(self.store.read(object_key, owner_id=self.account_id), content)
         with self.engine.connect() as db:
             self.assertEqual(db.execute(text("SELECT source_kind FROM activity_sources WHERE id=:id"), {
                 "id": int(source_id),
@@ -330,7 +330,7 @@ class UploadIntegrationTests(unittest.TestCase):
 
     def test_transient_failure_retries_then_marks_source_failed_on_exhaustion(self):
         upload = self.upload().json()
-        self.store.delete(self._source_object_key(upload["id"]))
+        self.store.delete(self._source_object_key(upload["id"]), owner_id=self.account_id)
         for attempt in range(1, 6):
             job = claim(self.engine, kind="process_upload")
             self.assertEqual(job["attempts"], attempt)

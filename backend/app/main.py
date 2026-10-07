@@ -28,6 +28,7 @@ from backend.app.activity_filters import (
     canonical_filters,
     create_activity_filters_router,
 )
+from backend.app.account_data import create_account_data_router
 
 
 class ChallengeRequest(BaseModel):
@@ -136,6 +137,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
     app.include_router(create_import_batch_router(engine, current_user))
     app.include_router(create_routes_router(engine, current_user, routing_provider))
     app.include_router(create_activity_impact_router(engine, current_user))
+    app.include_router(create_account_data_router(engine, current_user))
     app.include_router(create_activity_filters_router(engine, current_user))
     app.include_router(create_map_router(engine, current_user))
     app.include_router(create_explorer_router(engine, current_user))

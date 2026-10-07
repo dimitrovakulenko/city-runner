@@ -294,6 +294,15 @@ export type ActivityFilterOptions = {
   types_truncated: boolean;
 };
 
+export type AccountDeletionRequest = {
+  confirmation: 'DELETE';
+};
+
+export type AccountDeletionResponse = {
+  id: string;
+  status: 'cleanup-pending' | 'complete';
+};
+
 export type CityItem = {
   id: string;
   name: string;

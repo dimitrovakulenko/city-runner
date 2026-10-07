@@ -33,6 +33,10 @@ jobs:
           sudo -u postgres createuser --superuser "$USER"
       - name: Run PostGIS integration tests
         run: scripts/dev/postgis-test.sh
+      - name: Rehearse account deletion after backup restore
+        env:
+          POSTGIS_ADMIN_DATABASE_URL: postgresql+psycopg:///postgres
+        run: python scripts/dev/account-restore-drill.py --output /tmp/account-restore.json
 
   mobile:
     runs-on: ubuntu-latest

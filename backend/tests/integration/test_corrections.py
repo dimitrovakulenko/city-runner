@@ -339,8 +339,8 @@ class CorrectionsPostgisTests(unittest.TestCase):
         release_read = threading.Event()
         original_read = self.store.read
 
-        def delayed_read(key):
-            data = original_read(key)
+        def delayed_read(key, **kwargs):
+            data = original_read(key, **kwargs)
             read_started.set()
             if not release_read.wait(5):
                 raise TimeoutError("test read release timed out")

@@ -14,6 +14,7 @@ import jwt
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
+from backend.app.owner_guard import owner_lock, ensure_owner_allowed
 
 
 PROVIDERS = {
@@ -121,6 +122,8 @@ def create_identity_and_session(db: Connection, provider: str, subject: str) -> 
     else:
         account_id = identity[0]
 
+    owner_lock(db, account_id, require_account=True)
+
     token = secrets.token_urlsafe(32)
     expires_at = utcnow() + timedelta(days=session_lifetime_days())
     digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
@@ -147,7 +150,16 @@ def account_for_token(db: Connection, token: str) -> str | None:
         WHERE token_digest=:digest AND revoked_at IS NULL AND expires_at>:now"""), {
         "digest": digest, "now": utcnow(),
     }).first()
-    return result[0] if result else None
+    if not result:
+        return None
+    account_id = result[0]
+    try:
+        ensure_owner_allowed(db, account_id, require_account=True)
+    except HTTPException as error:
+        if error.status_code == 503:
+            raise
+        return None
+    return account_id
 
 
 def revoke_token(db: Connection, token: str) -> bool:

@@ -6,18 +6,19 @@ import json
 import math
 import os
 from decimal import Decimal
+from datetime import datetime
 import urllib.error
 import urllib.request
 import uuid
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Mapping
-from datetime import datetime
 from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator
 from sqlalchemy import Engine, text
+from backend.app.owner_guard import owner_lock
 
 
 MAX_CLIENT_REVISION = 2_147_483_647
@@ -341,6 +342,7 @@ def create_routes_router(engine: Engine, current_user: Callable[..., str],
         calculated = _calculate_route(engine, [list(p) for p in body.waypoints], 0, routing_provider)
         route_id = uuid.uuid4()
         with engine.begin() as db:
+            owner_lock(db, account_id)
             db.execute(text("""INSERT INTO saved_routes
                 (id,account_id,name,revision,waypoints,geometry,distance_m,duration_s,provider,attribution,routed_at)
                 VALUES (:id,:account,:name,1,CAST(:waypoints AS jsonb),
@@ -395,6 +397,7 @@ def create_routes_router(engine: Engine, current_user: Callable[..., str],
                 updated_at=clock_timestamp()
                 WHERE id=:id AND account_id=:account AND revision=:revision"""
         with engine.begin() as db:
+            owner_lock(db, account_id)
             result = db.execute(text(sql), params)
             if result.rowcount != 1:
                 exists = db.execute(text("SELECT 1 FROM saved_routes WHERE id=:id AND account_id=:account"), {
@@ -409,6 +412,7 @@ def create_routes_router(engine: Engine, current_user: Callable[..., str],
     def delete_route(route_id: UUID, expected_revision: int = Query(ge=1, le=MAX_CLIENT_REVISION),
                      account_id: str = Depends(current_user)):
         with engine.begin() as db:
+            owner_lock(db, account_id)
             result = db.execute(text("DELETE FROM saved_routes WHERE id=:id AND account_id=:account AND revision=:revision"), {
                 "id": route_id, "account": account_id, "revision": expected_revision,
             })

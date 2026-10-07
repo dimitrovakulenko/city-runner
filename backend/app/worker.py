@@ -12,11 +12,14 @@ from typing import Any
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
+from fastapi import HTTPException
 
 from backend.app.coverage import process_source_dataset
 from backend.app.corrections import process_private_object_cleanup
 from backend.app.jobs import claim, complete, fail
 from backend.app.uploads import process_upload
+from backend.app.account_data import process_account_deletion_cleanup, replay_account_deletions
+from backend.app.owner_guard import owner_lock
 
 logger = logging.getLogger(__name__)
 Handler = Callable[[dict[str, Any]], None]
@@ -34,12 +37,22 @@ def run_once(engine: Engine, handlers: dict[str, Handler], *, lease_seconds: int
         return False
     handler = handlers[job["kind"]]
     try:
+        if job["kind"] == "delete_private_object":
+            process_private_object_cleanup(job, engine=engine)
+            complete(engine, job_id=job["id"], lease_token=job["lease_token"])
+            return True
         handler(job)
     except Exception as error:
         error_code = re.sub(r"[^a-z0-9_]", "_", type(error).__name__.lower())[:64]
         if not error_code or not error_code[0].isalpha():
             error_code = "handler_error"
-        fail(engine, job_id=job["id"], lease_token=job["lease_token"], error_code=error_code)
+        try:
+            with engine.begin() as db:
+                owner_lock(db, str(job.get("account_id", "")))
+                fail(db, job_id=job["id"], lease_token=job["lease_token"], error_code=error_code)
+        except HTTPException as guard_error:
+            if guard_error.status_code != 410:
+                raise
         logger.error("job %s failed (%s)", job["id"], error_code)
     else:
         complete(engine, job_id=job["id"], lease_token=job["lease_token"])
@@ -58,14 +71,17 @@ def main() -> None:
         "dev.noop": _noop,
         "process_upload": lambda job: process_upload(engine, job),
         "match_coverage": lambda job: process_source_dataset(engine, job),
-        "delete_private_object": lambda job: process_private_object_cleanup(job),
+        "delete_private_object": lambda job: process_private_object_cleanup(job, engine=engine),
     }
     try:
         if args.once:
+            replay_account_deletions(engine, force_cleanup=False, require_ledger=False)
             run_once(engine, handlers)
             return
         while True:
-            if not run_once(engine, handlers):
+            replay_account_deletions(engine, force_cleanup=False, require_ledger=False)
+            cleaned = process_account_deletion_cleanup(engine)
+            if not cleaned and not run_once(engine, handlers):
                 time.sleep(args.poll_seconds)
     except KeyboardInterrupt:
         logger.info("worker stopped")

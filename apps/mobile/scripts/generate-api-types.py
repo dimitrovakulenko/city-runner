@@ -50,6 +50,8 @@ SCHEMAS = (
     "ActivityImpactStreet",
     "ActivityFilters",
     "ActivityFilterOptions",
+    "AccountDeletionRequest",
+    "AccountDeletionResponse",
 )
 
 

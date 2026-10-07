@@ -15,8 +15,9 @@ from sqlalchemy import Engine, text
 from starlette.concurrency import run_in_threadpool
 
 from backend.app.jobs import enqueue
-from backend.app.storage import LocalObjectStore
+from backend.app.storage import LocalObjectStore, cleanup_unreferenced_original
 from backend.app.uploads import _job_state, _one_activity_file, _safe_error
+from backend.app.owner_guard import owner_lock
 
 MAX_BIGINT = 9_223_372_036_854_775_807
 MULTIPART_BODY = {"requestBody": {"required": True, "content": {"multipart/form-data": {
@@ -154,57 +155,60 @@ def _lock_source(db, account_id, candidate):
     return source, job
 
 
-def _attach_once(engine, account_id, batch_id, item_id, content_hash, object_key, file_format):
-    with _transaction(engine) as db:
-        batch = db.execute(text("""SELECT state FROM import_batches
+def _attach_once(db, store, account_id, batch_id, item_id, content, content_hash, file_format, created_keys):
+    owner_lock(db, account_id)
+    batch = db.execute(text("""SELECT state FROM import_batches
             WHERE id=:batch AND account_id=:account FOR UPDATE"""), {
             "batch": batch_id, "account": account_id,
         }).mappings().first()
-        if batch is None:
-            raise HTTPException(status_code=404, detail="Import batch not found.")
-        item = db.execute(text("""SELECT id,format,status,content_hash,source_id
+    if batch is None:
+        raise HTTPException(status_code=404, detail="Import batch not found.")
+    item = db.execute(text("""SELECT id,format,status,content_hash,source_id
             FROM import_batch_items WHERE id=:item AND batch_id=:batch AND account_id=:account
             FOR UPDATE"""), {"item": item_id, "batch": batch_id, "account": account_id}).mappings().first()
-        if item is None:
-            raise HTTPException(status_code=404, detail="Import batch item not found.")
-        if item["status"] == "deleted":
-            raise HTTPException(status_code=409, detail="Deleted batch items cannot be uploaded again.")
-        if item["format"] != file_format:
-            raise HTTPException(status_code=422, detail="File does not match the batch item's format.")
-        if item["content_hash"] is not None:
-            if item["content_hash"] != content_hash:
-                raise HTTPException(status_code=409, detail="Batch item is already pinned to different bytes.")
-            candidate = db.execute(text("""SELECT id,revision FROM activity_sources
+    if item is None:
+        raise HTTPException(status_code=404, detail="Import batch item not found.")
+    if item["status"] == "deleted":
+        raise HTTPException(status_code=409, detail="Deleted batch items cannot be uploaded again.")
+    if item["format"] != file_format:
+        raise HTTPException(status_code=422, detail="File does not match the batch item's format.")
+    if item["content_hash"] is not None:
+        if item["content_hash"] != content_hash:
+            raise HTTPException(status_code=409, detail="Batch item is already pinned to different bytes.")
+        candidate = db.execute(text("""SELECT id,revision FROM activity_sources
                 WHERE id=:id AND account_id=:account"""), {
                 "id": item["source_id"], "account": account_id,
             }).mappings().first()
-            if candidate is None:
-                raise HTTPException(status_code=409, detail="Deleted batch items cannot be uploaded again.")
-            _lock_source(db, account_id, candidate)
-            return False
-        if batch["state"] != "open":
-            raise HTTPException(status_code=409, detail="Batch is stopped.")
-        source = db.execute(text("""INSERT INTO activity_sources
+        if candidate is None:
+            raise HTTPException(status_code=409, detail="Deleted batch items cannot be uploaded again.")
+        _lock_source(db, account_id, candidate)
+        return False
+    if batch["state"] != "open":
+        raise HTTPException(status_code=409, detail="Batch is stopped.")
+    object_key = store.write(content, extension=file_format, owner_id=account_id)
+    created_keys.append(object_key)
+    source = db.execute(text("""INSERT INTO activity_sources
             (account_id,source_kind,content_hash,revision,private_object_key,status)
             VALUES (:account,:kind,:hash,1,:object,'queued')
             ON CONFLICT (account_id,source_kind,content_hash) DO NOTHING
             RETURNING id,revision,status"""), {
             "account": account_id, "kind": file_format, "hash": content_hash, "object": object_key,
         }).mappings().first()
-        duplicate = source is None
-        if source is None:
-            source = db.execute(text("""SELECT id,revision,status FROM activity_sources
+    duplicate = source is None
+    if source is None:
+        source = db.execute(text("""SELECT id,revision,status FROM activity_sources
                 WHERE account_id=:account AND source_kind=:kind AND content_hash=:hash"""), {
                 "account": account_id, "kind": file_format, "hash": content_hash,
             }).mappings().first()
-            if source is None:
-                raise _SourceChanged()
-            source, job = _lock_source(db, account_id, source)
-        else:
-            job = enqueue(db, account_id=account_id, kind="process_upload",
+        if source is None:
+            raise _SourceChanged()
+        source, job = _lock_source(db, account_id, source)
+        store.delete(object_key, owner_id=account_id)
+    else:
+        job = enqueue(db, account_id=account_id, kind="process_upload",
                 dedupe_key=f"upload:{source['id']}:r{source['revision']}",
                 payload={"source_id": source["id"], "revision": source["revision"]}, priority=100)
-        db.execute(text("""UPDATE import_batch_items SET content_hash=:hash,source_id=:source,
+    db.execute(text("""UPDATE import_batch_items SET content_hash=:hash,source_id=:source,
                 duplicate=:duplicate,status=:status,error_code=NULL,updated_at=clock_timestamp()
             WHERE id=:item AND batch_id=:batch AND account_id=:account"""), {
             "hash": content_hash, "source": source["id"], "duplicate": duplicate,
@@ -217,28 +221,38 @@ def _attach_once(engine, account_id, batch_id, item_id, content_hash, object_key
 def _attach_file(engine: Engine, store: LocalObjectStore, account_id: str, batch_id: int,
                  item_id: int, content: bytes, file_format: str) -> None:
     content_hash = hashlib.sha256(content).hexdigest()
-    object_key = store.write(content, extension=file_format)
-    retained = False
-    try:
-        for _ in range(3):
-            try:
-                retained = _attach_once(engine, account_id, batch_id, item_id, content_hash, object_key, file_format)
-                return
-            except _SourceChanged:
-                continue
-        raise HTTPException(status_code=503, detail="Upload changed during submission; retry the request.")
-    finally:
-        if not retained:
-            try:
-                store.delete(object_key)
-            except OSError:
-                pass
+    for _ in range(3):
+        created_keys = []
+        try:
+            with _transaction(engine) as db:
+                _attach_once(db, store, account_id, batch_id, item_id, content, content_hash,
+                             file_format, created_keys)
+            return
+        except _SourceChanged:
+            for key in created_keys:
+                cleanup_unreferenced_original(engine, store, account_id, key)
+            continue
+        except Exception:
+            for key in created_keys:
+                try:
+                    with engine.connect() as db:
+                        retained = db.execute(text("SELECT 1 FROM activity_sources WHERE account_id=:account AND private_object_key=:key"), {
+                            "account": account_id, "key": key,
+                        }).first()
+                    if retained is None:
+                        cleanup_unreferenced_original(engine, store, account_id, key)
+                except Exception:
+                    # Keep the sidecar as a durable orphan discovery record.
+                    pass
+            raise
+    raise HTTPException(status_code=503, detail="Upload changed during submission; retry the request.")
 
 
 def _retry_upload(engine, account_id, source_id):
     for _ in range(3):
         try:
             with _transaction(engine) as db:
+                owner_lock(db, account_id)
                 candidate = db.execute(text("""SELECT id,revision FROM activity_sources
                     WHERE id=:id AND account_id=:account"""), {
                     "id": source_id, "account": account_id,
@@ -280,6 +294,7 @@ def create_import_batch_router(engine: Engine, current_user: Callable[..., str],
         encoded = json.dumps([file.model_dump() for file in body.files], separators=(",", ":"))
         digest = hashlib.sha256(encoded.encode()).hexdigest()
         with engine.begin() as db:
+            owner_lock(db, account_id)
             row = db.execute(text("""INSERT INTO import_batches(account_id,request_id,manifest_hash)
                 VALUES (:account,:request,:hash) ON CONFLICT (account_id,request_id) DO NOTHING
                 RETURNING id"""), {"account": account_id, "request": str(body.request_id), "hash": digest}).first()
@@ -347,6 +362,7 @@ def create_import_batch_router(engine: Engine, current_user: Callable[..., str],
 
     def set_state(batch_id: int, account_id: str, state: str):
         with engine.begin() as db:
+            owner_lock(db, account_id)
             result = db.execute(text("""UPDATE import_batches SET state=:state,updated_at=clock_timestamp()
                 WHERE id=:id AND account_id=:account"""), {
                 "state": state, "id": batch_id, "account": account_id,
