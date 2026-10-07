@@ -1,9 +1,10 @@
 import { ApiError } from './api/client';
 import type { ActivityApi, ApiErrorKind } from './api/client';
-import type { ActivityDetail, ActivitySummary } from './api/generated';
+import type { ActivityDetail, ActivityImpactPage, ActivitySummary } from './api/generated';
 
 export type ListStatus = 'loading' | 'loading-more' | 'ready' | 'empty' | 'offline' | 'sign-in-required' | 'error';
 export type DetailStatus = 'idle' | 'loading' | 'ready' | 'offline' | 'sign-in-required' | 'error';
+export type ImpactStatus = 'idle' | ListStatus;
 
 export interface ActivityExplorerState {
   items: ActivitySummary[];
@@ -17,12 +18,19 @@ export interface ActivityExplorerState {
   detail: ActivityDetail | null;
   detailStatus: DetailStatus;
   detailError: string | null;
+  impactDatasetId: string | null;
+  impactRule: 'normal' | 'strict';
+  impact: ActivityImpactPage | null;
+  impactPage: number;
+  impactStatus: ImpactStatus;
+  impactError: string | null;
 }
 
 const INITIAL_STATE: ActivityExplorerState = {
   items: [], page: 1, pageSize: 20, total: 0, query: '',
   listStatus: 'loading', listError: null, selectedId: null,
   detail: null, detailStatus: 'idle', detailError: null,
+  impactDatasetId: null, impactRule: 'normal', impact: null, impactPage: 1, impactStatus: 'idle', impactError: null,
 };
 
 function errorStatus(error: unknown): ApiErrorKind | 'http' {
@@ -43,6 +51,8 @@ export class ActivityStore {
   private state = INITIAL_STATE;
   private listRequest = 0;
   private detailRequest = 0;
+  private impactRequest = 0;
+  private accountGeneration = 0;
   private accountController = new AbortController();
   private listeners = new Set<(state: ActivityExplorerState) => void>();
 
@@ -63,18 +73,25 @@ export class ActivityStore {
   }
 
   private expireSession(): void {
+    this.accountGeneration += 1;
     this.listRequest += 1;
     this.detailRequest += 1;
+    this.impactRequest += 1;
+    this.accountController.abort();
+    this.accountController = new AbortController();
     this.update({
       items: [], page: 1, total: 0, listStatus: 'sign-in-required',
       listError: 'Your session expired. Sign in again.', selectedId: null,
       detail: null, detailStatus: 'idle', detailError: null,
+      impactDatasetId: null, impactRule: 'normal', impact: null, impactPage: 1, impactStatus: 'idle', impactError: null,
     });
   }
 
   reset(): void {
+    this.accountGeneration += 1;
     this.listRequest += 1;
     this.detailRequest += 1;
+    this.impactRequest += 1;
     this.accountController.abort();
     this.accountController = new AbortController();
     this.update({ ...INITIAL_STATE });
@@ -119,15 +136,20 @@ export class ActivityStore {
 
   async selectActivity(id: string): Promise<void> {
     const requestId = ++this.detailRequest;
-    this.update({ selectedId: id, detail: null, detailStatus: 'loading', detailError: null });
+    const account = this.accountGeneration;
+    this.impactRequest += 1;
+    this.update({ selectedId: id, detail: null, detailStatus: 'loading', detailError: null,
+      impact: null, impactPage: 1, impactStatus: this.state.impactDatasetId ? 'loading' : 'idle', impactError: null });
     try {
       const detail = await this.api.getActivity(id, this.accountController.signal);
       if (requestId !== this.detailRequest || this.state.selectedId !== id) return;
       this.update({ detail, detailStatus: 'ready' });
+      if (this.state.impactDatasetId !== null) void this.loadActivityImpact(1, false);
     } catch (error) {
-      if (requestId !== this.detailRequest || this.state.selectedId !== id) return;
+      if (account !== this.accountGeneration) return;
       if (errorStatus(error) === 'sign-in-required') return this.expireSession();
-      this.update({ detailStatus: listFailureStatus(error), detailError: errorMessage(error) });
+      if (requestId !== this.detailRequest || this.state.selectedId !== id) return;
+      this.update({ detailStatus: listFailureStatus(error), detailError: errorMessage(error), impactStatus: 'idle', impactError: null });
     }
   }
 
@@ -136,9 +158,71 @@ export class ActivityStore {
     if (id !== null) return this.selectActivity(id);
   }
 
+  selectImpactDataset(datasetId: string | null, rule: 'normal' | 'strict' = this.state.impactRule): void {
+    if (datasetId === '') datasetId = null;
+    if (datasetId === this.state.impactDatasetId && rule === this.state.impactRule) return;
+    this.impactRequest += 1;
+    this.update({ impactDatasetId: datasetId, impactRule: rule, impact: null, impactPage: 1,
+      impactStatus: datasetId && this.state.detailStatus === 'ready' && this.state.selectedId ? 'loading' : 'idle', impactError: null });
+    if (datasetId && this.state.detailStatus === 'ready' && this.state.selectedId) void this.loadActivityImpact(1, false);
+  }
+
+  async loadMoreImpact(): Promise<void> {
+    const impact = this.state.impact;
+    if (!impact || this.state.impactStatus !== 'ready' || impact.total === null || impact.streets.length >= impact.total) return;
+    await this.loadActivityImpact(this.state.impactPage + 1, true);
+  }
+
+  async retryImpact(): Promise<void> {
+    if (this.state.impactDatasetId && this.state.detailStatus === 'ready' && this.state.selectedId) await this.loadActivityImpact(1, false);
+  }
+
+  async refreshImpact(): Promise<void> {
+    this.impactRequest += 1;
+    this.update({ impact: null, impactPage: 1, impactStatus: 'idle', impactError: null });
+    if (this.state.impactDatasetId && this.state.detailStatus === 'ready' && this.state.selectedId) await this.loadActivityImpact(1, false);
+  }
+
+  private async loadActivityImpact(page: number, append: boolean): Promise<void> {
+    const activityId = this.state.selectedId;
+    const datasetId = this.state.impactDatasetId;
+    if (!activityId || !datasetId || this.state.detailStatus !== 'ready') return;
+    const requestId = ++this.impactRequest;
+    const account = this.accountGeneration;
+    const rule = this.state.impactRule;
+    this.update({ impactStatus: append ? 'loading-more' : 'loading', impactError: null,
+      ...(append ? {} : { impact: null, impactPage: 1 }) });
+    try {
+      const result = await this.api.getActivityImpact(activityId, { datasetId, rule, page, pageSize: this.state.impact?.page_size ?? 50 }, this.accountController.signal);
+      if (requestId !== this.impactRequest || account !== this.accountGeneration || activityId !== this.state.selectedId ||
+        datasetId !== this.state.impactDatasetId || rule !== this.state.impactRule) return;
+      if (result.activity_id !== activityId || result.dataset_id !== datasetId || result.rule !== rule || result.page !== page) {
+        this.update({ impact: null, impactPage: 1, impactStatus: 'error', impactError: 'The activity impact response did not match the selected activity and dataset.' }); return;
+      }
+      if (result.dataset_state !== 'active') {
+        this.update({ impact: null, impactPage: 1, impactStatus: 'error', impactError: 'The selected dataset is no longer active. Choose another dataset and retry.' }); return;
+      }
+      const current = this.state.impact;
+      if (append && current && (current.coverage.progress_revision !== result.coverage.progress_revision || current.coverage.status !== result.coverage.status)) {
+        await this.loadActivityImpact(1, false);
+        return;
+      }
+      const streets = append && current ? [...current.streets, ...result.streets] : result.streets;
+      this.update({ impact: { ...result, streets }, impactPage: result.page,
+        impactStatus: streets.length === 0 && result.total === 0 ? 'empty' : 'ready', impactError: null });
+    } catch (error) {
+      if (account !== this.accountGeneration) return;
+      if (errorStatus(error) === 'sign-in-required') return this.expireSession();
+      if (requestId !== this.impactRequest || activityId !== this.state.selectedId || datasetId !== this.state.impactDatasetId || rule !== this.state.impactRule) return;
+      this.update({ impactStatus: listFailureStatus(error), impactError: errorMessage(error) });
+    }
+  }
+
   clearSelection(): void {
     this.detailRequest += 1;
-    this.update({ selectedId: null, detail: null, detailStatus: 'idle', detailError: null });
+    this.impactRequest += 1;
+    this.update({ selectedId: null, detail: null, detailStatus: 'idle', detailError: null,
+      impact: null, impactPage: 1, impactStatus: 'idle', impactError: null });
   }
 
   activityDeleted(id: string): void {

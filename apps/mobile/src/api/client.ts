@@ -1,5 +1,6 @@
 import type {
   ActivityDetail,
+  ActivityImpactPage,
   ActivityPage,
   ChallengeRequest,
   ChallengeResponse,
@@ -44,6 +45,7 @@ export const noSessionStore: SessionStore = {
 export interface ActivityApi {
   listActivities(input?: { page?: number; pageSize?: number; query?: string }, signal?: AbortSignal): Promise<ActivityPage>;
   getActivity(id: string, signal?: AbortSignal): Promise<ActivityDetail>;
+  getActivityImpact(id: string, input: { datasetId: string; rule: 'normal' | 'strict'; page: number; pageSize: number }, signal?: AbortSignal): Promise<ActivityImpactPage>;
   getMe(): Promise<MeResponse>;
   createChallenge(body: ChallengeRequest): Promise<ChallengeResponse>;
   exchange(body: ExchangeRequest, options?: { persist?: boolean }): Promise<ExchangeResponse>;
@@ -143,6 +145,10 @@ export function createActivityApi(options: Parameters<typeof createApiRequest>[0
     },
     getActivity(id, signal) {
       return request<ActivityDetail>(`/api/activities/${encodeURIComponent(id)}`, { signal });
+    },
+    getActivityImpact(id, input, signal) {
+      const params = new URLSearchParams({ dataset_id: input.datasetId, rule: input.rule, page: String(input.page), page_size: String(input.pageSize) });
+      return request<ActivityImpactPage>(`/api/activities/${encodeURIComponent(id)}/impact?${params}`, { signal });
     },
     getMe() {
       return request<MeResponse>('/api/me');

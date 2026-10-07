@@ -21,6 +21,7 @@ export const fixtureApi: ActivityApi = {
     if (!result) throw new Error('Activity not found.');
     return result;
   },
+  async getActivityImpact() { throw new Error('Fixture mode does not provide activity impact.'); },
   async getMe() { throw new Error('Fixture mode does not provide sign-in.'); },
   async createChallenge() { throw new Error('Fixture mode does not provide sign-in.'); },
   async exchange() { throw new Error('Fixture mode does not provide sign-in.'); },

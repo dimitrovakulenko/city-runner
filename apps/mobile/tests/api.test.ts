@@ -38,6 +38,19 @@ test('requires a session and preserves large string IDs and track segments', asy
   assert.deepEqual(actual.timestamps, activity.timestamps);
 });
 
+test('activity impact uses its independent authenticated query and preserves BIGINT IDs', async () => {
+  let requestedUrl = ''; let authorization: string | null = null;
+  const api = createActivityApi({ baseUrl: 'https://example.test/', sessionStore: sessions('owner-token'), fetchImpl: async (url, init) => {
+    requestedUrl = String(url); authorization = new Headers(init?.headers).get('Authorization'); return Response.json({});
+  } });
+  await api.getActivityImpact('-9007199254740993', { datasetId: '9007199254740997', rule: 'strict', page: 2, pageSize: 50 });
+  const url = new URL(requestedUrl);
+  assert.equal(url.pathname, '/api/activities/-9007199254740993/impact');
+  assert.equal(url.searchParams.get('dataset_id'), '9007199254740997');
+  assert.equal(url.searchParams.get('rule'), 'strict'); assert.equal(url.searchParams.get('page'), '2');
+  assert.equal(url.searchParams.get('page_size'), '50'); assert.equal(authorization, 'Bearer owner-token');
+});
+
 test('old-token 401 does not replay under or clear a replacement session', async () => {
   const store = sessions('old');
   let calls = 0;
