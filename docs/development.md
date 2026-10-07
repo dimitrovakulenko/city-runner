@@ -19,6 +19,10 @@ Set registered `GOOGLE_CLIENT_IDS` and/or `APPLE_CLIENT_IDS` to enable provider 
 
 The PostGIS integration runner creates a UUID-named `city_runner_test_*` database, runs migration up/down/up and synthetic owner/search/track API checks, then drops that database even when tests fail. It requires a PostgreSQL administrator URL that can create/drop databases and install the PostGIS extension. Run `rtk proxy env PATH="$PWD/.venv/bin:$PATH" scripts/dev/postgis-test.sh` from the repository root. The default admin URL uses the local Unix socket and current OS username. To select another local cluster, set `POSTGIS_ADMIN_DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:PORT/postgres`. The test URL is derived from the same admin URL, and the harness overrides any inherited `DATABASE_URL` before running migrations.
 
+## Account data and history scale
+
+Account data operations use the [export/deletion contract and recovery commands](account-data.md). Configure and explicitly initialize the independent deletion journal for a fresh installation; share its path between API and worker. Missing configuration disables full account deletion, while a configured missing/corrupt journal fails closed. Never initialize a replacement journal during restore. The [synthetic history benchmark](history-benchmark.md) records the local 5-million-sample workload and measured map fix.
+
 ## Mobile checks and development app
 
 From `apps/mobile`, run `rtk npm ci` followed by `rtk npm run typecheck` and `rtk npm test`. `npm ci` uses the checked-in `package-lock.json`.

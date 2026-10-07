@@ -33,3 +33,30 @@ Before exposing a restored API or worker, replay the latest independently retain
 ## Verification
 
 Use synthetic GPX/FIT and disposable PostGIS only. Verify ZIP contents/IDs/exact bytes/coordinates/timestamps, auth/owner isolation, bounds/errors/temp cleanup, shared-owner writes versus exclusive export/deletion, old activity cleanup keys, failed-write leftovers, streaming uploads, worker ingest/match/lease restart, retry and concurrent login/deletion. Test journal/fsync/DB failure at the commit boundary, idempotent cleanup, failed cleanup retry, stale lease acknowledgement, API restart and actual backup replay. Generate backend types before client/UI wiring; independently review backend and shared client. Browser tests cover explicit download/delete confirmation, failure/cancel, account/session replacement and private state removal. Native testing remains assigned separately.
+
+## Local operation and recovery
+
+API and worker must use the same `DATABASE_URL`, `UPLOAD_STORAGE_DIR` and `ACCOUNT_DELETION_LEDGER`. Give the ledger a dedicated private directory. On a **fresh installation only**, initialize it explicitly:
+
+```sh
+rtk proxy env ACCOUNT_DELETION_LEDGER=/path/to/private-privacy/deletions.jsonl .venv/bin/python -m backend.app.account_data --init-ledger
+```
+
+Keep the independently retained current journal outside database/source backup snapshots. A database restore does not undo completed deletions. Stop API/worker exposure during recovery, restore the database and source store, recover the latest independent journal, then run:
+
+```sh
+rtk .venv/bin/python -m backend.app.account_data --restore
+rtk .venv/bin/python -m backend.app.account_data --status
+```
+
+`--restore` force-replays intent, drains cleanup and exits unsuccessfully unless tombstoned owners and originals are absent. Never initialize an empty journal to replace a missing restore journal. Failed cleanup remains visible; correct the storage error, use `--retry DELETION_ID` (or `--retry` for all failed receipts), then `--drain`/`--restore` again. Retryable failures wait for their backoff; the ordinary worker resumes them. The operator commands do not authorize exposing an unverified restored installation.
+
+The [synthetic restore result](benchmarks/d32-restore.json) comes from real `pg_dump`/`pg_restore`, a source-file backup and a newer independent journal. It verifies exact originals before backup, revoked old sessions even before replay, removal of old rows/files, preservation of an unrelated account and a fresh same-identity account surviving later replay. Production backup cadence, external journal retention and hosted restore operations remain D34.
+
+To repeat the drill, put PostgreSQL client tools on `PATH`:
+
+```sh
+rtk proxy env POSTGIS_ADMIN_DATABASE_URL=postgresql+psycopg://USER@127.0.0.1:PORT/postgres .venv/bin/python scripts/dev/account-restore-drill.py --output /tmp/account-restore.json
+```
+
+It creates/drops two generated local databases and uses only temporary synthetic source files. Hosted CI also runs this drill.

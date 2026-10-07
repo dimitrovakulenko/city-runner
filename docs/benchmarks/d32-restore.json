@@ -1,0 +1,11 @@
+{
+  "scope": "Synthetic local PostgreSQL/source-file backup and restore; no production backup or deployment acceptance",
+  "actual_pg_dump_restore": true,
+  "byte_exact_original_before_backup": true,
+  "old_token_revoked_after_restore_before_replay": true,
+  "deleted_owner_rows_and_files_absent": true,
+  "unrelated_account_preserved": true,
+  "same_identity_fresh_account_survives_replay": true,
+  "database_backup_bytes": 92276,
+  "disposable_cleanup": true
+}

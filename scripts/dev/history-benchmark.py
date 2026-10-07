@@ -273,7 +273,7 @@ def main():
     engine = None; created = False; children = []; stopped = threading.Event(); metrics = None; monitoring = None
     started = time.perf_counter(); cpu_start = time.process_time()
     report = {'timestamp_utc': datetime.now(timezone.utc).isoformat(), 'scope': 'Local synthetic GPX file and HTTP benchmark; no VM/native/provider acceptance',
-        'fixture_method': 'Production GPX parser and original storage; bulk seeded qualified source/job/run/node support. Fixture loading is not import timing. Each activity repeats ten distinct original nodes; twenty sequential HTTP imports run alongside concurrent browsing.',
+        'fixture_method': 'Production GPX parser and original storage; bulk seeded qualified source/job/run/node support. Fixture loading is not import timing. Each activity repeats ten distinct original nodes; Measured files are uploaded sequentially alongside concurrent browsing.',
         'environment': {'os': platform.platform(), 'architecture': platform.machine(), 'python': platform.python_version(),
             'logical_cpus': os.cpu_count(), 'physical_memory_bytes': os.sysconf('SC_PAGE_SIZE') * os.sysconf('SC_PHYS_PAGES')},
         'workload': vars(args) | {'output': str(args.output)}}
