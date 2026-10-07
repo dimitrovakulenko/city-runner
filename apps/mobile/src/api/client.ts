@@ -12,6 +12,7 @@ import type {
 } from './generated';
 
 export type ApiErrorKind = 'sign-in-required' | 'stale-session' | 'offline' | 'http';
+export interface BinaryDownload { blob: Blob; fileName: string }
 
 export class ApiError extends Error {
   readonly kind: ApiErrorKind;
@@ -91,10 +92,10 @@ export function createApiRequest(options: {
     init: RequestInit = {},
     authenticated = true,
     tokenOverride?: string,
-    responseMode: 'json' | 'text' = 'json',
+    responseMode: 'json' | 'text' | 'download' | 'accepted' = 'json',
   ): Promise<T> {
     const headers = new Headers(init.headers);
-    headers.set('Accept', responseMode === 'text' ? 'application/gpx+xml, text/plain' : 'application/json');
+    headers.set('Accept', responseMode === 'text' ? 'application/gpx+xml, text/plain' : responseMode === 'download' ? 'application/zip' : 'application/json');
     if (typeof init.body === 'string') headers.set('Content-Type', 'application/json');
     let usedToken: string | null = null;
     if (authenticated) {
@@ -131,6 +132,18 @@ export function createApiRequest(options: {
         }
         throw new ApiError('http', message, response.status);
       }
+      if (responseMode === 'accepted' && response.status !== 202) {
+        throw new ApiError('http', 'The server did not return the required account deletion acceptance receipt. Check account status before retrying.', response.status);
+      }
+      if (responseMode === 'download') {
+        if (response.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/zip') {
+          throw new ApiError('http', 'The server returned an invalid account archive type.', response.status);
+        }
+        const contentLength = Number(response.headers.get('Content-Length'));
+        if (Number.isFinite(contentLength) && contentLength > 512 * 1024 * 1024) {
+          throw new ApiError('http', 'The account archive exceeds the 512 MiB download limit.', response.status);
+        }
+      }
       if (response.status === 204) {
         if (authenticated && await sessionStore.getToken() !== usedToken) {
           throw new ApiError('stale-session', 'Your session changed while this request was running.');
@@ -139,8 +152,21 @@ export function createApiRequest(options: {
       }
       let result: T;
       try {
-        result = (responseMode === 'text' ? await response.text() : await response.json()) as T;
-      } catch {
+        if (responseMode === 'download') {
+          const blob = await response.blob();
+          if (blob.size > 512 * 1024 * 1024) {
+            throw new ApiError('http', 'The account archive exceeds the 512 MiB download limit.', response.status);
+          }
+          result = { blob, fileName: safeDownloadFilename(response.headers.get('Content-Disposition')) } as T;
+        } else {
+          result = (responseMode === 'text' ? await response.text() : await response.json()) as T;
+        }
+      } catch (error) {
+        if (responseMode === 'accepted') {
+          throw new ApiError('http', 'Account deletion was accepted but returned an invalid receipt. Check account status before retrying.', response.status);
+        }
+        if (error instanceof ApiError) throw error;
+        if (responseMode === 'download') throw new ApiError('http', 'The server returned an invalid account archive.', response.status);
         throw new ApiError('http', 'The server returned an invalid response.', response.status);
       }
       if (authenticated && await sessionStore.getToken() !== usedToken) {
@@ -154,6 +180,16 @@ export function createApiRequest(options: {
   }
 
   return request;
+}
+
+export function safeDownloadFilename(contentDisposition: string | null, fallback = 'city-runner-account.zip'): string {
+  const encoded = contentDisposition?.match(/(?:^|;)\s*filename\*\s*=\s*UTF-8''([^;]+)/i)?.[1];
+  const quoted = contentDisposition?.match(/(?:^|;)\s*filename\s*=\s*(?:"([^"]*)"|([^;]*))/i);
+  let filename = '';
+  try { filename = encoded ? decodeURIComponent(encoded.trim()) : (quoted?.[1] ?? quoted?.[2] ?? '').trim(); }
+  catch { filename = ''; }
+  const basename = filename.replace(/\\/g, '/').split('/').pop()?.replace(/[\u0000-\u001f\u007f]/g, '').trim() ?? '';
+  return basename && basename !== '.' && basename !== '..' ? basename.slice(0, 255) : fallback;
 }
 
 export function createActivityApi(options: Parameters<typeof createApiRequest>[0]): ActivityApi {

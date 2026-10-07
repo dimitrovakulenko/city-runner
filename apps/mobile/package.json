@@ -8,7 +8,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
-    "test": "tsc -p tsconfig.test.json && node --test .test-build/tests/*.test.js",
+    "test": "tsc -p tsconfig.test.json && node --test .test-build/apps/mobile/tests/*.test.js",
     "api:types": "python scripts/generate-api-types.py",
     "api:types:check": "python scripts/generate-api-types.py --check"
   },

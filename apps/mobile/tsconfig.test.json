@@ -8,7 +8,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "types": ["node"],
+    "rootDir": "../..",
     "outDir": ".test-build"
   },
-  "include": ["src/activityStore.ts", "src/api/*.ts", "tests/*.test.ts"]
+  "include": ["src/activityStore.ts", "src/accountStore.ts", "src/api/*.ts", "tests/*.test.ts"]
 }
