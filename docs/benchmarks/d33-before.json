@@ -1,0 +1,465 @@
+{
+  "timestamp_utc": "2026-10-07T10:25:22.556098+00:00",
+  "scope": "Local synthetic GPX file and HTTP benchmark; no VM/native/provider acceptance",
+  "fixture_method": "Production GPX parser and original storage; bulk seeded qualified source/job/run/node support. Fixture loading is not import timing.",
+  "environment": {
+    "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "python": "3.13.13",
+    "logical_cpus": 16,
+    "physical_memory_bytes": 68719476736,
+    "postgresql": "PostgreSQL 16.15 (Postgres.app) on aarch64-apple-darwin21.6.0, compiled by Apple clang version 14.0.0 (clang-1400.0.29.102), 64-bit",
+    "postgis": "3.4.6"
+  },
+  "workload": {
+    "activities": 5000,
+    "samples": 1000,
+    "users": 20,
+    "secondary_activities": 100,
+    "import_files": 20,
+    "repeats": 5,
+    "output": "/private/tmp/city-runner-history-benchmark.json"
+  },
+  "storage": {
+    "original_bytes": 540722700,
+    "database_bytes": 85580823
+  },
+  "fixture_seconds": 42.716,
+  "distinct_users": {
+    "map-overview": {
+      "samples": 100,
+      "p50_ms": 1577.36,
+      "p95_ms": 3085.07,
+      "max_ms": 3102.03,
+      "successful": 0,
+      "status_counts": {
+        "500": 100
+      },
+      "max_decoded_response_bytes": 21,
+      "max_theoretical_gzip_bytes": 41,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 21,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-close": {
+      "samples": 100,
+      "p50_ms": 53.51,
+      "p95_ms": 706.3,
+      "max_ms": 1603.77,
+      "successful": 95,
+      "status_counts": {
+        "200": 95,
+        "500": 5
+      },
+      "max_decoded_response_bytes": 4483,
+      "max_theoretical_gzip_bytes": 834,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 4483,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-filtered": {
+      "samples": 100,
+      "p50_ms": 62.63,
+      "p95_ms": 83.19,
+      "max_ms": 1304.99,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 4699,
+      "max_theoretical_gzip_bytes": 856,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 4699,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress": {
+      "samples": 100,
+      "p50_ms": 41.82,
+      "p95_ms": 51.1,
+      "max_ms": 76.4,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 544,
+      "max_theoretical_gzip_bytes": 298,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 544,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress-filtered": {
+      "samples": 100,
+      "p50_ms": 40.91,
+      "p95_ms": 48.06,
+      "max_ms": 49.47,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 565,
+      "max_theoretical_gzip_bytes": 314,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 565,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "activities": {
+      "samples": 100,
+      "p50_ms": 26.05,
+      "p95_ms": 28.17,
+      "max_ms": 28.64,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 2322,
+      "max_theoretical_gzip_bytes": 327,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 2322,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "sorted-streets": {
+      "samples": 100,
+      "p50_ms": 41.2,
+      "p95_ms": 49.6,
+      "max_ms": 72.37,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 11469,
+      "max_theoretical_gzip_bytes": 670,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 11469,
+      "content_encodings": [
+        "identity"
+      ]
+    }
+  },
+  "heavy_account": {
+    "map-overview": {
+      "samples": 100,
+      "p50_ms": 1592.25,
+      "p95_ms": 3133.93,
+      "max_ms": 3144.66,
+      "successful": 0,
+      "status_counts": {
+        "500": 100
+      },
+      "max_decoded_response_bytes": 21,
+      "max_theoretical_gzip_bytes": 41,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 21,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-close": {
+      "samples": 100,
+      "p50_ms": 1601.69,
+      "p95_ms": 3137.04,
+      "max_ms": 3158.57,
+      "successful": 0,
+      "status_counts": {
+        "500": 98,
+        "503": 2
+      },
+      "max_decoded_response_bytes": 82,
+      "max_theoretical_gzip_bytes": 94,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 82,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-filtered": {
+      "samples": 100,
+      "p50_ms": 1595.62,
+      "p95_ms": 2932.95,
+      "max_ms": 2948.06,
+      "successful": 25,
+      "status_counts": {
+        "200": 25,
+        "500": 73,
+        "503": 2
+      },
+      "max_decoded_response_bytes": 4699,
+      "max_theoretical_gzip_bytes": 856,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 4699,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress": {
+      "samples": 100,
+      "p50_ms": 74.02,
+      "p95_ms": 110.33,
+      "max_ms": 112.36,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 544,
+      "max_theoretical_gzip_bytes": 296,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 544,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress-filtered": {
+      "samples": 100,
+      "p50_ms": 51.84,
+      "p95_ms": 69.22,
+      "max_ms": 70.63,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 565,
+      "max_theoretical_gzip_bytes": 314,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 565,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "activities": {
+      "samples": 100,
+      "p50_ms": 26.58,
+      "p95_ms": 28.98,
+      "max_ms": 29.96,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 2322,
+      "max_theoretical_gzip_bytes": 313,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 2322,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "sorted-streets": {
+      "samples": 100,
+      "p50_ms": 66.1,
+      "p95_ms": 93.99,
+      "max_ms": 96.81,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 11460,
+      "max_theoretical_gzip_bytes": 646,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 11460,
+      "content_encodings": [
+        "identity"
+      ]
+    }
+  },
+  "browse_during_imports": {
+    "map-overview": {
+      "samples": 72,
+      "p50_ms": 1552.95,
+      "p95_ms": 3078.59,
+      "max_ms": 3123.61,
+      "successful": 0,
+      "status_counts": {
+        "500": 71,
+        "503": 1
+      },
+      "max_decoded_response_bytes": 82,
+      "max_theoretical_gzip_bytes": 94,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 82,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-close": {
+      "samples": 63,
+      "p50_ms": 22.5,
+      "p95_ms": 925.79,
+      "max_ms": 1552.5,
+      "successful": 61,
+      "status_counts": {
+        "200": 61,
+        "500": 2
+      },
+      "max_decoded_response_bytes": 4483,
+      "max_theoretical_gzip_bytes": 834,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 4483,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-filtered": {
+      "samples": 59,
+      "p50_ms": 17.06,
+      "p95_ms": 729.46,
+      "max_ms": 1575.64,
+      "successful": 58,
+      "status_counts": {
+        "200": 58,
+        "500": 1
+      },
+      "max_decoded_response_bytes": 4503,
+      "max_theoretical_gzip_bytes": 844,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 4503,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress": {
+      "samples": 59,
+      "p50_ms": 9.94,
+      "p95_ms": 683.45,
+      "max_ms": 754.82,
+      "successful": 59,
+      "status_counts": {
+        "200": 59
+      },
+      "max_decoded_response_bytes": 545,
+      "max_theoretical_gzip_bytes": 298,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 545,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress-filtered": {
+      "samples": 58,
+      "p50_ms": 12.51,
+      "p95_ms": 132.28,
+      "max_ms": 166.42,
+      "successful": 58,
+      "status_counts": {
+        "200": 58
+      },
+      "max_decoded_response_bytes": 576,
+      "max_theoretical_gzip_bytes": 310,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 576,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "activities": {
+      "samples": 54,
+      "p50_ms": 5.14,
+      "p95_ms": 118.25,
+      "max_ms": 123.65,
+      "successful": 54,
+      "status_counts": {
+        "200": 54
+      },
+      "max_decoded_response_bytes": 2322,
+      "max_theoretical_gzip_bytes": 327,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 2322,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "sorted-streets": {
+      "samples": 53,
+      "p50_ms": 13.07,
+      "p95_ms": 35.63,
+      "max_ms": 144.03,
+      "successful": 53,
+      "status_counts": {
+        "200": 53
+      },
+      "max_decoded_response_bytes": 11469,
+      "max_theoretical_gzip_bytes": 670,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 11469,
+      "content_encodings": [
+        "identity"
+      ]
+    }
+  },
+  "real_http_import": {
+    "upload_acceptance": {
+      "samples": 20,
+      "p50_ms": 8.34,
+      "p95_ms": 680.37,
+      "max_ms": 1591.14
+    },
+    "ingestion_queue": {
+      "samples": 20,
+      "p50_ms": 32.75,
+      "p95_ms": 103.95,
+      "max_ms": 108.55
+    },
+    "ingestion_handler": {
+      "samples": 20,
+      "p50_ms": 18.29,
+      "p95_ms": 48.34,
+      "max_ms": 95.14
+    },
+    "matching_queue": {
+      "samples": 20,
+      "p50_ms": 15.31,
+      "p95_ms": 35.49,
+      "max_ms": 80.43
+    },
+    "matching_handler": {
+      "samples": 20,
+      "p50_ms": 43.4,
+      "p95_ms": 92.53,
+      "max_ms": 108.25
+    },
+    "upload_to_ready_including_poll_interval": {
+      "samples": 20,
+      "p50_ms": 235.87,
+      "p95_ms": 1257.01,
+      "max_ms": 1909.27
+    },
+    "poll_interval_ms": 100,
+    "browsing_think_time_ms": 100
+  },
+  "verified": {
+    "activities": 5020,
+    "gps_samples": 5020000,
+    "cities": 2,
+    "distinct_users": 20
+  },
+  "targets": {
+    "warm_viewport_p95_under_1000ms": false,
+    "map_transferred_body_under_1MiB": true
+  },
+  "resources": {
+    "sampled_peak_rss_bytes": {
+      "api": 100564992,
+      "worker": 82788352,
+      "postgresql": 1843888128
+    },
+    "sampled_cpu_seconds": {
+      "api": 9.54,
+      "worker": 1.35,
+      "postgresql": 417.58
+    },
+    "sampling_seconds": 1,
+    "limitations": "PostgreSQL includes backends connected to this disposable database; summed RSS counts shared pages repeatedly. Short-lived processes between samples and cluster background workers are excluded. Local loopback, no VM/native/provider acceptance.",
+    "driver_cpu_seconds_including_fixture": 31.957
+  },
+  "elapsed_seconds": 138.291,
+  "disposable_cleanup": true
+}

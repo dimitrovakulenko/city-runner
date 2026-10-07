@@ -214,6 +214,44 @@ class MapApiPostgisTests(unittest.TestCase):
         self.assertEqual(missing.json()["node_state"], "ready")
         self.assertEqual(len(missing.json()["missing_nodes"]), 3)
 
+    def test_repeated_sample_tracks_clip_quickly_without_changing_activity_detail(self):
+        cycle = [[.2 + (index % 5) * .1, .4 + (index // 5) * .1] for index in range(10)]
+        segments = [[cycle[index % len(cycle)] for index in range(500)] for _ in range(2)]
+        timestamps = [[f"2026-10-07T00:00:{index % 60:02d}Z" for index in range(500)] for _ in range(2)]
+        original_tracks = json.loads(json.dumps(segments))
+        original_timestamps = json.loads(json.dumps(timestamps))
+        activity_ids = [9007199254741100 + index for index in range(51)]
+        with self.engine.begin() as db:
+            for activity_id in activity_ids:
+                db.execute(text("""INSERT INTO activities
+                    (id,user_id,name,date,activity_type,processed,unmapped_points,tracks,timestamps)
+                    VALUES (:id,:account,'Repeated synthetic run','2026-10-07','run',false,0,
+                      CAST(:tracks AS json),CAST(:timestamps AS json))"""), {
+                    "id": activity_id, "account": self.account,
+                    "tracks": json.dumps(original_tracks), "timestamps": json.dumps(original_timestamps),
+                })
+
+        response = self.client.get("/api/map", params={"bbox": "0.3,0.4,0.5,0.5", "zoom": 16},
+                                   headers=self.headers(self.account))
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        self.assertGreater(body["limits"]["tracks"]["returned"], 0)
+        self.assertLessEqual(body["limits"]["tracks"]["returned"], 50)
+        self.assertTrue(body["limits"]["tracks"]["truncated"])
+        self.assertTrue(body["tracks"])
+        self.assertGreaterEqual(len(body["tracks"][0]["geometry"]["coordinates"]), 2)
+        display_points = [point for segment in body["tracks"][0]["geometry"]["coordinates"] for point in segment]
+        self.assertTrue(display_points)
+        self.assertTrue(all(.3 <= point[0] <= .5 and .4 <= point[1] <= .5 for point in display_points))
+
+        detail = self.client.get(f"/api/activities/{activity_ids[0]}", headers=self.headers(self.account))
+        self.assertEqual(detail.status_code, 200, detail.text)
+        self.assertEqual(detail.json()["tracks"], original_tracks)
+        self.assertEqual(detail.json()["timestamps"], original_timestamps)
+        self.assertEqual(detail.json()["bounds"][0], [.2, .4])
+        self.assertAlmostEqual(detail.json()["bounds"][1][0], .6)
+        self.assertEqual(detail.json()["bounds"][1][1], .5)
+
     def test_live_progress_survives_overlapping_source_delete_and_ignores_zero_node_street(self):
         first_activity = self.add_activity(self.account, tracks=[[[.25,.5],[.75,.5]]], source_status=None)
         second_activity = self.add_activity(self.account, tracks=[[[.75,.5],[1.25,.5]]],

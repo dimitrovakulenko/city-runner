@@ -541,7 +541,7 @@ def _query_connection(engine):
             yield db
     except DBAPIError as error:
         sqlstate = getattr(error.orig, "sqlstate", None) or getattr(error.orig, "pgcode", None)
-        if sqlstate == "57014":
+        if sqlstate == "57014" or (sqlstate == "XX000" and "InterruptedException" in str(error.orig)):
             raise HTTPException(status_code=503,
                 detail="Spatial query exceeded its work limit; retry with a smaller viewport.") from error
         raise
@@ -572,9 +572,7 @@ _TRACK_QUERY = """
     clipped AS (
       SELECT candidates.id,candidates.name,candidates.date,candidates.source_points,
         CASE WHEN candidates.source_points<=:max_source_points THEN
-          CASE WHEN ST_Intersects(candidates.track_geometry,box.geom) THEN
-            ST_Simplify(ST_Intersection(candidates.track_geometry,box.geom),:tolerance)
-          END
+          ST_Simplify(ST_ClipByBox2D(candidates.track_geometry,box.geom::box2d),:tolerance)
         END AS geom
       FROM candidates CROSS JOIN box
     )

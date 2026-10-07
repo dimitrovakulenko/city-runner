@@ -1,0 +1,473 @@
+{
+  "timestamp_utc": "2026-10-07T11:15:16.948360+00:00",
+  "scope": "Local synthetic GPX file and HTTP benchmark; no VM/native/provider acceptance",
+  "fixture_method": "Production GPX parser and original storage; bulk seeded qualified source/job/run/node support. Fixture loading is not import timing. Each activity repeats ten distinct original nodes; twenty sequential HTTP imports run alongside concurrent browsing.",
+  "environment": {
+    "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "architecture": "arm64",
+    "python": "3.13.13",
+    "logical_cpus": 16,
+    "physical_memory_bytes": 68719476736,
+    "postgresql": "PostgreSQL 16.15 (Postgres.app) on aarch64-apple-darwin21.6.0, compiled by Apple clang version 14.0.0 (clang-1400.0.29.102), 64-bit",
+    "postgis": "3.4.6"
+  },
+  "workload": {
+    "activities": 5000,
+    "samples": 1000,
+    "users": 20,
+    "secondary_activities": 100,
+    "import_files": 20,
+    "repeats": 5,
+    "output": "/private/tmp/city-runner-history-benchmark-fixed.json"
+  },
+  "storage": {
+    "seed_original_bytes": 540722700,
+    "database_bytes": 85523479,
+    "final_original_bytes": 542306170
+  },
+  "fixture_seconds": 73.472,
+  "warmup_statuses": {
+    "map-overview": 200,
+    "map-close": 200,
+    "map-filtered": 200,
+    "progress": 200,
+    "progress-filtered": 200,
+    "activities": 200,
+    "sorted-streets": 200
+  },
+  "distinct_users": {
+    "map-overview": {
+      "samples": 100,
+      "p50_ms": 70.09,
+      "p95_ms": 101.78,
+      "max_ms": 120.38,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 69671,
+      "max_theoretical_gzip_bytes": 4329,
+      "truncated_responses": 100,
+      "max_transferred_body_bytes": 69671,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-close": {
+      "samples": 100,
+      "p50_ms": 53.32,
+      "p95_ms": 65.35,
+      "max_ms": 68.14,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 7021,
+      "max_theoretical_gzip_bytes": 1063,
+      "truncated_responses": 30,
+      "max_transferred_body_bytes": 7021,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-filtered": {
+      "samples": 100,
+      "p50_ms": 62.11,
+      "p95_ms": 74.46,
+      "max_ms": 76.26,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 4503,
+      "max_theoretical_gzip_bytes": 844,
+      "truncated_responses": 5,
+      "max_transferred_body_bytes": 4503,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress": {
+      "samples": 100,
+      "p50_ms": 44.31,
+      "p95_ms": 53.11,
+      "max_ms": 70.59,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 544,
+      "max_theoretical_gzip_bytes": 298,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 544,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress-filtered": {
+      "samples": 100,
+      "p50_ms": 47.62,
+      "p95_ms": 56.67,
+      "max_ms": 76.09,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 565,
+      "max_theoretical_gzip_bytes": 314,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 565,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "activities": {
+      "samples": 100,
+      "p50_ms": 27.35,
+      "p95_ms": 29.07,
+      "max_ms": 29.97,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 2322,
+      "max_theoretical_gzip_bytes": 327,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 2322,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "sorted-streets": {
+      "samples": 100,
+      "p50_ms": 42.65,
+      "p95_ms": 52.42,
+      "max_ms": 68.97,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 11469,
+      "max_theoretical_gzip_bytes": 670,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 11469,
+      "content_encodings": [
+        "identity"
+      ]
+    }
+  },
+  "heavy_account": {
+    "map-overview": {
+      "samples": 100,
+      "p50_ms": 102.43,
+      "p95_ms": 157.66,
+      "max_ms": 160.3,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 69621,
+      "max_theoretical_gzip_bytes": 4227,
+      "truncated_responses": 100,
+      "max_transferred_body_bytes": 69621,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-close": {
+      "samples": 100,
+      "p50_ms": 59.74,
+      "p95_ms": 77.17,
+      "max_ms": 78.82,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 7021,
+      "max_theoretical_gzip_bytes": 1063,
+      "truncated_responses": 100,
+      "max_transferred_body_bytes": 7021,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-filtered": {
+      "samples": 100,
+      "p50_ms": 72.53,
+      "p95_ms": 97.4,
+      "max_ms": 106.67,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 2742,
+      "max_theoretical_gzip_bytes": 724,
+      "truncated_responses": 100,
+      "max_transferred_body_bytes": 2742,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress": {
+      "samples": 100,
+      "p50_ms": 86.2,
+      "p95_ms": 125.31,
+      "max_ms": 137.86,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 544,
+      "max_theoretical_gzip_bytes": 296,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 544,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress-filtered": {
+      "samples": 100,
+      "p50_ms": 51.12,
+      "p95_ms": 68.71,
+      "max_ms": 70.79,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 565,
+      "max_theoretical_gzip_bytes": 314,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 565,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "activities": {
+      "samples": 100,
+      "p50_ms": 25.65,
+      "p95_ms": 28.47,
+      "max_ms": 29.35,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 2322,
+      "max_theoretical_gzip_bytes": 313,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 2322,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "sorted-streets": {
+      "samples": 100,
+      "p50_ms": 63.71,
+      "p95_ms": 89.4,
+      "max_ms": 92.37,
+      "successful": 100,
+      "status_counts": {
+        "200": 100
+      },
+      "max_decoded_response_bytes": 11460,
+      "max_theoretical_gzip_bytes": 646,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 11460,
+      "content_encodings": [
+        "identity"
+      ]
+    }
+  },
+  "browse_during_imports": {
+    "map-overview": {
+      "samples": 99,
+      "p50_ms": 29.88,
+      "p95_ms": 83.9,
+      "max_ms": 90.69,
+      "successful": 99,
+      "status_counts": {
+        "200": 99
+      },
+      "max_decoded_response_bytes": 69671,
+      "max_theoretical_gzip_bytes": 4329,
+      "truncated_responses": 99,
+      "max_transferred_body_bytes": 69671,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-close": {
+      "samples": 99,
+      "p50_ms": 12.4,
+      "p95_ms": 39.59,
+      "max_ms": 61.54,
+      "successful": 99,
+      "status_counts": {
+        "200": 99
+      },
+      "max_decoded_response_bytes": 7041,
+      "max_theoretical_gzip_bytes": 1076,
+      "truncated_responses": 29,
+      "max_transferred_body_bytes": 7041,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "map-filtered": {
+      "samples": 99,
+      "p50_ms": 15.36,
+      "p95_ms": 46.44,
+      "max_ms": 80.01,
+      "successful": 99,
+      "status_counts": {
+        "200": 99
+      },
+      "max_decoded_response_bytes": 4503,
+      "max_theoretical_gzip_bytes": 844,
+      "truncated_responses": 4,
+      "max_transferred_body_bytes": 4503,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress": {
+      "samples": 90,
+      "p50_ms": 7.84,
+      "p95_ms": 32.05,
+      "max_ms": 54.81,
+      "successful": 90,
+      "status_counts": {
+        "200": 90
+      },
+      "max_decoded_response_bytes": 545,
+      "max_theoretical_gzip_bytes": 300,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 545,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "progress-filtered": {
+      "samples": 80,
+      "p50_ms": 9.04,
+      "p95_ms": 25.44,
+      "max_ms": 31.2,
+      "successful": 80,
+      "status_counts": {
+        "200": 80
+      },
+      "max_decoded_response_bytes": 575,
+      "max_theoretical_gzip_bytes": 317,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 575,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "activities": {
+      "samples": 80,
+      "p50_ms": 4.25,
+      "p95_ms": 11.15,
+      "max_ms": 17.02,
+      "successful": 80,
+      "status_counts": {
+        "200": 80
+      },
+      "max_decoded_response_bytes": 2322,
+      "max_theoretical_gzip_bytes": 327,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 2322,
+      "content_encodings": [
+        "identity"
+      ]
+    },
+    "sorted-streets": {
+      "samples": 80,
+      "p50_ms": 9.8,
+      "p95_ms": 31.68,
+      "max_ms": 43.34,
+      "successful": 80,
+      "status_counts": {
+        "200": 80
+      },
+      "max_decoded_response_bytes": 11469,
+      "max_theoretical_gzip_bytes": 670,
+      "truncated_responses": 0,
+      "max_transferred_body_bytes": 11469,
+      "content_encodings": [
+        "identity"
+      ]
+    }
+  },
+  "real_http_import": {
+    "upload_acceptance": {
+      "samples": 20,
+      "p50_ms": 4.32,
+      "p95_ms": 21.77,
+      "max_ms": 58.25
+    },
+    "ingestion_queue": {
+      "samples": 20,
+      "p50_ms": 31.29,
+      "p95_ms": 93.97,
+      "max_ms": 103.47
+    },
+    "ingestion_handler": {
+      "samples": 20,
+      "p50_ms": 14.57,
+      "p95_ms": 22.45,
+      "max_ms": 25.72
+    },
+    "matching_queue": {
+      "samples": 20,
+      "p50_ms": 11.49,
+      "p95_ms": 18.86,
+      "max_ms": 23.04
+    },
+    "matching_handler": {
+      "samples": 20,
+      "p50_ms": 34.91,
+      "p95_ms": 38.12,
+      "max_ms": 72.93
+    },
+    "upload_to_ready_including_poll_interval": {
+      "samples": 20,
+      "p50_ms": 156.64,
+      "p95_ms": 304.88,
+      "max_ms": 358.98
+    },
+    "poll_interval_ms": 100,
+    "browsing_think_time_ms": 100
+  },
+  "verified": {
+    "activities": 5020,
+    "gps_samples": 5020000,
+    "cities": 2,
+    "distinct_users": 20,
+    "heavy_source_contribution_rows": 50200,
+    "all_source_contribution_rows": 69200,
+    "geography_nodes": 2000,
+    "geography_streets": 200
+  },
+  "targets": {
+    "warm_viewport_p95_under_1000ms": true,
+    "map_transferred_body_under_1MiB": true
+  },
+  "server_errors": [],
+  "resources": {
+    "sampled_peak_rss_bytes": {
+      "api": 106004480,
+      "worker": 82984960,
+      "postgresql": 815005696
+    },
+    "sampled_cpu_seconds": {
+      "api": 8.61,
+      "worker": 0.62,
+      "postgresql": 2.15
+    },
+    "sampling_seconds": 1,
+    "limitations": "PostgreSQL includes backends connected to this disposable database; summed RSS counts shared pages repeatedly. Short-lived processes between samples and cluster background workers are excluded. Local loopback, no VM/native/provider acceptance.",
+    "driver_cpu_seconds_including_fixture": 32.68
+  },
+  "elapsed_seconds": 85.343,
+  "disposable_cleanup": true
+}
