@@ -1,6 +1,7 @@
 import { ApiError } from './api/client';
+import { canonicalizeActivityFilters } from './api/client';
 import type { ActivityApi, ApiErrorKind } from './api/client';
-import type { ActivityDetail, ActivityImpactPage, ActivitySummary } from './api/generated';
+import type { ActivityDetail, ActivityFilterOptions, ActivityFilters, ActivityImpactPage, ActivitySummary } from './api/generated';
 
 export type ListStatus = 'loading' | 'loading-more' | 'ready' | 'empty' | 'offline' | 'sign-in-required' | 'error';
 export type DetailStatus = 'idle' | 'loading' | 'ready' | 'offline' | 'sign-in-required' | 'error';
@@ -12,6 +13,10 @@ export interface ActivityExplorerState {
   pageSize: number;
   total: number;
   query: string;
+  filters: Required<ActivityFilters>;
+  filterOptions: ActivityFilterOptions | null;
+  filterOptionsStatus: 'idle' | 'loading' | 'ready' | 'offline' | 'sign-in-required' | 'error';
+  filterOptionsError: string | null;
   listStatus: ListStatus;
   listError: string | null;
   selectedId: string | null;
@@ -27,7 +32,8 @@ export interface ActivityExplorerState {
 }
 
 const INITIAL_STATE: ActivityExplorerState = {
-  items: [], page: 1, pageSize: 20, total: 0, query: '',
+  items: [], page: 1, pageSize: 20, total: 0, query: '', filters: canonicalizeActivityFilters(),
+  filterOptions: null, filterOptionsStatus: 'idle', filterOptionsError: null,
   listStatus: 'loading', listError: null, selectedId: null,
   detail: null, detailStatus: 'idle', detailError: null,
   impactDatasetId: null, impactRule: 'normal', impact: null, impactPage: 1, impactStatus: 'idle', impactError: null,
@@ -52,6 +58,7 @@ export class ActivityStore {
   private listRequest = 0;
   private detailRequest = 0;
   private impactRequest = 0;
+  private filterOptionsRequest = 0;
   private accountGeneration = 0;
   private accountController = new AbortController();
   private listeners = new Set<(state: ActivityExplorerState) => void>();
@@ -77,10 +84,13 @@ export class ActivityStore {
     this.listRequest += 1;
     this.detailRequest += 1;
     this.impactRequest += 1;
+    this.filterOptionsRequest += 1;
     this.accountController.abort();
     this.accountController = new AbortController();
     this.update({
       items: [], page: 1, total: 0, listStatus: 'sign-in-required',
+      filters: canonicalizeActivityFilters(),
+      filterOptions: null, filterOptionsStatus: 'sign-in-required', filterOptionsError: 'Your session expired. Sign in again.',
       listError: 'Your session expired. Sign in again.', selectedId: null,
       detail: null, detailStatus: 'idle', detailError: null,
       impactDatasetId: null, impactRule: 'normal', impact: null, impactPage: 1, impactStatus: 'idle', impactError: null,
@@ -92,6 +102,7 @@ export class ActivityStore {
     this.listRequest += 1;
     this.detailRequest += 1;
     this.impactRequest += 1;
+    this.filterOptionsRequest += 1;
     this.accountController.abort();
     this.accountController = new AbortController();
     this.update({ ...INITIAL_STATE });
@@ -108,7 +119,7 @@ export class ActivityStore {
       ...(page === 1 ? { items: [] } : {}),
     });
     try {
-      const result = await this.api.listActivities({ page, pageSize: this.state.pageSize, query: normalizedQuery }, this.accountController.signal);
+      const result = await this.api.listActivities({ page, pageSize: this.state.pageSize, query: normalizedQuery, filters: this.state.filters }, this.accountController.signal);
       if (requestId !== this.listRequest) return;
       const items = page === 1 ? result.items : [...this.state.items, ...result.items];
       this.update({
@@ -128,6 +139,33 @@ export class ActivityStore {
   async retryList(): Promise<void> {
     return this.loadPage(this.state.query, 1);
   }
+
+  setFilters(filters: ActivityFilters): void {
+    const canonical = canonicalizeActivityFilters(filters);
+    if (JSON.stringify(canonical) === JSON.stringify(this.state.filters)) return;
+    this.detailRequest += 1;
+    this.impactRequest += 1;
+    this.update({ filters: canonical, selectedId: null, detail: null, detailStatus: 'idle', detailError: null,
+      impact: null, impactPage: 1, impactStatus: 'idle', impactError: null });
+    void this.loadPage(this.state.query, 1);
+  }
+
+  async loadFilterOptions(): Promise<void> {
+    const request = ++this.filterOptionsRequest;
+    const account = this.accountGeneration;
+    this.update({ filterOptionsStatus: 'loading', filterOptionsError: null });
+    try {
+      const result = await this.api.getActivityFilters(this.accountController.signal);
+      if (request !== this.filterOptionsRequest || account !== this.accountGeneration) return;
+      this.update({ filterOptions: result, filterOptionsStatus: 'ready' });
+    } catch (error) {
+      if (account !== this.accountGeneration || request !== this.filterOptionsRequest) return;
+      if (errorStatus(error) === 'sign-in-required') return this.expireSession();
+      this.update({ filterOptionsStatus: listFailureStatus(error), filterOptionsError: errorMessage(error) });
+    }
+  }
+
+  async retryFilterOptions(): Promise<void> { return this.loadFilterOptions(); }
 
   async loadMore(): Promise<void> {
     if (this.state.listStatus !== 'ready' || this.state.items.length >= this.state.total) return;

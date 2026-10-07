@@ -5,7 +5,7 @@ import type { SessionStore } from '../src/api/client';
 import { createExploreApi, createFixtureExploreApi } from '../src/api/explore';
 import type { ExploreApi, GpxFile } from '../src/api/explore';
 import { ExploreStore, type Viewport } from '../src/exploreStore';
-import type { MapResponse, ProgressResponse, UploadResponse, UploadStatusResponse } from '../src/api/generated';
+import type { ActivityFilters, MapResponse, ProgressResponse, UploadResponse, UploadStatusResponse } from '../src/api/generated';
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -72,6 +72,22 @@ test('explore client sends bearer, string bbox, selected rule, and keeps huge ID
   assert.equal(result.streets[0]?.street_id, '9007199254740993');
 });
 
+test('map and progress client serialize the shared filters and coverage scope', async () => {
+  const urls: string[] = [];
+  const client = createExploreApi({ baseUrl: 'https://api.test', sessionStore: sessionStore('opaque'), fetchImpl: async (url) => {
+    urls.push(String(url)); return Response.json(urls.length === 1 ? mapResult() : progressResult({ state: 'ready', datasets: [] }));
+  } });
+  const filters: ActivityFilters = { date_from: '2025-01-02', date_to: '2025-03-04', activity_type: 'cycling', source: 'fit' };
+  await client.getMap(viewport.bbox, viewport.zoom, 'strict', undefined, filters, 'filtered');
+  await client.getProgress('strict', undefined, filters, 'filtered');
+  for (const raw of urls) {
+    const url = new URL(raw);
+    assert.equal(url.searchParams.get('date_from'), '2025-01-02'); assert.equal(url.searchParams.get('date_to'), '2025-03-04');
+    assert.equal(url.searchParams.get('activity_type'), 'cycling'); assert.equal(url.searchParams.get('source'), 'fit');
+    assert.equal(url.searchParams.get('coverage_scope'), 'filtered'); assert.equal(url.searchParams.get('rule'), 'strict');
+  }
+});
+
 test('multipart upload leaves boundary header to fetch and returns duplicate state', async () => {
   const store = sessionStore('opaque');
   let init: RequestInit | undefined;
@@ -131,6 +147,91 @@ test('viewport refresh ignores an older map and progress response', async () => 
   assert.equal(store.getState().rule, 'strict');
   assert.equal(store.getState().map?.geography_state, 'geography_pending');
   assert.equal(store.getState().progress?.state, 'unsupported-geography');
+});
+
+test('old filtered map and progress responses cannot replace a newer filter selection', async () => {
+  const oldMap = deferred<MapResponse>(); const oldProgress = deferred<ProgressResponse>();
+  const service = api({
+    getMap: (_bbox, _zoom, _rule, _signal, filters) => filters?.source === 'gpx' ? oldMap.promise : Promise.resolve(mapResult({ filters: { source: 'fit' } })),
+    getProgress: (_rule, _signal, filters) => filters?.source === 'gpx' ? oldProgress.promise : Promise.resolve(progressResult({ state: 'ready', datasets: [], filters: { source: 'fit' } })),
+  });
+  const store = new ExploreStore(service);
+  store.setFilters({ source: 'gpx' });
+  const stale = store.refreshViewport(viewport);
+  store.setFilters({ source: 'fit' }); await new Promise((resolve) => setTimeout(resolve, 0));
+  oldMap.resolve(mapResult({ filters: { source: 'gpx' }, tracks: [{ activity_id: 'old' }] } as unknown as Partial<MapResponse>));
+  oldProgress.resolve(progressResult({ state: 'ready', datasets: [], filters: { source: 'gpx' } }));
+  await stale;
+  assert.equal(store.getState().filters.source, 'fit');
+  assert.deepEqual(store.getState().map?.filters, { source: 'fit' });
+  assert.deepEqual(store.getState().progress?.filters, { source: 'fit' });
+});
+
+test('filtered coverage fails safely when the server omits or mismatches selection echoes', async () => {
+  const store = new ExploreStore(api({
+    getMap: async () => mapResult(),
+    getProgress: async () => progressResult({ state: 'ready', datasets: [] }),
+  }));
+  await store.refreshViewport(viewport);
+  store.setFilters({ source: 'fit' }); store.setCoverageScope('filtered');
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(store.getState().map, null); assert.equal(store.getState().mapStatus, 'error');
+  assert.equal(store.getState().progress, null); assert.equal(store.getState().progressStatus, 'error');
+  assert.match(store.getState().mapError ?? '', /did not match/);
+});
+
+test('foreground progress from an old scope cannot trigger a stale map refresh', async () => {
+  let mapCalls = 0; let progressCalls = 0; const staleForeground = deferred<ProgressResponse>();
+  const store = new ExploreStore(api({
+    getMap: async (bbox, _zoom, _rule, _signal, filters, scope) => {
+      mapCalls++;
+      return mapResult({ bbox: bbox as MapResponse['bbox'], filters, coverage_scope: scope });
+    },
+    getProgress: (_rule, _signal, filters, scope) => {
+      progressCalls++;
+      if (progressCalls === 4) return staleForeground.promise;
+      return Promise.resolve(progressResult({ state: 'pending', filters, coverage_scope: scope }));
+    },
+  }));
+  store.setFilters({ source: 'gpx' });
+  await store.refreshProgress();
+  await store.refreshViewport(viewport);
+  const foreground = store.refreshForeground();
+  store.setCoverageScope('filtered'); await new Promise((resolve) => setTimeout(resolve, 0));
+  staleForeground.resolve(progressResult({ state: 'pending', filters: { source: 'gpx' }, coverage_scope: 'lifetime' }));
+  await foreground;
+  assert.equal(mapCalls, 2);
+  assert.equal(store.getState().map?.coverage_scope, 'filtered');
+});
+
+test('offline invalidates pending requests, retains selection, and reconnect loads the latest viewport and filters', async () => {
+  let mapCalls = 0; let progressCalls = 0; const staleMap = deferred<MapResponse>(); const staleProgress = deferred<ProgressResponse>();
+  const store = new ExploreStore(api({
+    getMap: (bbox, _zoom, _rule, _signal, filters, scope) => {
+      mapCalls++;
+      if (mapCalls === 1) return staleMap.promise;
+      return Promise.resolve(mapResult({ bbox: bbox as MapResponse['bbox'], filters, coverage_scope: scope }));
+    },
+    getProgress: (_rule, _signal, filters, scope) => {
+      progressCalls++;
+      if (progressCalls === 1) return staleProgress.promise;
+      return Promise.resolve(progressResult({ state: 'ready', datasets: [], filters, coverage_scope: scope }));
+    },
+  }));
+  const initial = store.refreshViewport(viewport);
+  store.setConnection(false);
+  store.refreshViewport({ bbox: [4, 51, 4.2, 51.2], zoom: 14 });
+  store.setFilters({ source: 'unknown' }); store.setCoverageScope('filtered');
+  assert.equal(store.getState().mapStatus, 'offline'); assert.equal(store.getState().progressStatus, 'offline');
+  assert.equal(mapCalls, 1); assert.equal(progressCalls, 1);
+  staleMap.resolve(mapResult({ tracks: [{ activity_id: 'stale' }] } as unknown as Partial<MapResponse>));
+  staleProgress.resolve(progressResult({ state: 'ready', datasets: [] })); await initial;
+  assert.equal(store.getState().mapStatus, 'offline'); assert.equal(store.getState().progressStatus, 'offline');
+  store.setConnection(true); await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(mapCalls, 2); assert.equal(progressCalls, 2);
+  assert.deepEqual(store.getState().map?.bbox, [4, 51, 4.2, 51.2]);
+  assert.equal(store.getState().map?.coverage_scope, 'filtered'); assert.equal(store.getState().map?.filters?.source, 'unknown');
+  assert.equal(store.getState().progress?.coverage_scope, 'filtered');
 });
 
 test('pending progress retains null counts instead of showing zero-like values', async () => {

@@ -1,6 +1,7 @@
-import { ApiError } from './api/client';
+import { activityFiltersMatch, canonicalizeActivityFilters, ApiError } from './api/client';
 import type { ApiErrorKind } from './api/client';
-import type { GpxFile, ExploreApi } from './api/explore';
+import type { ActivityFilters } from './api/generated';
+import type { CoverageScope, GpxFile, ExploreApi } from './api/explore';
 import type { MapResponse, ProgressResponse, UploadResponse, UploadStatusResponse } from './api/generated';
 
 export type LoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'offline' | 'sign-in-required' | 'error';
@@ -15,6 +16,8 @@ export interface UploadItem extends UploadStatusResponse {
 
 export interface ExploreState {
   rule: Rule;
+  filters: Required<ActivityFilters>;
+  coverageScope: CoverageScope;
   viewport: Viewport | null;
   map: MapResponse | null;
   progress: ProgressResponse | null;
@@ -29,7 +32,7 @@ export interface ExploreState {
 }
 
 const INITIAL_STATE: ExploreState = {
-  rule: 'normal', viewport: null, map: null, progress: null,
+  rule: 'normal', filters: canonicalizeActivityFilters(), coverageScope: 'lifetime', viewport: null, map: null, progress: null,
   mapStatus: 'idle', progressStatus: 'idle', mapError: null, progressError: null,
   uploads: [], uploading: false, uploadError: null, foregroundPollingStopped: false,
 };
@@ -50,6 +53,9 @@ export class ExploreStore {
   private mapRequest = 0;
   private progressRequest = 0;
   private accountRevision = 0;
+  private selectionRevision = 0;
+  private networkRevision = 0;
+  private connected = true;
   private accountController = new AbortController();
   private foregroundPolls = 0;
   private operationGeneration = 0;
@@ -80,6 +86,9 @@ export class ExploreStore {
     this.mapRequest++;
     this.progressRequest++;
     this.accountRevision++;
+    this.selectionRevision++;
+    this.networkRevision++;
+    this.connected = true;
     this.accountController.abort();
     this.accountController = new AbortController();
     this.operationGeneration++;
@@ -94,6 +103,7 @@ export class ExploreStore {
     this.mapRequest++;
     if (this.viewportChangePending) return;
     this.viewportChangePending = true;
+    if (!this.connected) { this.update({ mapStatus: 'offline' }); return; }
     this.update({ map: null, mapStatus: 'loading', mapError: null });
   }
 
@@ -103,10 +113,11 @@ export class ExploreStore {
     this.progressRequest++;
     this.viewportChangePending = false;
     this.update({ viewport: { bbox: [longitude - span, latitude - span, longitude + span, latitude + span], zoom },
-      map: null, mapStatus: 'loading', mapError: null });
+      ...(this.connected ? { map: null, mapStatus: 'loading' as const, mapError: null } : { mapStatus: 'offline' as const }) });
   }
 
   async retry(): Promise<void> {
+    if (!this.connected) return;
     this.foregroundPolls = 0;
     const uploads = this.state.uploads.map((item) => item.status === 'queued' || item.status === 'processing'
       ? { ...item, polls: 0, polling: 'active' as const } : item);
@@ -117,35 +128,47 @@ export class ExploreStore {
   }
 
   async refreshAfterCorrection(): Promise<void> {
+    if (!this.connected) return;
     if (this.state.viewport) await this.refreshViewport(this.state.viewport);
     else await this.refreshProgress();
   }
 
   async refreshViewport(viewport: Viewport): Promise<void> {
     this.viewportChangePending = false;
+    if (!this.connected) {
+      this.update({ viewport, mapStatus: 'offline', progressStatus: 'offline' });
+      return;
+    }
     this.update({ viewport, map: null, mapStatus: 'loading', progressStatus: 'loading', mapError: null, progressError: null });
     const mapRequest = ++this.mapRequest;
     const progressRequest = ++this.progressRequest;
     const accountRevision = this.accountRevision;
-    const { rule } = this.state;
+    const selectionRevision = this.selectionRevision;
+    const { rule, filters, coverageScope } = this.state;
     await Promise.all([
-      this.api.getMap(viewport.bbox, viewport.zoom, rule, this.accountController.signal).then((map) => {
-        if (mapRequest !== this.mapRequest || accountRevision !== this.accountRevision) return;
+      this.api.getMap(viewport.bbox, viewport.zoom, rule, this.accountController.signal, filters, coverageScope).then((map) => {
+        if (mapRequest !== this.mapRequest || accountRevision !== this.accountRevision || selectionRevision !== this.selectionRevision || !this.connected) return;
+        if (!activityFiltersMatch(map.filters, filters) || (map.coverage_scope ?? 'lifetime') !== coverageScope) {
+          this.update({ map: null, mapStatus: 'error', mapError: 'The map response did not match the selected activity filters and coverage scope.' }); return;
+        }
         this.update({ map, mapStatus: map.cities.length || map.tracks.length || map.streets.length || map.missing_nodes.length ? 'ready' : 'empty' });
       }).catch((error: unknown) => {
-        if (mapRequest !== this.mapRequest || accountRevision !== this.accountRevision) return;
+        if (mapRequest !== this.mapRequest || accountRevision !== this.accountRevision || selectionRevision !== this.selectionRevision || !this.connected) return;
         if (errorKind(error) === 'sign-in-required') return this.clearForExpiredSession();
         this.update({ mapStatus: errorState(error), mapError: errorMessage(error) });
       }),
-      this.api.getProgress(rule, this.accountController.signal).then((progress) => {
-        if (progressRequest !== this.progressRequest || accountRevision !== this.accountRevision) return;
+      this.api.getProgress(rule, this.accountController.signal, filters, coverageScope).then((progress) => {
+        if (progressRequest !== this.progressRequest || accountRevision !== this.accountRevision || selectionRevision !== this.selectionRevision || !this.connected) return;
+        if (!activityFiltersMatch(progress.filters, filters) || (progress.coverage_scope ?? 'lifetime') !== coverageScope) {
+          this.update({ progress: null, progressStatus: 'error', progressError: 'The progress response did not match the selected activity filters and coverage scope.' }); return;
+        }
         this.update({ progress, progressStatus: 'ready' });
         if (!hasPendingWork(progress)) {
           this.foregroundPolls = 0;
           this.update({ foregroundPollingStopped: false });
         }
       }).catch((error: unknown) => {
-        if (progressRequest !== this.progressRequest || accountRevision !== this.accountRevision) return;
+        if (progressRequest !== this.progressRequest || accountRevision !== this.accountRevision || selectionRevision !== this.selectionRevision || !this.connected) return;
         if (errorKind(error) === 'sign-in-required') return this.clearForExpiredSession();
         this.update({ progressStatus: errorState(error), progressError: errorMessage(error) });
       }),
@@ -153,20 +176,25 @@ export class ExploreStore {
   }
 
   async refreshProgress(): Promise<void> {
+    if (!this.connected) { this.update({ progressStatus: 'offline' }); return; }
     const request = ++this.progressRequest;
     const accountRevision = this.accountRevision;
-    const rule = this.state.rule;
+    const selectionRevision = this.selectionRevision;
+    const { rule, filters, coverageScope } = this.state;
     this.update({ progressStatus: 'loading', progressError: null });
     try {
-      const progress = await this.api.getProgress(rule, this.accountController.signal);
-      if (request !== this.progressRequest || accountRevision !== this.accountRevision) return;
+      const progress = await this.api.getProgress(rule, this.accountController.signal, filters, coverageScope);
+      if (request !== this.progressRequest || accountRevision !== this.accountRevision || selectionRevision !== this.selectionRevision || !this.connected) return;
+      if (!activityFiltersMatch(progress.filters, filters) || (progress.coverage_scope ?? 'lifetime') !== coverageScope) {
+        this.update({ progress: null, progressStatus: 'error', progressError: 'The progress response did not match the selected activity filters and coverage scope.' }); return;
+      }
       this.update({ progress, progressStatus: 'ready' });
       if (!hasPendingWork(progress)) {
         this.foregroundPolls = 0;
         this.update({ foregroundPollingStopped: false });
       }
     } catch (error) {
-      if (request !== this.progressRequest || accountRevision !== this.accountRevision) return;
+      if (request !== this.progressRequest || accountRevision !== this.accountRevision || selectionRevision !== this.selectionRevision || !this.connected) return;
       if (errorKind(error) === 'sign-in-required') return this.clearForExpiredSession();
       this.update({ progressStatus: errorState(error), progressError: errorMessage(error) });
     }
@@ -174,12 +202,62 @@ export class ExploreStore {
 
   setRule(rule: Rule): void {
     if (rule === this.state.rule) return;
+    this.selectionRevision++;
+    this.mapRequest++;
+    this.progressRequest++;
     this.update({ rule, map: null, progress: null, mapStatus: 'loading', progressStatus: 'loading', mapError: null, progressError: null });
-    if (this.state.viewport) void this.refreshViewport(this.state.viewport);
+    if (!this.connected) this.update({ mapStatus: 'offline', progressStatus: 'offline' });
+    else if (this.state.viewport) void this.refreshViewport(this.state.viewport);
     else void this.refreshProgress();
   }
 
+  setFilters(filters: ActivityFilters): void {
+    const canonical = canonicalizeActivityFilters(filters);
+    if (JSON.stringify(canonical) === JSON.stringify(this.state.filters)) return;
+    this.selectionRevision++;
+    this.mapRequest++;
+    this.progressRequest++;
+    this.update({ filters: canonical, map: null, progress: null,
+      mapStatus: this.connected ? 'loading' : 'offline', progressStatus: this.connected ? 'loading' : 'offline', mapError: null, progressError: null });
+    if (this.connected) {
+      if (this.state.viewport) void this.refreshViewport(this.state.viewport);
+      else void this.refreshProgress();
+    }
+  }
+
+  setCoverageScope(coverageScope: CoverageScope): void {
+    if (coverageScope === this.state.coverageScope) return;
+    this.selectionRevision++;
+    this.mapRequest++;
+    this.progressRequest++;
+    this.update({ coverageScope, map: null, progress: null,
+      mapStatus: this.connected ? 'loading' : 'offline', progressStatus: this.connected ? 'loading' : 'offline', mapError: null, progressError: null });
+    if (this.connected) {
+      if (this.state.viewport) void this.refreshViewport(this.state.viewport);
+      else void this.refreshProgress();
+    }
+  }
+
+  setConnection(online: boolean): void {
+    if (online === this.connected) return;
+    this.connected = online;
+    this.networkRevision++;
+    this.mapRequest++;
+    this.progressRequest++;
+    this.operationGeneration++;
+    this.pollOwner = null;
+    this.foregroundOwner = null;
+    this.update({ mapStatus: online ? 'loading' : 'offline', progressStatus: online ? 'loading' : 'offline',
+      mapError: online ? null : this.state.mapError, progressError: online ? null : this.state.progressError });
+    if (online) {
+      if (this.state.viewport) void this.refreshViewport(this.state.viewport);
+      else void this.refreshProgress();
+      void this.pollUploads();
+    }
+  }
+
   async uploadFile(file: GpxFile): Promise<void> {
+    if (!this.connected) { this.update({ uploadError: 'You are offline. Reconnect to upload this file.' }); return; }
     const revision = this.accountRevision;
     this.foregroundPolls = 0;
     this.update({ uploading: true, uploadError: null, foregroundPollingStopped: false });
@@ -199,11 +277,13 @@ export class ExploreStore {
   }
 
   async pollUploads(): Promise<void> {
+    if (!this.connected) return;
     const active = this.state.uploads.filter((item) => item.polling === 'active');
     if (!active.length || this.pollOwner !== null) return;
     const owner = ++this.operationGeneration;
     this.pollOwner = owner;
     const revision = this.accountRevision;
+    const networkRevision = this.networkRevision;
     try {
       await Promise.all(active.map(async (item) => {
         if (item.polls >= 30) {
@@ -212,13 +292,13 @@ export class ExploreStore {
         }
         try {
           const status = await this.api.getUpload(item.id, this.accountController.signal);
-          if (revision !== this.accountRevision) return;
+          if (revision !== this.accountRevision || networkRevision !== this.networkRevision || !this.connected) return;
           const polls = item.polls + 1;
           const activeStatus = status.status === 'queued' || status.status === 'processing';
           this.replaceUpload({ ...item, ...status, polls, polling: activeStatus && polls < 30 ? 'active' : 'stopped' });
           if (!activeStatus) await this.refreshAfterUpload();
         } catch (error) {
-          if (revision !== this.accountRevision) return;
+          if (revision !== this.accountRevision || networkRevision !== this.networkRevision || !this.connected) return;
           const polls = item.polls + 1;
           if (errorKind(error) === 'sign-in-required') this.clearForExpiredSession();
           else this.replaceUpload({ ...item, polls, polling: polls < 30 ? 'active' : 'stopped', error: errorMessage(error) });
@@ -230,6 +310,7 @@ export class ExploreStore {
   }
 
   async refreshForeground(): Promise<void> {
+    if (!this.connected) return;
     if (this.foregroundOwner !== null) return;
     const hasActiveUploads = this.state.uploads.some((item) => item.polling === 'active');
     const progressPending = hasPendingWork(this.state.progress);
@@ -242,19 +323,22 @@ export class ExploreStore {
     const owner = ++this.operationGeneration;
     this.foregroundOwner = owner;
     const revision = this.accountRevision;
+    const selectionRevision = this.selectionRevision;
+    const networkRevision = this.networkRevision;
     try {
       await Promise.all([this.pollUploads(), this.refreshProgress()]);
-      if (revision === this.accountRevision && !this.viewportChangePending && this.state.viewport &&
+      if (revision === this.accountRevision && selectionRevision === this.selectionRevision && networkRevision === this.networkRevision && this.connected && !this.viewportChangePending && this.state.viewport &&
         (hasActiveUploads || progressPending || hasPendingWork(this.state.progress))) {
         await this.refreshMapOnly();
       }
-      if (revision === this.accountRevision && this.foregroundPolls >= 30) this.update({ foregroundPollingStopped: true });
+      if (revision === this.accountRevision && selectionRevision === this.selectionRevision && networkRevision === this.networkRevision && this.foregroundPolls >= 30) this.update({ foregroundPollingStopped: true });
     } finally {
       if (this.foregroundOwner === owner) this.foregroundOwner = null;
     }
   }
 
   private async refreshAfterUpload(): Promise<void> {
+    if (!this.connected) return;
     if (this.state.viewport) await this.refreshViewport(this.state.viewport);
     else await this.refreshProgress();
   }
@@ -264,12 +348,18 @@ export class ExploreStore {
     if (!viewport || this.viewportChangePending) return;
     const request = ++this.mapRequest;
     const revision = this.accountRevision;
+    const selectionRevision = this.selectionRevision;
+    const networkRevision = this.networkRevision;
+    const { filters, coverageScope, rule } = this.state;
     try {
-      const map = await this.api.getMap(viewport.bbox, viewport.zoom, this.state.rule, this.accountController.signal);
-      if (request !== this.mapRequest || revision !== this.accountRevision || this.viewportChangePending) return;
+      const map = await this.api.getMap(viewport.bbox, viewport.zoom, rule, this.accountController.signal, filters, coverageScope);
+      if (request !== this.mapRequest || revision !== this.accountRevision || selectionRevision !== this.selectionRevision || networkRevision !== this.networkRevision || !this.connected || this.viewportChangePending) return;
+      if (!activityFiltersMatch(map.filters, filters) || (map.coverage_scope ?? 'lifetime') !== coverageScope) {
+        this.update({ map: null, mapStatus: 'error', mapError: 'The map response did not match the selected activity filters and coverage scope.' }); return;
+      }
       this.update({ map, mapStatus: map.cities.length || map.tracks.length || map.streets.length || map.missing_nodes.length ? 'ready' : 'empty' });
     } catch (error) {
-      if (request !== this.mapRequest || revision !== this.accountRevision) return;
+      if (request !== this.mapRequest || revision !== this.accountRevision || selectionRevision !== this.selectionRevision || networkRevision !== this.networkRevision || !this.connected) return;
       if (errorKind(error) === 'sign-in-required') return this.clearForExpiredSession();
       this.update({ mapStatus: errorState(error), mapError: errorMessage(error) });
     }

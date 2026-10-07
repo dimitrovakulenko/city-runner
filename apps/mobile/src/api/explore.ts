@@ -1,5 +1,5 @@
-import type { MapLimits, MapResponse, ProgressResponse, UploadResponse, UploadStatusResponse } from './generated';
-import { createApiRequest } from './client';
+import type { ActivityFilters, MapLimits, MapResponse, ProgressResponse, UploadResponse, UploadStatusResponse } from './generated';
+import { appendActivityFilters, createApiRequest } from './client';
 import type { SessionStore } from './client';
 
 export interface GpxFile {
@@ -9,11 +9,13 @@ export interface GpxFile {
   size?: number | null;
 }
 
+export type CoverageScope = 'lifetime' | 'filtered';
+
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 export interface ExploreApi {
-  getMap(bbox: [number, number, number, number], zoom: number, rule: 'normal' | 'strict', signal?: AbortSignal): Promise<MapResponse>;
-  getProgress(rule: 'normal' | 'strict', signal?: AbortSignal): Promise<ProgressResponse>;
+  getMap(bbox: [number, number, number, number], zoom: number, rule: 'normal' | 'strict', signal?: AbortSignal, filters?: ActivityFilters, coverageScope?: CoverageScope): Promise<MapResponse>;
+  getProgress(rule: 'normal' | 'strict', signal?: AbortSignal, filters?: ActivityFilters, coverageScope?: CoverageScope): Promise<ProgressResponse>;
   upload(file: GpxFile, signal?: AbortSignal): Promise<UploadResponse>;
   getUpload(id: string, signal?: AbortSignal): Promise<UploadStatusResponse>;
 }
@@ -47,12 +49,17 @@ export function createExploreApi(options: {
   const uploadRequest = createApiRequest({ baseUrl, sessionStore, fetchImpl: options.fetchImpl, timeoutMs: 120_000 });
 
   return {
-    getMap(bbox, zoom, rule, signal) {
+    getMap(bbox, zoom, rule, signal, filters, coverageScope = 'lifetime') {
       const query = new URLSearchParams({ bbox: bbox.join(','), zoom: String(zoom), rule });
+      appendActivityFilters(query, filters);
+      if (coverageScope !== 'lifetime') query.set('coverage_scope', coverageScope);
       return request<MapResponse>(`/api/map?${query}`, { signal });
     },
-    getProgress(rule, signal) {
-      return request<ProgressResponse>(`/api/progress?${new URLSearchParams({ rule })}`, { signal });
+    getProgress(rule, signal, filters, coverageScope = 'lifetime') {
+      const query = new URLSearchParams({ rule });
+      appendActivityFilters(query, filters);
+      if (coverageScope !== 'lifetime') query.set('coverage_scope', coverageScope);
+      return request<ProgressResponse>(`/api/progress?${query}`, { signal });
     },
     upload(file, signal) {
       const form = new FormData();

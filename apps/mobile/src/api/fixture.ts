@@ -8,6 +8,7 @@ const activities: ActivityDetail[] = [
 ];
 
 export const fixtureApi: ActivityApi = {
+  async getActivityFilters() { return { activity_types: [], types_truncated: false }; },
   async listActivities({ page = 1, pageSize = 20, query = '' } = {}) {
     const matching = activities.filter((item) => item.name.toLowerCase().includes(query.toLowerCase()));
     const start = (page - 1) * pageSize;

@@ -51,6 +51,27 @@ test('activity impact uses its independent authenticated query and preserves BIG
   assert.equal(url.searchParams.get('page_size'), '50'); assert.equal(authorization, 'Bearer owner-token');
 });
 
+test('activity list filters serialize canonically and filter options use the literal route', async () => {
+  const urls: string[] = [];
+  const api = createActivityApi({ baseUrl: 'https://example.test', sessionStore: sessions('token'), fetchImpl: async (url) => {
+    urls.push(String(url));
+    return Response.json(urls.length === 1 ? {} : { activity_types: ['running'], types_truncated: false });
+  } });
+  await api.listActivities({ query: '  commute ', page: 2, pageSize: 10, filters: {
+    date_from: ' 2025-02-03 ', date_to: null, activity_type: '  RUNNING  ', source: 'unknown',
+  } });
+  const overlongType = 'x'.repeat(81);
+  await api.listActivities({ filters: { activity_type: overlongType } });
+  await api.getActivityFilters();
+  const list = new URL(urls[0]!);
+  assert.equal(list.pathname, '/api/activities'); assert.equal(list.searchParams.get('q'), 'commute');
+  assert.equal(list.searchParams.get('page'), '2'); assert.equal(list.searchParams.get('page_size'), '10');
+  assert.equal(list.searchParams.get('date_from'), '2025-02-03'); assert.equal(list.searchParams.has('date_to'), false);
+  assert.equal(list.searchParams.get('activity_type'), 'running'); assert.equal(list.searchParams.get('source'), 'unknown');
+  assert.equal(new URL(urls[1]!).searchParams.get('activity_type'), overlongType);
+  assert.equal(new URL(urls[2]!).pathname, '/api/activities/filters');
+});
+
 test('old-token 401 does not replay under or clear a replacement session', async () => {
   const store = sessions('old');
   let calls = 0;

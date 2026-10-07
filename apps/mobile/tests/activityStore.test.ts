@@ -28,6 +28,7 @@ const impactStreet = (streetId: string, extra: Partial<ActivityImpactPage['stree
 function fakeApi(overrides: Partial<ActivityApi> = {}): ActivityApi {
   return {
     async listActivities() { return page('default'); },
+    async getActivityFilters() { return { activity_types: ['running'], types_truncated: false }; },
     async getActivity(id) { return detail(id); },
     async getActivityImpact(id, input) { return impact(id, input.datasetId, input.rule, input.page); },
     async getMe() { throw new Error('unused'); },
@@ -48,6 +49,49 @@ test('new search wins when earlier list response arrives late', async () => {
   await oldRequest;
   assert.equal(store.getState().query, 'new');
   assert.equal(store.getState().items[0]?.name, 'new');
+});
+
+test('activity filter changes restart pagination and fence old list and detail results', async () => {
+  const staleList = deferred<ActivityPage>(); const staleDetail = deferred<ActivityDetail>();
+  const seen: Array<string | null> = [];
+  const store = new ActivityStore(fakeApi({
+    listActivities: (input) => {
+      seen.push(input?.filters?.activity_type ?? null);
+      return input?.filters?.activity_type ? Promise.resolve(page('filtered')) : staleList.promise;
+    },
+    getActivity: () => staleDetail.promise,
+  }));
+  const oldPage = store.loadPage(); const oldDetail = store.selectActivity('old');
+  store.setFilters({ date_from: null, date_to: null, activity_type: ' RUNNING ', source: 'all' });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  staleList.resolve(page('stale')); staleDetail.resolve(detail('old'));
+  await Promise.all([oldPage, oldDetail]);
+  assert.deepEqual(seen, [null, 'running']);
+  assert.equal(store.getState().page, 1); assert.equal(store.getState().items[0]?.name, 'filtered');
+  assert.equal(store.getState().selectedId, null); assert.equal(store.getState().detail, null);
+  assert.deepEqual(store.getState().filters, { date_from: null, date_to: null, activity_type: 'running', source: 'all' });
+});
+
+test('activity pagination carries the canonical filter selection to every page', async () => {
+  const requested: Array<{ page?: number; type: string | null }> = [];
+  const store = new ActivityStore(fakeApi({ listActivities: async (input) => {
+    requested.push({ page: input?.page, type: input?.filters?.activity_type ?? null });
+    return { items: [{ id: String(input?.page), name: `page-${input?.page}`, date: 'today', type: 'running', processed: true, unmapped_points: 0 }], page: input?.page ?? 1, page_size: 1, total: 2 };
+  } }));
+  store.setFilters({ activity_type: ' running ', source: 'fit' });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await store.loadMore();
+  assert.deepEqual(requested.map(({ page, type }) => [page, type]), [[1, 'running'], [2, 'running']]);
+  assert.deepEqual(store.getState().items.map((item) => item.name), ['page-1', 'page-2']);
+});
+
+test('filter option requests are account fenced and retryable', async () => {
+  const old = deferred<{ activity_types: string[]; types_truncated: boolean }>(); let calls = 0;
+  const store = new ActivityStore(fakeApi({ getActivityFilters: () => ++calls === 1 ? old.promise : Promise.resolve({ activity_types: ['walking'], types_truncated: false }) }));
+  const pending = store.loadFilterOptions(); store.reset(); await store.retryFilterOptions();
+  old.resolve({ activity_types: ['private type'], types_truncated: false }); await pending;
+  assert.deepEqual(store.getState().filterOptions, { activity_types: ['walking'], types_truncated: false });
+  assert.equal(store.getState().filterOptionsStatus, 'ready');
 });
 
 test('rapid detail switching ignores the previous response', async () => {

@@ -1,5 +1,7 @@
 import type {
   ActivityDetail,
+  ActivityFilters,
+  ActivityFilterOptions,
   ActivityImpactPage,
   ActivityPage,
   ChallengeRequest,
@@ -43,7 +45,8 @@ export const noSessionStore: SessionStore = {
 };
 
 export interface ActivityApi {
-  listActivities(input?: { page?: number; pageSize?: number; query?: string }, signal?: AbortSignal): Promise<ActivityPage>;
+  listActivities(input?: { page?: number; pageSize?: number; query?: string; filters?: ActivityFilters }, signal?: AbortSignal): Promise<ActivityPage>;
+  getActivityFilters(signal?: AbortSignal): Promise<ActivityFilterOptions>;
   getActivity(id: string, signal?: AbortSignal): Promise<ActivityDetail>;
   getActivityImpact(id: string, input: { datasetId: string; rule: 'normal' | 'strict'; page: number; pageSize: number }, signal?: AbortSignal): Promise<ActivityImpactPage>;
   getMe(): Promise<MeResponse>;
@@ -53,6 +56,25 @@ export interface ActivityApi {
 }
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
+
+export type CanonicalActivityFilters = Required<ActivityFilters>;
+
+export function canonicalizeActivityFilters(filters?: ActivityFilters): CanonicalActivityFilters {
+  const activityType = filters?.activity_type?.trim().toLowerCase() ?? '';
+  return {
+    date_from: filters?.date_from?.trim() || null,
+    date_to: filters?.date_to?.trim() || null,
+    activity_type: activityType || null,
+    source: filters?.source ?? 'all',
+  };
+}
+
+export function activityFiltersMatch(actual: ActivityFilters | undefined, expected: CanonicalActivityFilters): boolean {
+  if (!actual) return expected.date_from === null && expected.date_to === null && expected.activity_type === null && expected.source === 'all';
+  const echoed = canonicalizeActivityFilters(actual);
+  return echoed.date_from === expected.date_from && echoed.date_to === expected.date_to &&
+    echoed.activity_type === expected.activity_type && echoed.source === expected.source;
+}
 
 export function createApiRequest(options: {
   baseUrl: string;
@@ -138,10 +160,14 @@ export function createActivityApi(options: Parameters<typeof createApiRequest>[0
   const request = createApiRequest(options);
   const sessionStore = options.sessionStore ?? noSessionStore;
   return {
-    listActivities({ page = 1, pageSize = 20, query = '' } = {}, signal) {
+    listActivities({ page = 1, pageSize = 20, query = '', filters } = {}, signal) {
       const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
       if (query.trim()) params.set('q', query.trim());
+      appendActivityFilters(params, filters);
       return request<ActivityPage>(`/api/activities?${params.toString()}`, { signal });
+    },
+    getActivityFilters(signal) {
+      return request<ActivityFilterOptions>('/api/activities/filters', { signal });
     },
     getActivity(id, signal) {
       return request<ActivityDetail>(`/api/activities/${encodeURIComponent(id)}`, { signal });
@@ -173,4 +199,13 @@ export function createActivityApi(options: Parameters<typeof createApiRequest>[0
       await sessionStore.clearIfCurrent(token);
     },
   };
+}
+
+export function appendActivityFilters(params: URLSearchParams, filters?: ActivityFilters): void {
+  if (!filters) return;
+  const canonical = canonicalizeActivityFilters(filters);
+  if (canonical.date_from) params.set('date_from', canonical.date_from);
+  if (canonical.date_to) params.set('date_to', canonical.date_to);
+  if (canonical.activity_type) params.set('activity_type', canonical.activity_type);
+  if (canonical.source !== 'all') params.set('source', canonical.source);
 }
