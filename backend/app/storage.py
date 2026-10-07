@@ -103,15 +103,15 @@ class LocalObjectStore:
             # Compatibility for objects written before owner directories existed.
             try:
                 self._path(object_key).unlink()
-                self._fsync_dir(self.root)
             except FileNotFoundError:
                 pass
+            self._fsync_dir(self.root)
             return
         try:
             self._path(object_key).unlink()
-            self._fsync_dir(self.root)
         except FileNotFoundError:
             pass
+        self._fsync_dir(self.root)
 
     def list_owned_keys(self, owner_id: str) -> list[str]:
         directory = self._owner_dir(owner_id)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import time
 
 from fastapi import HTTPException
 from sqlalchemy import text
@@ -47,13 +48,25 @@ def ensure_owner_allowed(db: Connection, account_id: str, *, require_account: bo
 
 
 @contextmanager
-def exclusive_owner_snapshot(engine: Engine, account_id: str):
+def exclusive_owner_snapshot(engine: Engine, account_id: str, *, timeout_seconds: float = 120):
     """Hold a session advisory lock without creating the data snapshot."""
+    deadline = time.monotonic() + timeout_seconds
+
+    def remaining_timeout() -> str:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise HTTPException(status_code=503, detail="Account export exceeded its time limit.")
+        return f"{max(1, int(remaining * 1000))}ms"
+
     with engine.connect() as lock_connection:
         session_lock_acquired = False
+        prior_lock_timeout = None
         try:
             if lock_connection.dialect.name == "postgresql":
-                lock_connection.execute(text("SET lock_timeout = '120s'"))
+                prior_lock_timeout = lock_connection.execute(text("SHOW lock_timeout")).scalar_one()
+                lock_connection.execute(text("SELECT set_config('lock_timeout', :timeout, false)"), {
+                    "timeout": remaining_timeout(),
+                }).scalar_one()
                 try:
                     lock_connection.execute(text("SELECT pg_advisory_lock(hashtextextended(:key, 0))"), {
                         "key": f"city-runner:owner:{account_id}",
@@ -68,8 +81,13 @@ def exclusive_owner_snapshot(engine: Engine, account_id: str):
                     raise
             with lock_connection.begin():
                 if lock_connection.dialect.name == "postgresql":
-                    lock_connection.execute(text("SET LOCAL statement_timeout = '120s'"))
-                    lock_connection.execute(text("SET LOCAL lock_timeout = '120s'"))
+                    remaining = remaining_timeout()
+                    lock_connection.execute(text("SELECT set_config('statement_timeout', :timeout, true)"), {
+                        "timeout": remaining,
+                    }).scalar_one()
+                    lock_connection.execute(text("SELECT set_config('lock_timeout', :timeout, true)"), {
+                        "timeout": remaining,
+                    }).scalar_one()
                 ensure_owner_allowed(lock_connection, account_id)
                 yield lock_connection
         finally:
@@ -78,6 +96,10 @@ def exclusive_owner_snapshot(engine: Engine, account_id: str):
                     lock_connection.execute(text("SELECT pg_advisory_unlock(hashtextextended(:key, 0))"), {
                         "key": f"city-runner:owner:{account_id}",
                     }).scalar_one()
+                    if prior_lock_timeout is not None:
+                        lock_connection.execute(text("SELECT set_config('lock_timeout', :timeout, false)"), {
+                            "timeout": prior_lock_timeout,
+                        }).scalar_one()
                     lock_connection.commit()
                 except BaseException:
                     # Returning this connection to the pool could strand the lock forever.

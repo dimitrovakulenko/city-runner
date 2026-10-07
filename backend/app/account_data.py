@@ -82,11 +82,14 @@ def create_account_data_router(engine: Engine, current_user: Callable[..., str],
 
 def build_account_export(engine: Engine, account_id: str, store: LocalObjectStore) -> BinaryIO:
     started = time.monotonic()
+    deadline = started + MAX_EXPORT_SECONDS
     archive = tempfile.TemporaryFile(mode="w+b")
     try:
-        with exclusive_owner_snapshot(engine, account_id) as db:
+        with exclusive_owner_snapshot(engine, account_id,
+                                      timeout_seconds=max(0.001, deadline - time.monotonic())) as db:
             manifest = {"schema_version": 1, "created_at": datetime.now(timezone.utc).isoformat(),
-                        "account_id": account_id, "entries": [], "counts": {}}
+                        "account_id": account_id, "scope": "gpx-fit-account-data",
+                        "entries": [], "counts": {}}
             uncompressed = 0
             entry_count = 0
             output = None
@@ -107,16 +110,32 @@ def build_account_export(engine: Engine, account_id: str, store: LocalObjectStor
                 if entry_count > MAX_EXPORT_ENTRIES:
                     raise HTTPException(status_code=413, detail="Account export exceeds its entry limit.")
 
-            def json_entry(path: str, query: str, params: dict, *, single: bool = False) -> int:
+            def set_statement_deadline() -> None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise HTTPException(status_code=503, detail="Account export exceeded its time limit.")
+                db.execute(text("SELECT set_config('statement_timeout', :timeout, true)"), {
+                    "timeout": f"{max(1, int(remaining * 1000))}ms",
+                }).scalar_one()
+
+            def json_entry(path: str, query: str, params: dict, *, single: bool = False,
+                           batch_size: int = 100) -> int:
                 nonlocal entry_count
                 add_entry()
                 count = 0
                 with output.open(path, "w") as target:
+                    add_size(2)
                     target.write(b"[")
-                    result = db.execute(text(query), params, execution_options={"stream_results": True})
+                    set_statement_deadline()
+                    result = db.execute(text(query), params,
+                                        execution_options={"stream_results": True, "yield_per": batch_size})
                     cursor = result.cursor
                     try:
-                        while rows := result.mappings().fetchmany(100):
+                        while True:
+                            set_statement_deadline()
+                            rows = result.mappings().fetchmany(batch_size)
+                            if not rows:
+                                break
                             for row in rows:
                                 encoded = json.dumps(_jsonable_row(dict(row)), ensure_ascii=False,
                                                      separators=(",", ":"), allow_nan=False).encode("utf-8")
@@ -138,6 +157,7 @@ def build_account_export(engine: Engine, account_id: str, store: LocalObjectStor
                 manifest["counts"]["account"] = json_entry("data/account.json", "SELECT id,created_at FROM accounts WHERE id=:account", {"account": account_id}, single=True)
                 if manifest["counts"]["account"] != 1:
                     raise HTTPException(status_code=401, detail="Unauthenticated.")
+                set_statement_deadline()
                 source_result = db.execute(text("SELECT id,source_kind,private_object_key FROM activity_sources WHERE account_id=:account ORDER BY id LIMIT :limit"), {
                     "account": account_id, "limit": MAX_EXPORT_ENTRIES,
                 }).mappings()
@@ -179,7 +199,8 @@ def build_account_export(engine: Engine, account_id: str, store: LocalObjectStor
                     "saved_routes": "SELECT id,name,revision,waypoints,ST_AsGeoJSON(geometry,17) AS geometry,distance_m,duration_s,provider,attribution,routed_at,created_at,updated_at FROM saved_routes WHERE account_id=:account ORDER BY id",
                 }
                 for name, query in queries.items():
-                    manifest["counts"][name] = json_entry(f"data/{name}.json", query, {"account": account_id})
+                    manifest["counts"][name] = json_entry(f"data/{name}.json", query, {"account": account_id},
+                                                            batch_size=1 if name == "activities" else 100)
                 source_map_payload = json.dumps(_jsonable(source_files), ensure_ascii=False,
                                                separators=(",", ":")).encode("utf-8")
                 add_entry()

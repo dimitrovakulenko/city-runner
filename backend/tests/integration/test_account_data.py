@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 from alembic import command
 from alembic.config import Config
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Connection
@@ -115,6 +116,7 @@ class AccountDataIntegrationTests(unittest.TestCase):
         self.assertEqual(response.headers["cache-control"], "no-store, private")
         with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
             manifest = json.loads(archive.read("manifest.json"))
+            self.assertEqual(manifest["scope"], "gpx-fit-account-data")
             sources = json.loads(archive.read("data/sources.json"))
             activities = json.loads(archive.read("data/activities.json"))
             original = f"originals/source-{result['id']}.gpx"
@@ -197,6 +199,12 @@ class AccountDataIntegrationTests(unittest.TestCase):
         finally:
             single_connection_engine.dispose()
 
+    def test_snapshot_lock_wait_uses_export_deadline(self):
+        with self.assertRaises(HTTPException) as error:
+            with exclusive_owner_snapshot(self.engine, self.account, timeout_seconds=-1):
+                self.fail("expired snapshot deadline must not enter the data snapshot")
+        self.assertEqual(error.exception.status_code, 503)
+
     def test_export_and_delete_preserve_other_account_fit_original(self):
         self.upload()
         other = str(uuid.uuid4())
@@ -226,7 +234,11 @@ class AccountDataIntegrationTests(unittest.TestCase):
 
     def test_export_cap_fails_before_successful_partial_download(self):
         self.upload()
-        with patch("backend.app.account_data.MAX_EXPORT_UNCOMPRESSED", 4):
+        complete = self.client.get("/api/account/export", headers=self.headers)
+        self.assertEqual(complete.status_code, 200, complete.text)
+        with zipfile.ZipFile(io.BytesIO(complete.content)) as archive:
+            uncompressed_size = sum(entry.file_size for entry in archive.infolist())
+        with patch("backend.app.account_data.MAX_EXPORT_UNCOMPRESSED", uncompressed_size - 1):
             response = self.client.get("/api/account/export", headers=self.headers)
         self.assertEqual(response.status_code, 413)
 
@@ -373,9 +385,9 @@ class AccountDataIntegrationTests(unittest.TestCase):
                 raise TimeoutError("synthetic upload gate timed out")
             return key
 
-        def observe_snapshot(engine, account_id):
+        def observe_snapshot(engine, account_id, **kwargs):
             reached_export.set()
-            return original_snapshot(engine, account_id)
+            return original_snapshot(engine, account_id, **kwargs)
 
         with patch.object(LocalObjectStore, "write", delayed_write), \
              patch.object(account_data, "exclusive_owner_snapshot", observe_snapshot):

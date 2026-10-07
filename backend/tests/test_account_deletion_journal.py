@@ -81,6 +81,35 @@ class DeletionJournalTests(unittest.TestCase):
         self.assertIn(Path(self.temp.name) / "one", synced)
         self.assertIn(Path(self.temp.name) / "one" / "two", synced)
 
+    def test_legacy_delete_retry_fsyncs_root_even_when_file_is_already_missing(self):
+        root = Path(self.temp.name) / "uploads"
+        store = LocalObjectStore(root)
+        key = store.write(b"legacy original")
+        original = LocalObjectStore._fsync_dir
+        failed = False
+
+        def fail_first_sync(directory):
+            nonlocal failed
+            if Path(directory) == root and not failed:
+                failed = True
+                raise OSError("synthetic directory fsync failure")
+            original(Path(directory))
+
+        with patch.object(LocalObjectStore, "_fsync_dir", side_effect=fail_first_sync):
+            with self.assertRaises(OSError):
+                store.delete(key, owner_id="account-a")
+        self.assertFalse((root / key).exists())
+
+        synced = []
+
+        def observe_sync(directory):
+            synced.append(Path(directory))
+            original(Path(directory))
+
+        with patch.object(LocalObjectStore, "_fsync_dir", side_effect=observe_sync):
+            store.delete(key, owner_id="account-a")
+        self.assertIn(root, synced)
+
     def test_owner_metadata_precedes_bytes_and_is_account_scoped(self):
         root = Path(self.temp.name) / "uploads"
         store = LocalObjectStore(root)
