@@ -46,6 +46,8 @@ SCHEMAS = (
     "RoutePage",
     "RouteGeometry",
     "RouteAttribution",
+    "ActivityImpactPage",
+    "ActivityImpactStreet",
 )
 
 

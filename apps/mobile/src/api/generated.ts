@@ -245,6 +245,39 @@ export type RouteAttribution = {
   waypoints_notice: string;
 };
 
+export type ActivityImpactPage = {
+  activity_id: string;
+  dataset_id: string;
+  dataset_state: 'active' | 'importing' | 'retired';
+  rule: 'normal' | 'strict';
+  coverage: DatasetCoverage;
+  history_status: 'ready' | 'unknown-dates' | 'history-limit' | 'missing-provenance';
+  supported_nodes: number | null;
+  new_nodes: number | null;
+  streets_advanced: number | null;
+  streets_completed: number | null;
+  streets: Array<ActivityImpactStreet>;
+  page: number;
+  page_size: number;
+  total: number | null;
+};
+
+export type ActivityImpactStreet = {
+  street_id: string;
+  city_id: string;
+  dataset_id: string;
+  name: string;
+  city_name: string;
+  eligible_nodes: number;
+  supported_nodes: number;
+  new_nodes: number | null;
+  before_nodes: number | null;
+  after_nodes: number | null;
+  completed_by_activity: boolean | null;
+  current_nodes: number | null;
+  bounds: Array<number>;
+};
+
 export type CityItem = {
   id: string;
   name: string;
