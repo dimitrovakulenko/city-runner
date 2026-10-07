@@ -11,7 +11,7 @@ function valid(value: unknown): value is MapPosition {
 
 /** Only account-scoped center/zoom preferences; no tracks, sessions or progress. */
 export class BrowserViewports {
-  constructor(private readonly storage: Pick<Storage, 'getItem' | 'setItem'>) {}
+  constructor(private readonly storage: Pick<Storage, 'getItem' | 'setItem'> & Partial<Pick<Storage, 'removeItem'>>) {}
   read(accountId: string): MapPosition {
     try { const value: unknown = JSON.parse(this.storage.getItem(this.key(accountId)) ?? 'null'); return valid(value) ? value : DEFAULT_POSITION; }
     catch { return DEFAULT_POSITION; }
@@ -20,5 +20,6 @@ export class BrowserViewports {
     if (!valid(value)) return;
     try { this.storage.setItem(this.key(accountId), JSON.stringify({ center: value.center, zoom: value.zoom })); } catch { /* Storage can be denied or full. */ }
   }
+  forget(accountId: string): void { try { this.storage.removeItem?.(this.key(accountId)); } catch { /* Browser storage may be unavailable. */ } }
   private key(accountId: string) { return `city-runner.viewport.${encodeURIComponent(accountId)}`; }
 }

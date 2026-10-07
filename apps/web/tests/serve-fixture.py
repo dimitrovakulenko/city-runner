@@ -24,6 +24,9 @@ from backend.app.uploads import process_upload
 from backend.app.coverage import process_source_dataset
 from backend.app.corrections import process_private_object_cleanup
 from backend.app.worker import run_once
+from backend.app.account_deletion_journal import initialize_ledger
+from backend.app.account_data import process_account_deletion_cleanup
+from backend.app.storage import LocalObjectStore
 from backend.tests.test_fit import fit_fixture, semicircles
 
 ADMIN_URL = os.environ['POSTGIS_ADMIN_DATABASE_URL']
@@ -68,12 +71,14 @@ try:
     os.environ['DATABASE_URL'] = url
     with tempfile.TemporaryDirectory(prefix='city-runner-web-test-') as temporary:
         os.environ['UPLOAD_STORAGE_DIR'] = temporary + '/sources'
+        os.environ['ACCOUNT_DELETION_LEDGER'] = temporary + '/account-deletions.jsonl'
+        initialize_ledger()
         config = Config(str(ROOT / 'backend/alembic.ini'))
         config.set_main_option('sqlalchemy.url', url.replace('%', '%%'))
         command.upgrade(config, 'head')
         engine = create_engine(url, pool_pre_ping=True)
         with engine.begin() as db:
-            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other']:
+            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race']:
                 db.execute(text('INSERT INTO accounts(id) VALUES (:id)'), {'id': 'web-test-' + account})
                 db.execute(text('INSERT INTO sessions(token_digest,account_id,expires_at) VALUES (:digest,:id,:expires)'), {
                     'digest': hashlib.sha256(('web-synthetic-' + account).encode()).hexdigest(), 'id': 'web-test-' + account,
@@ -89,6 +94,19 @@ try:
             return {'code': 'Ok', 'waypoints': [{'location': point, 'distance': 0} for point in points],
                 'routes': [{'geometry': {'type': 'LineString', 'coordinates': points}, 'distance': 1234.5, 'duration': 900}]}
         app = create_app(engine, routing_provider=synthetic_route if os.environ.get('WEB_TEST_ROUTING') == '1' else None)
+        @app.get('/__test__/account-deletions/{deletion_id}', include_in_schema=False)
+        def fixture_deletion_state(deletion_id: str):
+            with engine.connect() as db:
+                deletion = db.execute(text('SELECT account_id,status FROM account_deletions WHERE id=:id'), {'id': deletion_id}).first()
+                if deletion is None or not deletion.account_id.startswith('web-test-'):
+                    return {'status': 'missing', 'originals_present': False}
+                entries = db.execute(text('SELECT object_key,status FROM account_deletion_outbox WHERE deletion_id=:id'), {'id': deletion_id}).all()
+            store = LocalObjectStore()
+            originals_present = False
+            for object_key, _ in entries:
+                try: store.read(object_key, owner_id=deletion.account_id); originals_present = True
+                except OSError: pass
+            return {'status': deletion.status, 'outbox_statuses': [row.status for row in entries], 'originals_present': originals_present}
         if os.environ.get('WEB_TEST_LOGIN') == '1':
             @app.post('/api/dev/session', include_in_schema=False)
             def development_session():
@@ -112,7 +130,8 @@ try:
         (fixtures / 'corrupt.fit').write_bytes(valid_fit[:-1] + bytes([valid_fit[-1] ^ 1]))
         def work():
             while not stop.is_set():
-                if not run_once(engine, handlers): stop.wait(.15)
+                cleaned = process_account_deletion_cleanup(engine)
+                if not cleaned and not run_once(engine, handlers): stop.wait(.15)
         worker = threading.Thread(target=work, daemon=True); worker.start()
         try:
             uvicorn.run(app, host='127.0.0.1', port=int(os.environ.get('WEB_TEST_API_PORT', '8003')), log_level='warning')

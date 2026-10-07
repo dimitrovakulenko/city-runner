@@ -4,6 +4,8 @@ import { CityExplorerStore } from '../../mobile/src/cityExplorerStore';
 import { ImportStore } from '../../mobile/src/importStore';
 import { CorrectionStore } from '../../mobile/src/correctionStore';
 import { RoutePlannerStore } from '../../mobile/src/routePlannerStore';
+import { AccountStore } from '../../mobile/src/accountStore';
+import { createAccountApi } from '../../mobile/src/api/account';
 import { createRouteApi } from '../../mobile/src/api/routes';
 import { createActivityApi, createApiRequest } from '../../mobile/src/api/client';
 import { createExploreApi } from '../../mobile/src/api/explore';
@@ -19,6 +21,7 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
   const files = new BrowserFiles();
   const api = createActivityApi(options);
   const activities = new ActivityStore(api);
+  const account = new AccountStore(createAccountApi(options), sessions);
   const explore = new ExploreStore(createExploreApi(options));
   const cities = new CityExplorerStore(createCityExplorerApi(options));
   const planner = new RoutePlannerStore(createRouteApi(options));
@@ -30,10 +33,10 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
     void activities.refreshImpact();
     void explore.refreshAfterCorrection(); void cities.refreshAfterCorrection(); void imports.refresh();
   });
-  const reset = () => { files.clear(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); planner.reset(); };
+  const reset = () => { files.clear(); account.reset(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); planner.reset(); };
   sessions.subscribe(reset);
   const applyFilters = (filters: ActivityFilters) => { activities.setFilters(filters); explore.setFilters(filters); };
-  return { sessions, files, api, activities, explore, cities, imports, corrections, planner, reset, applyFilters };
+  return { sessions, files, api, account, activities, explore, cities, imports, corrections, planner, reset, applyFilters };
 }
 
 export type Runtime = ReturnType<typeof createRuntime>;

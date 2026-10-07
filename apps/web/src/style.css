@@ -37,3 +37,7 @@ dialog.modal{position:fixed;inset:0;margin:auto;height:fit-content;max-height:ca
 .filter-summary { font-size: 12px; line-height: 1.8; color: #687566; margin: 5px 0 0; }
 .connection-status { padding: 14px; background: #fff2d9; border-radius: 10px; margin-bottom: 15px; font-size: 13px; }
 .connection-status p { line-height: 1.5; }
+
+.account-delete { border-color: #e9c9bf; }
+.account-delete input { width: 100%; min-width: 0; border: 1px solid #dfe5d8; border-radius: 8px; padding: 10px; font: inherit; background: white; }
+.account-delete .filter-actions { flex-wrap: wrap; }

@@ -16,6 +16,7 @@ export function ExploreMap({ runtime, enabled, accountId, planning, selected, se
   const enabledRef = useRef(enabled); enabledRef.current = enabled;
   const accountRef = useRef(accountId); accountRef.current = accountId;
   const restoredAccount = useRef<string | null>(null); const positions = useRef<BrowserViewports | null>(null);
+  const restoredGeneration = useRef<number | null>(null);
   const locationRequest = useRef(0); const locationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [locating, setLocating] = useState(false); const [locationError, setLocationError] = useState<string | null>(null);
   const [location, setLocation] = useState<{ accountId: string; coordinate: [number, number]; accuracy: number | null } | null>(null);
@@ -81,7 +82,7 @@ export function ExploreMap({ runtime, enabled, accountId, planning, selected, se
     map.on('movestart', () => { if (enabledRef.current) runtime.explore.invalidateViewport(); });
     map.on('moveend', () => {
       const account = accountRef.current;
-      if (enabledRef.current && account && restoredAccount.current === account) { const center = map.getCenter(); positions.current?.write(account, { center: [center.lng, center.lat], zoom: map.getZoom() }); }
+      if (enabledRef.current && account && restoredAccount.current === account && restoredGeneration.current === runtime.imports.getAccountGeneration()) { const center = map.getCenter(); positions.current?.write(account, { center: [center.lng, center.lat], zoom: map.getZoom() }); }
       clearTimeout(timer); timer = setTimeout(refresh, 150);
     });
     map.on('error', () => setError('Some map tiles could not load. Check your connection.'));
@@ -91,6 +92,7 @@ export function ExploreMap({ runtime, enabled, accountId, planning, selected, se
     locationRequest.current++; clearTimeout(locationTimer.current); setLocating(false); setLocation(null); setLocationError(null);
     const map = mapRef.current; if (!ready || !map) return;
     restoredAccount.current = accountId;
+    restoredGeneration.current = runtime.imports.getAccountGeneration();
     map.jumpTo(accountId ? positions.current?.read(accountId) ?? DEFAULT_POSITION : DEFAULT_POSITION);
   }, [accountId, ready]);
   useEffect(() => {
