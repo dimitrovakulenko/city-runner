@@ -125,3 +125,5 @@ Coordinates are ordered `[longitude, latitude]`, finite WGS84 bounds; 2–20 way
 | `GET /api/routes/{id}/gpx` | UTF-8 GPX 1.1 attachment with escaped route name and original routed positions in `<rte>`; no fabricated recording timestamps. A planned route is not a recorded GPX track and cannot contribute GPS coverage. |
 
 Store owner FK, name, ordered waypoints, bounded validated routed geometry, metrics/provider/attribution, revision and timestamps. The database owns the revision; no client-submitted geometry is trusted. Avoid redundant external recalculation for unchanged saved waypoints. Browser edits invalidate current previews immediately; stale responses and prior-account responses cannot repopulate the draft or saved list. Add/move/remove/reorder/undo must preserve waypoint order. Save/reopen/edit/delete/export are available on web; native route editor acceptance remains separate.
+
+Activity list/map selection and explicit lifetime/filtered GPS coverage follow [activity filters](activity-filters.md). Generated API types include canonical selection echoes and owner-scoped activity-type options.
