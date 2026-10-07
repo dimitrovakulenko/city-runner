@@ -14,6 +14,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.engine import Engine
 
+from backend.app.activity_filters import ActivityFilters, SourceFilter, activity_predicate, canonical_filters
+
 MAX_BBOX_WIDTH = 45.0
 MAX_BBOX_HEIGHT = 45.0
 MAX_BBOX_AREA = 500.0
@@ -106,6 +108,8 @@ class MapResponse(BaseModel):
     missing_nodes: list[MissingNode]
     node_state: Literal["ready", "pending", "not-requested", "geography_pending"]
     limits: MapLimits
+    filters: ActivityFilters = ActivityFilters()
+    coverage_scope: Literal["lifetime", "filtered"] = "lifetime"
 
 
 class ProgressDataset(BaseModel):
@@ -131,6 +135,8 @@ class ProgressResponse(BaseModel):
     datasets_truncated: bool
     unmapped_points: int
     pending_imports: int
+    filters: ActivityFilters = ActivityFilters()
+    coverage_scope: Literal["lifetime", "filtered"] = "lifetime"
 
 
 class BBox(BaseModel):
@@ -175,6 +181,11 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
         bbox: str = Query(min_length=7, max_length=100),
         zoom: float = Query(ge=0, le=24),
         rule: Literal["normal", "strict"] = Query("normal"),
+        date_from: str | None = Query(None, max_length=10),
+        date_to: str | None = Query(None, max_length=10),
+        activity_type: str | None = Query(None, max_length=200),
+        source: SourceFilter = Query("all"),
+        coverage_scope: Literal["lifetime", "filtered"] = Query("lifetime"),
         account_id: str = Depends(current_user),
     ):
         try:
@@ -183,6 +194,7 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
             raise HTTPException(status_code=422, detail=str(error)) from error
         if not math.isfinite(zoom):
             raise HTTPException(status_code=422, detail="zoom must be finite")
+        filters = canonical_filters(date_from, date_to, activity_type, source)
         params = _bbox_params(bounds)
         tolerance = min(0.01, max(0.000002, 0.0003 * (2 ** (12 - zoom))))
         with _query_connection(engine) as db:
@@ -197,8 +209,9 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
                 dataset_ids = dataset_ids[:MAX_DATASETS]
                 city_rows = [row for row in city_rows if row["dataset_id"] in dataset_ids]
                 dataset_statuses = [
-                    _dataset_status(_get_account_coverage(db, account_id, dataset_id), dataset_id,
-                                    next(row["region"] for row in city_rows if row["dataset_id"] == dataset_id))
+                    _selected_dataset_status(db, account_id, dataset_id, filters, coverage_scope,
+                        _get_account_coverage(db, account_id, dataset_id),
+                        next(row["region"] for row in city_rows if row["dataset_id"] == dataset_id))
                     for dataset_id in dataset_ids
                 ]
                 readiness = {int(item.id): item.state for item in dataset_statuses}
@@ -206,11 +219,12 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
                                     bounds=(r["west"], r["south"], r["east"], r["north"]))
                           for r in city_rows]
 
-                raw_tracks = db.execute(text(_TRACK_QUERY), {
-                    **params, "account_id": account_id, "limit": MAX_TRACKS + 1,
-                    "max_points": MAX_FEATURE_POINTS, "max_source_points": MAX_TRACK_SOURCE_POINTS,
-                    "tolerance": tolerance,
-                }).mappings().all()
+                track_params: dict[str, Any] = {**params, "account_id": account_id,
+                    "limit": MAX_TRACKS + 1, "max_points": MAX_FEATURE_POINTS,
+                    "max_source_points": MAX_TRACK_SOURCE_POINTS, "tolerance": tolerance}
+                track_filter = activity_predicate(filters, "a", track_params)
+                raw_tracks = db.execute(text(_TRACK_QUERY.replace("/* ACTIVITY_FILTER */", track_filter)),
+                                        track_params).mappings().all()
                 track_truncated = len(raw_tracks) > MAX_TRACKS
                 raw_tracks = raw_tracks[:MAX_TRACKS]
                 tracks, used_points, used_bytes, track_dropped = _append_geometry_features(
@@ -236,7 +250,8 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
                     }).mappings().all()
                     street_truncated = len(raw_streets) > MAX_STREETS
                     raw_streets = raw_streets[:MAX_STREETS]
-                visited_by_street = _street_visit_counts(db, account_id, raw_streets)
+                visited_by_street = _street_visit_counts(db, account_id, raw_streets, filters,
+                                                          filtered=coverage_scope == "filtered")
                 street_rows = []
                 for row in raw_streets:
                     enriched = dict(row)
@@ -245,7 +260,8 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
                 streets, used_points, used_bytes, street_dropped = _append_geometry_features(
                     street_rows, "geometry_json", MAX_RESPONSE_POINTS, MAX_GEOMETRY_BYTES,
                     initial_points=used_points, initial_bytes=used_bytes,
-                    make=lambda row, geometry: _street_feature(row, geometry, readiness.get(int(row["dataset_id"])), rule),
+                    make=lambda row, geometry: _street_feature(row, geometry,
+                        readiness.get(int(row["dataset_id"])), rule, coverage_scope),
                 )
                 street_truncated = street_truncated or street_dropped or any(
                     r["point_count"] is None or r["point_count"] > MAX_FEATURE_POINTS for r in raw_streets)
@@ -255,10 +271,18 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
                     pending_ids = len(ready_ids) != len(dataset_ids)
                     node_state = "pending" if pending_ids else "ready"
                     if ready_ids:
-                        node_rows = db.execute(text(_MISSING_NODE_QUERY), {
-                            **params, "dataset_ids": ready_ids, "account_id": account_id,
-                            "limit": MAX_NODES + 1,
-                        }).mappings().all()
+                        node_params: dict[str, Any] = {**params, "dataset_ids": ready_ids,
+                            "account_id": account_id, "limit": MAX_NODES + 1}
+                        node_query = _MISSING_NODE_QUERY
+                        if coverage_scope == "filtered":
+                            node_query = node_query.replace("/* FILTERED_ACTIVITY_JOIN */",
+                                _activity_source_join(filters, "src", node_params, account_id=account_id))
+                            node_query = node_query.replace("/* FILTERED_SOURCE */",
+                                _selected_source_sql(filters, "src", node_params))
+                        else:
+                            node_query = node_query.replace("/* FILTERED_ACTIVITY_JOIN */", "")
+                            node_query = node_query.replace("/* FILTERED_SOURCE */", "")
+                        node_rows = db.execute(text(node_query), node_params).mappings().all()
                         missing_truncated = len(node_rows) > MAX_NODES
                         for row in node_rows[:MAX_NODES]:
                             coordinate_bytes = len(f"[{row['longitude']},{row['latitude']}],".encode("ascii"))
@@ -292,11 +316,18 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
                 geometry_bytes=LayerLimit(returned=used_bytes, limit=MAX_GEOMETRY_BYTES,
                                           truncated=track_truncated or street_truncated or missing_truncated),
             ),
+            filters=filters, coverage_scope=coverage_scope,
         )
 
     @router.get("/api/progress", response_model=ProgressResponse)
     def progress(rule: Literal["normal", "strict"] = Query("normal"),
+                 date_from: str | None = Query(None, max_length=10),
+                 date_to: str | None = Query(None, max_length=10),
+                 activity_type: str | None = Query(None, max_length=200),
+                 source: SourceFilter = Query("all"),
+                 coverage_scope: Literal["lifetime", "filtered"] = Query("lifetime"),
                  account_id: str = Depends(current_user)):
+        filters = canonical_filters(date_from, date_to, activity_type, source)
         with _query_connection(engine) as db:
             with db.begin():
                 db.execute(text(f"SET LOCAL statement_timeout = '{STATEMENT_TIMEOUT_MS}ms'"))
@@ -311,9 +342,11 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
                 for row in rows:
                     dataset_id = int(row["id"])
                     coverage = _get_account_coverage(db, account_id, dataset_id)
-                    status = _dataset_status(coverage, dataset_id, row["region"])
+                    status = _selected_dataset_status(db, account_id, dataset_id, filters,
+                                                      coverage_scope, coverage, row["region"])
                     ready = status.state in {"ready", "not-matched"}
-                    counts = (_progress_counts(db, account_id, dataset_id, rule) if ready else
+                    counts = (_progress_counts(db, account_id, dataset_id, rule, filters,
+                                               filtered=coverage_scope == "filtered") if ready else
                               {"manual_completed_streets": _manual_completed_count(db, account_id, dataset_id)})
                     result.append(ProgressDataset(
                         dataset_id=str(dataset_id), region=row["region"], state=status.state,
@@ -327,9 +360,12 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
                         effective_completed_streets=counts["effective_completed_streets"] if ready else None,
                         eligible_nodes=counts["eligible_nodes"] if ready else None,
                     ))
-                unmapped = db.execute(text("""
-                    SELECT COALESCE(sum(unmapped_points),0) FROM activities WHERE user_id=:account
-                """), {"account": account_id}).scalar_one()
+                unmapped_params: dict[str, Any] = {"account": account_id}
+                selected = activity_predicate(filters, "a", unmapped_params, account_param="account")
+                unmapped = db.execute(text(f"""
+                    SELECT COALESCE(sum(a.unmapped_points),0) FROM activities a
+                    WHERE a.user_id=:account AND {selected}
+                """), unmapped_params).scalar_one()
                 pending_imports = _pending_import_count(db, account_id)
         if not result:
             state = "unsupported-geography"
@@ -343,7 +379,7 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
             state = "ready"
         return ProgressResponse(state=state, rule=rule, datasets=result,
                                 datasets_truncated=datasets_truncated, unmapped_points=int(unmapped or 0),
-                                pending_imports=pending_imports)
+                                pending_imports=pending_imports, filters=filters, coverage_scope=coverage_scope)
 
     return router
 
@@ -381,18 +417,81 @@ def _pending_import_count(db, account_id: str) -> int:
     """), {"account": account_id}).scalar_one())
 
 
-def _street_visit_counts(db, account_id: str, rows) -> dict[tuple[int, int], int]:
+def _selected_source_sql(filters: ActivityFilters, source_alias: str, params: dict[str, Any]) -> str:
+    if filters.source == "unknown":
+        return " AND FALSE"
+    if filters.source in {"gpx", "fit"}:
+        params["activity_source"] = filters.source
+        return f" AND {source_alias}.source_kind=:activity_source"
+    return ""
+
+
+def _activity_source_join(filters: ActivityFilters, source_alias: str, params: dict[str, Any], *,
+                          account_id: str) -> str:
+    params["account_id"] = account_id
+    selection = activity_predicate(filters, "selected_activity", params, include_source=False)
+    return (f"JOIN activities selected_activity ON selected_activity.id={source_alias}.activity_id "
+            f"AND selected_activity.user_id=:account_id AND {selection}")
+
+
+def _selected_dataset_status(db, account_id: str, dataset_id: int, filters: ActivityFilters,
+                             scope: str, coverage: dict[str, Any], region: str) -> DatasetStatus:
+    status = _dataset_status(coverage, dataset_id, region)
+    if scope != "filtered" or status.state not in {"ready", "not-matched"}:
+        return status
+    visited, unsupported = _filtered_dataset_counts(db, account_id, dataset_id, filters)
+    if visited == 0 and unsupported > 0:
+        selected_state = "not-matched"
+    else:
+        selected_state = "ready"
+    return status.model_copy(update={"state": selected_state, "visited_node_count": visited,
+                                    "unsupported_sample_count": unsupported})
+
+
+def _filtered_dataset_counts(db, account_id: str, dataset_id: int, filters: ActivityFilters) -> tuple[int, int]:
+    if filters.source == "unknown":
+        return 0, 0
+    params: dict[str, Any] = {"account_id": account_id, "dataset_id": dataset_id}
+    join = _activity_source_join(filters, "src", params, account_id=account_id)
+    source_filter = _selected_source_sql(filters, "src", params)
+    row = db.execute(text(f"""
+        WITH selected_runs AS (
+          SELECT src.account_id,src.id AS source_id,src.revision,r.source_revision,r.dataset_id,
+                 r.unsupported_sample_count
+          FROM activity_sources src
+          JOIN coverage_source_runs r ON r.account_id=src.account_id AND r.source_id=src.id
+            AND r.source_revision=src.revision AND r.dataset_id=:dataset_id AND r.status='succeeded'
+          JOIN jobs j ON j.account_id=r.account_id AND j.id=r.job_id AND j.status='succeeded'
+          {join}
+          WHERE src.account_id=:account_id AND src.status='succeeded' {source_filter}
+        )
+        SELECT (SELECT count(DISTINCT c.node_id)::integer FROM selected_runs r
+          JOIN source_node_contributions c ON c.account_id=r.account_id AND c.source_id=r.source_id
+            AND c.source_revision=r.source_revision AND c.dataset_id=r.dataset_id) AS visited,
+          COALESCE((SELECT sum(unsupported_sample_count) FROM selected_runs),0)::integer AS unsupported
+    """), params).mappings().one()
+    return int(row["visited"] or 0), int(row["unsupported"] or 0)
+
+
+def _street_visit_counts(db, account_id: str, rows, filters: ActivityFilters | None = None,
+                         *, filtered: bool = False) -> dict[tuple[int, int], int]:
     dataset_ids = list({int(row["dataset_id"]) for row in rows})
     street_ids = list({int(row["street_id"]) for row in rows})
     if not dataset_ids or not street_ids:
         return {}
-    visits = db.execute(text(_STREET_VISIT_QUERY), {
-        "account_id": account_id, "dataset_ids": dataset_ids, "street_ids": street_ids,
-    }).mappings().all()
+    params: dict[str, Any] = {"account_id": account_id, "dataset_ids": dataset_ids, "street_ids": street_ids}
+    query = _STREET_VISIT_QUERY
+    if filtered:
+        query = query.replace("/* FILTERED_ACTIVITY_JOIN */", _activity_source_join(
+            filters or ActivityFilters(), "src", params, account_id=account_id))
+        query = query.replace("/* FILTERED_SOURCE */", _selected_source_sql(filters or ActivityFilters(), "src", params))
+    else:
+        query = query.replace("/* FILTERED_ACTIVITY_JOIN */", "").replace("/* FILTERED_SOURCE */", "")
+    visits = db.execute(text(query), params).mappings().all()
     return {(row["dataset_id"], row["street_id"]): row["visited_nodes"] for row in visits}
 
 
-def _street_feature(row, geometry, state, rule):
+def _street_feature(row, geometry, state, rule, coverage_scope="lifetime"):
     ready = state in {"ready", "not-matched"}
     visited = row["visited_nodes"] if ready else None
     eligible = row["eligible_nodes"] if ready else None
@@ -404,7 +503,8 @@ def _street_feature(row, geometry, state, rule):
         way_id=str(row["way_id"]),
         name=row["name"], geometry=geometry, visited_nodes=visited, eligible_nodes=eligible,
         completed=gps_completed, manual_completed=manual_completed, manual_reason=row["manual_reason"],
-        effective_completed=True if manual_completed else gps_completed,
+        effective_completed=(gps_completed if coverage_scope == "filtered" else
+                             (True if manual_completed else gps_completed)),
     )
 
 
@@ -466,6 +566,7 @@ _TRACK_QUERY = """
       FROM activities a CROSS JOIN box
       WHERE a.user_id=:account_id AND a.track_geometry IS NOT NULL
         AND a.track_geometry && box.geom
+        AND (/* ACTIVITY_FILTER */)
       ORDER BY a.id DESC LIMIT :limit
     ),
     clipped AS (
@@ -545,7 +646,9 @@ _MISSING_NODE_QUERY = """
           JOIN coverage_source_runs r ON r.account_id=c.account_id AND r.source_id=c.source_id
             AND r.source_revision=c.source_revision AND r.dataset_id=c.dataset_id AND r.status='succeeded'
           JOIN jobs j ON j.account_id=r.account_id AND j.id=r.job_id AND j.status='succeeded'
+          /* FILTERED_ACTIVITY_JOIN */
           WHERE c.account_id=:account_id AND c.dataset_id=sn.dataset_id AND c.node_id=sn.osm_node_id
+            /* FILTERED_SOURCE */
         )
       GROUP BY sn.dataset_id,sn.osm_node_id,n.point
       ORDER BY sn.dataset_id,sn.osm_node_id LIMIT :limit
@@ -555,8 +658,17 @@ _MISSING_NODE_QUERY = """
 """
 
 
-def _progress_counts(db, account_id: str, dataset_id: int, rule: str):
+def _progress_counts(db, account_id: str, dataset_id: int, rule: str,
+                     filters: ActivityFilters | None = None, *, filtered: bool = False):
     threshold = "s.eligible_node_count" if rule == "strict" else "CASE WHEN s.eligible_node_count < 10 THEN s.eligible_node_count ELSE ceil(s.eligible_node_count*0.9)::integer END"
+    params: dict[str, Any] = {"account": account_id, "dataset": dataset_id}
+    join = ""
+    source_filter = ""
+    if filtered:
+        chosen = filters or ActivityFilters()
+        join = _activity_source_join(chosen, "src", params, account_id=account_id)
+        source_filter = _selected_source_sql(chosen, "src", params)
+    effective_manual = "" if filtered else " OR manual.street_id IS NOT NULL"
     return db.execute(text(f"""
         WITH visited AS (
           SELECT sn.dataset_id,sn.street_id,count(DISTINCT c.node_id)::integer AS visited_nodes
@@ -567,20 +679,21 @@ def _progress_counts(db, account_id: str, dataset_id: int, rule: str):
           JOIN coverage_source_runs r ON r.account_id=c.account_id AND r.source_id=c.source_id
             AND r.source_revision=c.source_revision AND r.dataset_id=c.dataset_id AND r.status='succeeded'
           JOIN jobs j ON j.account_id=r.account_id AND j.id=r.job_id AND j.status='succeeded'
-          WHERE sn.dataset_id=:dataset GROUP BY sn.dataset_id,sn.street_id
+          {join}
+          WHERE sn.dataset_id=:dataset {source_filter} GROUP BY sn.dataset_id,sn.street_id
         )
         SELECT count(*)::integer AS eligible_streets,
           count(*) FILTER (WHERE COALESCE(v.visited_nodes,0) >= {threshold})::integer AS completed_streets,
           count(*) FILTER (WHERE manual.street_id IS NOT NULL)::integer AS manual_completed_streets,
           count(*) FILTER (WHERE COALESCE(v.visited_nodes,0) >= {threshold}
-            OR manual.street_id IS NOT NULL)::integer AS effective_completed_streets,
+            {effective_manual})::integer AS effective_completed_streets,
           (SELECT count(DISTINCT sn.osm_node_id)::bigint FROM street_nodes sn
             WHERE sn.dataset_id=:dataset) AS eligible_nodes
         FROM streets s LEFT JOIN visited v ON v.dataset_id=s.dataset_id AND v.street_id=s.id
         LEFT JOIN manual_street_completions manual ON manual.account_id=:account
           AND manual.dataset_id=s.dataset_id AND manual.street_id=s.id
         WHERE s.dataset_id=:dataset AND s.eligible_node_count>0
-    """), {"account": account_id, "dataset": dataset_id}).mappings().one()
+    """), params).mappings().one()
 
 
 def _manual_completed_count(db, account_id: str, dataset_id: int) -> int:
@@ -601,6 +714,8 @@ _STREET_VISIT_QUERY = """
     JOIN coverage_source_runs r ON r.account_id=c.account_id AND r.source_id=c.source_id
       AND r.source_revision=c.source_revision AND r.dataset_id=c.dataset_id AND r.status='succeeded'
     JOIN jobs j ON j.account_id=r.account_id AND j.id=r.job_id AND j.status='succeeded'
+    /* FILTERED_ACTIVITY_JOIN */
     WHERE sn.dataset_id=ANY(:dataset_ids) AND sn.street_id=ANY(:street_ids)
+      /* FILTERED_SOURCE */
     GROUP BY sn.dataset_id,sn.street_id
 """

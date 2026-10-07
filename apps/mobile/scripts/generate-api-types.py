@@ -48,6 +48,8 @@ SCHEMAS = (
     "RouteAttribution",
     "ActivityImpactPage",
     "ActivityImpactStreet",
+    "ActivityFilters",
+    "ActivityFilterOptions",
 )
 
 

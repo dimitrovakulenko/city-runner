@@ -22,6 +22,12 @@ from backend.app.uploads import create_upload_router
 from backend.app.import_batches import create_import_batch_router
 from backend.app.routes import create_routes_router
 from backend.app.activity_impact import create_activity_impact_router
+from backend.app.activity_filters import (
+    SourceFilter,
+    activity_predicate,
+    canonical_filters,
+    create_activity_filters_router,
+)
 
 
 class ChallengeRequest(BaseModel):
@@ -130,6 +136,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
     app.include_router(create_import_batch_router(engine, current_user))
     app.include_router(create_routes_router(engine, current_user, routing_provider))
     app.include_router(create_activity_impact_router(engine, current_user))
+    app.include_router(create_activity_filters_router(engine, current_user))
     app.include_router(create_map_router(engine, current_user))
     app.include_router(create_explorer_router(engine, current_user))
     app.include_router(create_corrections_router(engine, current_user))
@@ -139,17 +146,23 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
         page: int = Query(1, ge=1),
         page_size: int = Query(20, ge=1, le=100),
         q: str | None = Query(None, max_length=200),
+        date_from: str | None = Query(None, max_length=10),
+        date_to: str | None = Query(None, max_length=10),
+        activity_type: str | None = Query(None, max_length=200),
+        source: SourceFilter = Query("all"),
         user_id: str = Depends(current_user),
     ):
-        filters = "user_id = :user_id"
+        selection = canonical_filters(date_from, date_to, activity_type, source)
         params: dict[str, Any] = {
             "user_id": user_id,
             "limit": page_size,
             "offset": (page - 1) * page_size,
         }
+        filters = "user_id = :user_id AND " + activity_predicate(selection, "activities", params,
+            account_param="user_id", dialect=engine.dialect.name)
         if q:
-            filters += " AND (lower(name) LIKE lower(:q) OR lower(coalesce(date, '')) LIKE lower(:q) " \
-                       "OR lower(coalesce(activity_type, '')) LIKE lower(:q))"
+            filters += " AND (lower(activities.name) LIKE lower(:q) OR lower(coalesce(activities.date, '')) LIKE lower(:q) " \
+                       "OR lower(coalesce(activities.activity_type, '')) LIKE lower(:q))"
             params["q"] = f"%{q}%"
         with engine.connect() as db:
             total = db.execute(text(f"SELECT count(*) FROM activities WHERE {filters}"), params).scalar_one()

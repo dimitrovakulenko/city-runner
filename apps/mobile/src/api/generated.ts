@@ -70,6 +70,8 @@ export type MapResponse = {
   missing_nodes: Array<MissingNode>;
   node_state: 'ready' | 'pending' | 'not-requested' | 'geography_pending';
   limits: MapLimits;
+  filters?: ActivityFilters;
+  coverage_scope?: 'lifetime' | 'filtered';
 };
 
 export type ProgressResponse = {
@@ -79,6 +81,8 @@ export type ProgressResponse = {
   datasets_truncated: boolean;
   unmapped_points: number;
   pending_imports: number;
+  filters?: ActivityFilters;
+  coverage_scope?: 'lifetime' | 'filtered';
 };
 
 export type UploadResponse = {
@@ -276,6 +280,18 @@ export type ActivityImpactStreet = {
   completed_by_activity: boolean | null;
   current_nodes: number | null;
   bounds: Array<number>;
+};
+
+export type ActivityFilters = {
+  date_from?: string | null;
+  date_to?: string | null;
+  activity_type?: string | null;
+  source?: 'all' | 'gpx' | 'fit' | 'unknown';
+};
+
+export type ActivityFilterOptions = {
+  activity_types: Array<string>;
+  types_truncated: boolean;
 };
 
 export type CityItem = {
