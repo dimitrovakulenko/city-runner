@@ -3,14 +3,14 @@ import { Map as MapLibre, Marker, NavigationControl, AttributionControl, LngLatB
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import type { GeoJSONSource, MapGeoJSONFeature } from 'maplibre-gl';
 import type { FeatureCollection, Feature, Geometry } from 'geojson';
-import type { ActivityDetail, MissingNode } from '../../mobile/src/api/generated';
+import type { ActivityDetail, ActivityImpactStreet, MissingNode } from '../../mobile/src/api/generated';
 import type { Runtime } from './runtime';
 import { useStore } from './hooks';
 import { Icon } from './icons';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
-export function ExploreMap({ runtime, enabled, planning, selected, focus, onStreet, showMissing, onMissingChange, selectedNode, onNode, nodeZoomRequest }: { runtime: Runtime; enabled: boolean; planning: boolean; selected: ActivityDetail | null; focus: [number, number] | null; onStreet: (feature: MapGeoJSONFeature) => void; showMissing: boolean; onMissingChange: (show: boolean) => void; selectedNode: MissingNode | null; onNode: (node: MissingNode) => void; nodeZoomRequest: number }) {
+export function ExploreMap({ runtime, enabled, planning, selected, selectedStreet, streetFocusRequest, focus, onStreet, showMissing, onMissingChange, selectedNode, onNode, nodeZoomRequest }: { runtime: Runtime; enabled: boolean; planning: boolean; selected: ActivityDetail | null; selectedStreet: ActivityImpactStreet | null; streetFocusRequest: number; focus: [number, number] | null; onStreet: (feature: MapGeoJSONFeature) => void; showMissing: boolean; onMissingChange: (show: boolean) => void; selectedNode: MissingNode | null; onNode: (node: MissingNode) => void; nodeZoomRequest: number }) {
   const host = useRef<HTMLDivElement>(null); const mapRef = useRef<MapLibre | null>(null);
   const enabledRef = useRef(enabled); enabledRef.current = enabled;
   const planningRef = useRef(planning); planningRef.current = planning;
@@ -39,7 +39,7 @@ export function ExploreMap({ runtime, enabled, planning, selected, focus, onStre
       void runtime.explore.refreshViewport({ bbox: [Math.max(-180, b.getWest()), Math.max(-90, b.getSouth()), Math.min(180, b.getEast()), Math.min(90, b.getNorth())], zoom: map.getZoom() });
     };
     map.on('load', () => {
-      for (const id of ['streets', 'tracks', 'missing', 'selected-node', 'selected', 'plan']) map.addSource(id, { type: 'geojson', data: EMPTY });
+      for (const id of ['streets', 'tracks', 'missing', 'selected-node', 'selected', 'highlighted-street', 'plan']) map.addSource(id, { type: 'geojson', data: EMPTY });
       map.addLayer({ id: 'street-outline', type: 'line', source: 'streets', paint: { 'line-color': '#fff', 'line-width': 4, 'line-opacity': 0.55 } });
       map.addLayer({ id: 'street-coverage', type: 'line', source: 'streets', paint: { 'line-color': ['case', ['==', ['get', 'complete'], true], '#21856e', ['==', ['get', 'known'], false], '#9ca89d', '#dda257'], 'line-width': ['case', ['==', ['get', 'complete'], true], 3, 1.8], 'line-opacity': ['case', ['==', ['get', 'complete'], true], 0.9, 0.55] } });
       map.addLayer({ id: 'activity-track-outline', type: 'line', source: 'tracks', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fff', 'line-width': 8, 'line-opacity': 0.95 } });
@@ -47,6 +47,8 @@ export function ExploreMap({ runtime, enabled, planning, selected, focus, onStre
       map.addLayer({ id: 'missing-nodes', type: 'circle', source: 'missing', minzoom: 16, layout: { visibility: 'none' }, paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 16, 4, 19, 6], 'circle-color': '#c54832', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2 } });
       map.addLayer({ id: 'selected-track-outline', type: 'line', source: 'selected', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fff', 'line-width': 11 } });
       map.addLayer({ id: 'selected-track', type: 'line', source: 'selected', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#4c1d95', 'line-width': 7 } });
+      map.addLayer({ id: 'highlighted-street-outline', type: 'line', source: 'highlighted-street', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fff', 'line-width': 11 } });
+      map.addLayer({ id: 'highlighted-street', type: 'line', source: 'highlighted-street', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#087f8c', 'line-width': 7 } });
       map.addLayer({ id: 'planned-route-outline', type: 'line', source: 'plan', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fff', 'line-width': 10 } });
       map.addLayer({ id: 'planned-route', type: 'line', source: 'plan', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#176bb3', 'line-width': 6 } });
       map.addLayer({ id: 'selected-missing-node', type: 'circle', source: 'selected-node', minzoom: 16, paint: { 'circle-radius': 10, 'circle-color': '#c54832', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
@@ -79,15 +81,21 @@ export function ExploreMap({ runtime, enabled, planning, selected, focus, onStre
     const feature = (geometry: Record<string, unknown>, properties: Record<string, unknown>): Feature => ({ type: 'Feature', geometry: geometry as unknown as Geometry, properties });
     const set = (id: string, features: Feature[]) => (map.getSource(id) as GeoJSONSource).setData({ type: 'FeatureCollection', features });
     set('streets', snapshot?.streets.map((street) => feature(street.geometry, { id: street.street_id, city_id: street.city_id, dataset_id: street.dataset_id, name: street.name, complete: street.effective_completed, known: street.effective_completed !== null })) ?? []);
+    set('highlighted-street', snapshot?.streets.filter((street) => street.street_id === selectedStreet?.street_id && street.dataset_id === selectedStreet.dataset_id).map((street) => feature(street.geometry, { id: street.street_id, dataset_id: street.dataset_id })) ?? []);
     set('tracks', snapshot?.tracks.map((track) => feature(track.geometry, { id: track.activity_id })) ?? []);
     set('missing', snapshot?.missing_nodes.map((node) => ({ type: 'Feature', properties: { node_id: node.node_id, dataset_id: node.dataset_id }, geometry: { type: 'Point', coordinates: [node.longitude, node.latitude] } })) ?? []);
-  }, [state.map, state.mapStatus, ready, enabled]);
+  }, [state.map, state.mapStatus, ready, enabled, selectedStreet]);
   useEffect(() => { const map = mapRef.current; if (ready && map) (map.getSource('selected-node') as GeoJSONSource).setData(enabled && showMissing && selectedNode ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: { node_id: selectedNode.node_id, dataset_id: selectedNode.dataset_id }, geometry: { type: 'Point', coordinates: [selectedNode.longitude, selectedNode.latitude] } }] } : EMPTY); }, [selectedNode, ready, enabled, showMissing]);
   useEffect(() => {
     const map = mapRef.current; if (!ready || !map) return;
     (map.getSource('selected') as GeoJSONSource).setData(enabled && selected ? { type: 'FeatureCollection', features: selected.tracks.filter((segment) => segment.length > 1).map((segment) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: segment } })) } : EMPTY);
-    if (enabled && selected?.bounds) map.fitBounds(new LngLatBounds(selected.bounds), { padding: 80, maxZoom: 17, duration: 700 });
-  }, [selected, ready, enabled]);
+    if (enabled && !selectedStreet && selected?.bounds) map.fitBounds(new LngLatBounds(selected.bounds), { padding: 80, maxZoom: 17, duration: 700 });
+  }, [selected, selectedStreet, ready, enabled]);
+  useEffect(() => {
+    const map = mapRef.current; if (!ready || !map || !enabled || !selectedStreet) return;
+    const [west, south, east, north] = selectedStreet.bounds;
+    map.fitBounds([[west, south], [east, north]], { padding: 80, maxZoom: 18, duration: 700 });
+  }, [selectedStreet, streetFocusRequest, ready, enabled]);
   useEffect(() => {
     const map = mapRef.current; if (!ready || !map) return;
     (map.getSource('plan') as GeoJSONSource).setData(enabled && planning && planner.preview ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: planner.preview.geometry }] } : EMPTY);
@@ -118,8 +126,8 @@ export function ExploreMap({ runtime, enabled, planning, selected, focus, onStre
   return <section className="map-area" aria-label="Exploration map" data-ready={ready}><div ref={host} className="map-canvas" />
     <div className="map-heading"><span className="live-dot" /><span>{planning && enabled ? 'Click the map to add waypoints' : 'Your exploration map'}</span><span className="map-heading-divider" />{enabled ? planning ? 'Walking route planner' : 'Lifetime coverage' : 'A new street is a new story'}</div>
     {enabled && <div className="map-layers"><Icon name="layers" size={17} /><label><input type="checkbox" checked={showTracks} onChange={(event) => setShowTracks(event.target.checked)} />Activity tracks</label><label title="Node Hunter: select missing GPS nodes and add them to your route"><input type="checkbox" checked={showMissing} onChange={(event) => onMissingChange(event.target.checked)} />Missing nodes</label></div>}
-    <div className="map-legend"><span><i className="legend-line completed" />Completed</span><span><i className="legend-line remaining" />Remaining</span><span><i className="legend-line track" />Activity</span>{planning && enabled && <span><i className="legend-line plan" />Planned</span>}</div>
-    {enabled && <div className="map-message" role="status">{state.mapStatus === 'loading' ? 'Updating this view…' : state.mapError ?? (state.map?.geography_state === 'geography_pending' ? 'Street coverage is not available in this area yet.' : showMissing && (state.viewport?.zoom ?? 0) < 16 ? 'Zoom closer to see individual missing nodes.' : 'Coverage uses your original GPS samples.')}{state.map && (state.map.dataset_truncated || Object.entries(state.map.limits).some(([layer, limit]) => (layer !== 'missing_nodes' || showMissing && (state.viewport?.zoom ?? 0) >= 16) && limit.truncated)) && ' Some results are limited; zoom in.'}</div>}
+    <div className="map-legend"><span><i className="legend-line completed" />Completed</span><span><i className="legend-line remaining" />Remaining</span><span><i className="legend-line track" />Activity</span>{selectedStreet && enabled && <span><i className="legend-line highlight" />Selected street</span>}{planning && enabled && <span><i className="legend-line plan" />Planned</span>}</div>
+    {enabled && <div className="map-message" role="status">{state.mapStatus === 'loading' ? 'Updating this view…' : state.mapError ?? (selectedStreet ? state.map?.streets.some((street) => street.street_id === selectedStreet.street_id && street.dataset_id === selectedStreet.dataset_id) ? `Highlighted ${selectedStreet.name}. Display geometry is limited to this view.` : `${selectedStreet.name}: display geometry is unavailable in this view. Street details remain available.` : state.map?.geography_state === 'geography_pending' ? 'Street coverage is not available in this area yet.' : showMissing && (state.viewport?.zoom ?? 0) < 16 ? 'Zoom closer to see individual missing nodes.' : 'Coverage uses your original GPS samples.')}{state.map && (state.map.dataset_truncated || Object.entries(state.map.limits).some(([layer, limit]) => (layer !== 'missing_nodes' || showMissing && (state.viewport?.zoom ?? 0) >= 16) && limit.truncated)) && ' Some results are limited; zoom in.'}</div>}
     {error && <div className="map-error" role="alert">{error}<button aria-label="Dismiss map message" onClick={() => setError(null)}><Icon name="close" size={15} /></button></div>}
   </section>;
 }

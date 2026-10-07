@@ -29,6 +29,7 @@ test('real backend drives activities, street contributions, manual completion an
   await page.getByRole('button', { name: 'Activities', exact: true }).click();
   await page.getByRole('button', { name: /Morning loop \[synthetic\]/ }).click();
   await expect(page.getByRole('heading', { name: 'Morning loop [synthetic]' })).toBeVisible();
+  await page.getByText('Recording details', { exact: true }).click();
   await expect(page.getByText('10 original GPS samples', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Cities & streets', exact: true }).click();
   await page.getByLabel('Region', { exact: true }).selectOption({ label: 'Demo Region' });
@@ -99,6 +100,7 @@ test('browser GPX/FIT uploads pause, resume, survive reload and remain deleted a
   const focusedMap = page.waitForResponse((response) => response.url().includes('/api/map?') && Number(new URL(response.url()).searchParams.get('zoom')) > 15 && response.ok());
   await page.getByRole('button', { name: 'browser.gpx', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Browser GPX [synthetic]', exact: true })).toBeVisible();
+  await page.getByText('Recording details', { exact: true }).click();
   await expect(page.getByText('5 original GPS samples', { exact: true })).toBeVisible();
   await focusedMap;
   await page.getByRole('button', { name: 'Delete activity', exact: true }).click();

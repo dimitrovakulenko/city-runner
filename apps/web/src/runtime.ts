@@ -23,10 +23,11 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
   const cities = new CityExplorerStore(createCityExplorerApi(options));
   const planner = new RoutePlannerStore(createRouteApi(options));
   const imports = new ImportStore(createBrowserImportApi(options, files), () => crypto.randomUUID(), () => {
-    void activities.loadPage(); void explore.refreshAfterCorrection(); void cities.refreshAfterCorrection();
+    void activities.loadPage(); void activities.refreshImpact(); void explore.refreshAfterCorrection(); void cities.refreshAfterCorrection();
   });
   const corrections = new CorrectionStore(createCorrectionApi(options), (operation, id) => {
     if (operation === 'activity-delete') activities.activityDeleted(id);
+    void activities.refreshImpact();
     void explore.refreshAfterCorrection(); void cities.refreshAfterCorrection(); void imports.refresh();
   });
   const reset = () => { files.clear(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); planner.reset(); };
