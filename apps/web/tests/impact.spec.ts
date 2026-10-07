@@ -34,6 +34,11 @@ test('activity impact compares retained history, focuses streets and refreshes a
   await expect(result).toContainText('same-day ordering is approximate');
   await result.getByRole('button', { name: 'Show Garden Way on map', exact: true }).click();
   await expect(page.locator('.map-message')).toContainText('Highlighted Garden Way');
+  await page.context().setOffline(true);
+  await expect(page.locator('.map-message')).toContainText('unavailable offline');
+  await expect(page.locator('.map-message')).not.toContainText('Highlighted');
+  await page.context().setOffline(false);
+  await expect(page.locator('.map-message')).toContainText('Highlighted Garden Way');
   const focusedZoom = mapZoom;
   const zoomOut = page.waitForResponse((response) => response.ok() && response.url().includes('/api/map?') && Number(new URL(response.url()).searchParams.get('zoom')) < focusedZoom - .5);
   await page.getByRole('button', { name: 'Zoom out', exact: true }).click();

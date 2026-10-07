@@ -7,12 +7,18 @@ import type { ActivityDetail, ActivityImpactStreet, MissingNode } from '../../mo
 import type { Runtime } from './runtime';
 import { useStore } from './hooks';
 import { Icon } from './icons';
+import { BrowserViewports, DEFAULT_POSITION } from './viewports';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 const EMPTY: FeatureCollection = { type: 'FeatureCollection', features: [] };
-export function ExploreMap({ runtime, enabled, planning, selected, selectedStreet, streetFocusRequest, focus, onStreet, showMissing, onMissingChange, selectedNode, onNode, nodeZoomRequest }: { runtime: Runtime; enabled: boolean; planning: boolean; selected: ActivityDetail | null; selectedStreet: ActivityImpactStreet | null; streetFocusRequest: number; focus: [number, number] | null; onStreet: (feature: MapGeoJSONFeature) => void; showMissing: boolean; onMissingChange: (show: boolean) => void; selectedNode: MissingNode | null; onNode: (node: MissingNode) => void; nodeZoomRequest: number }) {
+export function ExploreMap({ runtime, enabled, accountId, planning, selected, selectedStreet, streetFocusRequest, focus, onStreet, showMissing, onMissingChange, selectedNode, onNode, nodeZoomRequest }: { runtime: Runtime; enabled: boolean; accountId: string | null; planning: boolean; selected: ActivityDetail | null; selectedStreet: ActivityImpactStreet | null; streetFocusRequest: number; focus: [number, number] | null; onStreet: (feature: MapGeoJSONFeature) => void; showMissing: boolean; onMissingChange: (show: boolean) => void; selectedNode: MissingNode | null; onNode: (node: MissingNode) => void; nodeZoomRequest: number }) {
   const host = useRef<HTMLDivElement>(null); const mapRef = useRef<MapLibre | null>(null);
   const enabledRef = useRef(enabled); enabledRef.current = enabled;
+  const accountRef = useRef(accountId); accountRef.current = accountId;
+  const restoredAccount = useRef<string | null>(null); const positions = useRef<BrowserViewports | null>(null);
+  const locationRequest = useRef(0); const locationTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [locating, setLocating] = useState(false); const [locationError, setLocationError] = useState<string | null>(null);
+  const [location, setLocation] = useState<{ accountId: string; coordinate: [number, number]; accuracy: number | null } | null>(null);
   const planningRef = useRef(planning); planningRef.current = planning;
   const streetRef = useRef(onStreet); streetRef.current = onStreet;
   const nodeRef = useRef(onNode); nodeRef.current = onNode;
@@ -26,9 +32,10 @@ export function ExploreMap({ runtime, enabled, planning, selected, selectedStree
     let timer: ReturnType<typeof setTimeout> | undefined;
     let map: MapLibre;
     try {
+      try { positions.current = new BrowserViewports(window.localStorage); } catch { positions.current = null; }
       setWorkerUrl(workerUrl);
       map = new MapLibre({ container: host.current, style: import.meta.env.VITE_MAP_STYLE ?? 'https://tiles.openfreemap.org/styles/liberty',
-        center: [3.724, 51.054], zoom: 14.8, minZoom: 9, maxZoom: 19, renderWorldCopies: false, attributionControl: false });
+        ...DEFAULT_POSITION, minZoom: 9, maxZoom: 19, renderWorldCopies: false, attributionControl: false });
     } catch (error) { if (import.meta.env.DEV) console.warn('Map initialization failed:', error); setError('Your browser could not start the map. Try a browser with WebGL enabled.'); return; }
     mapRef.current = map;
     map.addControl(new NavigationControl({ showCompass: false }), 'bottom-right');
@@ -39,7 +46,7 @@ export function ExploreMap({ runtime, enabled, planning, selected, selectedStree
       void runtime.explore.refreshViewport({ bbox: [Math.max(-180, b.getWest()), Math.max(-90, b.getSouth()), Math.min(180, b.getEast()), Math.min(90, b.getNorth())], zoom: map.getZoom() });
     };
     map.on('load', () => {
-      for (const id of ['streets', 'tracks', 'missing', 'selected-node', 'selected', 'highlighted-street', 'plan']) map.addSource(id, { type: 'geojson', data: EMPTY });
+      for (const id of ['streets', 'tracks', 'missing', 'selected-node', 'selected', 'highlighted-street', 'plan', 'current-location']) map.addSource(id, { type: 'geojson', data: EMPTY });
       map.addLayer({ id: 'street-outline', type: 'line', source: 'streets', paint: { 'line-color': '#fff', 'line-width': 4, 'line-opacity': 0.55 } });
       map.addLayer({ id: 'street-coverage', type: 'line', source: 'streets', paint: { 'line-color': ['case', ['==', ['get', 'complete'], true], '#21856e', ['==', ['get', 'known'], false], '#9ca89d', '#dda257'], 'line-width': ['case', ['==', ['get', 'complete'], true], 3, 1.8], 'line-opacity': ['case', ['==', ['get', 'complete'], true], 0.9, 0.55] } });
       map.addLayer({ id: 'activity-track-outline', type: 'line', source: 'tracks', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fff', 'line-width': 8, 'line-opacity': 0.95 } });
@@ -51,6 +58,7 @@ export function ExploreMap({ runtime, enabled, planning, selected, selectedStree
       map.addLayer({ id: 'highlighted-street', type: 'line', source: 'highlighted-street', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#087f8c', 'line-width': 7 } });
       map.addLayer({ id: 'planned-route-outline', type: 'line', source: 'plan', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#fff', 'line-width': 10 } });
       map.addLayer({ id: 'planned-route', type: 'line', source: 'plan', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#176bb3', 'line-width': 6 } });
+      map.addLayer({ id: 'current-location', type: 'circle', source: 'current-location', paint: { 'circle-radius': 8, 'circle-color': '#176bb3', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
       map.addLayer({ id: 'selected-missing-node', type: 'circle', source: 'selected-node', minzoom: 16, paint: { 'circle-radius': 10, 'circle-color': '#c54832', 'circle-stroke-color': '#fff', 'circle-stroke-width': 3 } });
       map.on('click', (event) => {
         if (!enabledRef.current) return;
@@ -71,10 +79,24 @@ export function ExploreMap({ runtime, enabled, planning, selected, selectedStree
       setReady(true); refresh();
     });
     map.on('movestart', () => { if (enabledRef.current) runtime.explore.invalidateViewport(); });
-    map.on('moveend', () => { clearTimeout(timer); timer = setTimeout(refresh, 150); });
+    map.on('moveend', () => {
+      const account = accountRef.current;
+      if (enabledRef.current && account && restoredAccount.current === account) { const center = map.getCenter(); positions.current?.write(account, { center: [center.lng, center.lat], zoom: map.getZoom() }); }
+      clearTimeout(timer); timer = setTimeout(refresh, 150);
+    });
     map.on('error', () => setError('Some map tiles could not load. Check your connection.'));
-    return () => { clearTimeout(timer); map.remove(); mapRef.current = null; };
+    return () => { clearTimeout(timer); clearTimeout(locationTimer.current); locationRequest.current++; map.remove(); mapRef.current = null; };
   }, [runtime]);
+  useEffect(() => {
+    locationRequest.current++; clearTimeout(locationTimer.current); setLocating(false); setLocation(null); setLocationError(null);
+    const map = mapRef.current; if (!ready || !map) return;
+    restoredAccount.current = accountId;
+    map.jumpTo(accountId ? positions.current?.read(accountId) ?? DEFAULT_POSITION : DEFAULT_POSITION);
+  }, [accountId, ready]);
+  useEffect(() => {
+    const map = mapRef.current; if (!ready || !map) return;
+    (map.getSource('current-location') as GeoJSONSource).setData(enabled && location?.accountId === accountId ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: location.coordinate } }] } : EMPTY);
+  }, [enabled, accountId, location, ready]);
   useEffect(() => {
     const map = mapRef.current; if (!ready || !map) return;
     const snapshot = enabled && (state.mapStatus === 'ready' || state.mapStatus === 'empty') ? state.map : null;
@@ -123,11 +145,30 @@ export function ExploreMap({ runtime, enabled, planning, selected, selectedStree
   useEffect(() => { const map = mapRef.current; if (ready && map) { for (const layer of ['activity-track-outline', 'activity-tracks']) map.setLayoutProperty(layer, 'visibility', showTracks ? 'visible' : 'none'); map.setLayoutProperty('missing-nodes', 'visibility', showMissing ? 'visible' : 'none'); } }, [ready, showTracks, showMissing]);
   useEffect(() => { if (ready && enabled && focus) { onMissingChange(true); mapRef.current?.flyTo({ center: focus, zoom: 18, duration: 700 }); } }, [ready, enabled, focus, onMissingChange]);
   useEffect(() => { if (ready && enabled && nodeZoomRequest > 0 && mapRef.current) mapRef.current.flyTo({ zoom: Math.max(16, mapRef.current.getZoom()), duration: 700 }); }, [ready, enabled, nodeZoomRequest]);
-  return <section className="map-area" aria-label="Exploration map" data-ready={ready}><div ref={host} className="map-canvas" />
-    <div className="map-heading"><span className="live-dot" /><span>{planning && enabled ? 'Click the map to add waypoints' : 'Your exploration map'}</span><span className="map-heading-divider" />{enabled ? planning ? 'Walking route planner' : 'Lifetime coverage' : 'A new street is a new story'}</div>
+  const cancelLocation = () => { locationRequest.current++; clearTimeout(locationTimer.current); setLocating(false); setLocationError(null); };
+  const locate = () => {
+    const account = accountRef.current; if (!enabled || !account || !mapRef.current || !ready) return;
+    cancelLocation(); setLocation(null);
+    if (!navigator.geolocation) { setLocationError('Current location is unavailable in this browser.'); return; }
+    const request = ++locationRequest.current; setLocating(true);
+    const current = () => request === locationRequest.current && account === accountRef.current && enabledRef.current && Boolean(mapRef.current);
+    const fail = (message: string) => { if (!current()) return; locationRequest.current++; clearTimeout(locationTimer.current); setLocating(false); setLocationError(message); };
+    locationTimer.current = setTimeout(() => fail('Location timed out. Try again when GPS is available.'), 10_000);
+    try { navigator.geolocation.getCurrentPosition((result) => {
+      if (!current()) return;
+      const { longitude, latitude, accuracy } = result.coords;
+      if (!Number.isFinite(longitude) || !Number.isFinite(latitude) || Math.abs(longitude) > 180 || Math.abs(latitude) > 85) { fail('Your location is outside the supported map area.'); return; }
+      clearTimeout(locationTimer.current); setLocating(false); setLocationError(null);
+      setLocation({ accountId: account, coordinate: [longitude, latitude], accuracy: Number.isFinite(accuracy) && accuracy >= 0 ? accuracy : null });
+      mapRef.current?.flyTo({ center: [longitude, latitude], zoom: 17, duration: 700 });
+    }, (error) => fail(error.code === 1 ? 'Location permission denied. Allow location in your browser settings and try again.' : error.code === 3 ? 'Location timed out. Try again when GPS is available.' : 'Your location could not be found. Try again.'), { enableHighAccuracy: true, timeout: 10_000, maximumAge: 30_000 }); } catch { fail('Current location is unavailable in this browser.'); }
+  };
+  return <section className="map-area" aria-label="Exploration map" data-ready={ready} data-located={Boolean(enabled && location?.accountId === accountId)}><div ref={host} className="map-canvas" />
+    <div className="map-heading"><span className="live-dot" /><span>{planning && enabled ? 'Click the map to add waypoints' : 'Your exploration map'}</span><span className="map-heading-divider" />{enabled ? planning ? 'Walking route planner' : state.coverageScope === 'filtered' ? 'Selected activities’ GPS coverage' : 'Lifetime GPS coverage' : 'A new street is a new story'}</div>
     {enabled && <div className="map-layers"><Icon name="layers" size={17} /><label><input type="checkbox" checked={showTracks} onChange={(event) => setShowTracks(event.target.checked)} />Activity tracks</label><label title="Node Hunter: select missing GPS nodes and add them to your route"><input type="checkbox" checked={showMissing} onChange={(event) => onMissingChange(event.target.checked)} />Missing nodes</label></div>}
+    {enabled && <div className="map-location"><button className="secondary" aria-label="Show current location" disabled={!ready || locating} onClick={locate}><Icon name="pin" size={16} />{locating ? 'Locating…' : 'My location'}</button>{locating && <button className="text-button" onClick={cancelLocation}>Cancel location</button>}{location?.accountId === accountId && <span role="status">Your location{location.accuracy !== null && ` · ±${Math.round(location.accuracy)} m`}</span>}{locationError && <span role="alert">{locationError}</span>}</div>}
     <div className="map-legend"><span><i className="legend-line completed" />Completed</span><span><i className="legend-line remaining" />Remaining</span><span><i className="legend-line track" />Activity</span>{selectedStreet && enabled && <span><i className="legend-line highlight" />Selected street</span>}{planning && enabled && <span><i className="legend-line plan" />Planned</span>}</div>
-    {enabled && <div className="map-message" role="status">{state.mapStatus === 'loading' ? 'Updating this view…' : state.mapError ?? (selectedStreet ? state.map?.streets.some((street) => street.street_id === selectedStreet.street_id && street.dataset_id === selectedStreet.dataset_id) ? `Highlighted ${selectedStreet.name}. Display geometry is limited to this view.` : `${selectedStreet.name}: display geometry is unavailable in this view. Street details remain available.` : state.map?.geography_state === 'geography_pending' ? 'Street coverage is not available in this area yet.' : showMissing && (state.viewport?.zoom ?? 0) < 16 ? 'Zoom closer to see individual missing nodes.' : 'Coverage uses your original GPS samples.')}{state.map && (state.map.dataset_truncated || Object.entries(state.map.limits).some(([layer, limit]) => (layer !== 'missing_nodes' || showMissing && (state.viewport?.zoom ?? 0) >= 16) && limit.truncated)) && ' Some results are limited; zoom in.'}</div>}
+    {enabled && <div className="map-message" role="status">{state.mapStatus === 'offline' ? 'Map coverage is unavailable offline. Reconnect to refresh this view.' : state.mapStatus === 'loading' ? 'Updating this view…' : state.mapError ?? (selectedStreet ? state.map?.streets.some((street) => street.street_id === selectedStreet.street_id && street.dataset_id === selectedStreet.dataset_id) ? `Highlighted ${selectedStreet.name}. Display geometry is limited to this view.` : `${selectedStreet.name}: display geometry is unavailable in this view. Street details remain available.` : state.map?.geography_state === 'geography_pending' ? 'Street coverage is not available in this area yet.' : showMissing && (state.viewport?.zoom ?? 0) < 16 ? 'Zoom closer to see individual missing nodes.' : 'Coverage uses your original GPS samples.')}{(state.mapStatus === 'ready' || state.mapStatus === 'empty') && state.map && (state.map.dataset_truncated || Object.entries(state.map.limits).some(([layer, limit]) => (layer !== 'missing_nodes' || showMissing && (state.viewport?.zoom ?? 0) >= 16) && limit.truncated)) && ' Some results are limited; zoom in.'}</div>}
     {error && <div className="map-error" role="alert">{error}<button aria-label="Dismiss map message" onClick={() => setError(null)}><Icon name="close" size={15} /></button></div>}
   </section>;
 }

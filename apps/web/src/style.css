@@ -23,3 +23,17 @@ dialog.modal{position:fixed;inset:0;margin:auto;height:fit-content;max-height:ca
 
 .node-hunter{border-top:1px solid var(--line);margin:22px 0;padding-top:2px}.hunter-selection{background:#fff2eb;border:1px solid #efd5c8;border-radius:10px;padding:14px;margin:13px 0}.hunter-selection>strong{display:block;font-size:12px}.hunter-selection>span{display:block;color:#8e6d5a;font-size:10px;margin:8px 0 13px}.hunter-list{margin-bottom:15px}.hunter-list .node-row{padding:12px 8px;color:#805b49}.hunter-list .node-row.selected{background:#fff2eb;border-radius:7px;color:#ad422d}.hunter-list small{display:block;font-size:9px;color:#8d9589;margin-top:4px}.filter-tabs{flex-wrap:wrap}.filter-tabs button{white-space:nowrap;min-width:45px}.row-copy>span{color:#707e69}
 .activity-impact{border-top:1px solid var(--line);margin-top:19px;padding-top:18px}.impact-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;background:#edf3e5;border-radius:9px;padding:14px 10px;margin:16px 0}.impact-totals strong{display:block;font-family:Manrope,sans-serif;font-size:26px;letter-spacing:-1px;color:#28563c}.impact-totals span{display:block;font-size:10px;color:#5e7154;line-height:1.5;margin-top:6px}.impact-street{border-bottom:1px solid var(--line);padding-bottom:10px}.impact-street .street-row{border:0}.impact-street.selected{background:#edf6fa;border-radius:7px;padding:0 8px 10px}.impact-street .row-copy strong{white-space:normal}.recording-details{margin:20px 0;font-size:11px;color:#728468}.recording-details summary{cursor:pointer}.legend-line.highlight{background:#087f8c;height:6px}
+
+.map-location{position:absolute;right:23px;top:78px;display:flex;align-items:flex-end;flex-direction:column;gap:8px;max-width:260px}.map-location .secondary{padding:10px 13px;box-shadow:0 3px 16px #44503515}.map-location>span,.map-location>.text-button{background:#ffffffed;padding:8px 12px;border-radius:7px;font-size:10px;line-height:1.6;color:#52694b}.map-location>span[role=alert]{background:#fbede8;color:#975d50}
+@media(max-width:1050px) and (min-width:721px){.map-location{top:130px}}
+@media(max-width:720px){.map-location{right:15px;top:61px;max-width:220px}.map-location .secondary{font-size:10px;padding:8px 11px}}
+
+.activity-filters { border-bottom: 1px solid var(--border, #dfe5d8); margin-bottom: 22px; padding-bottom: 12px; }
+.activity-filters summary { cursor: pointer; font-weight: 700; padding: 10px 0; }
+.activity-filters form { padding-top: 8px; }
+.filter-dates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.filter-dates input { min-width: 0; width: 100%; border: 1px solid #dfe5d8; border-radius: 8px; padding: 9px 4px; background: white; color: inherit; font: inherit; }
+.filter-actions { display: flex; align-items: center; gap: 15px; }
+.filter-summary { font-size: 12px; line-height: 1.8; color: #687566; margin: 5px 0 0; }
+.connection-status { padding: 14px; background: #fff2d9; border-radius: 10px; margin-bottom: 15px; font-size: 13px; }
+.connection-status p { line-height: 1.5; }

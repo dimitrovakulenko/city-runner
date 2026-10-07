@@ -10,7 +10,7 @@ import { createExploreApi } from '../../mobile/src/api/explore';
 import { createCityExplorerApi } from '../../mobile/src/api/cities';
 import { createImportBatchApi } from '../../mobile/src/api/importBatches';
 import { createCorrectionApi } from '../../mobile/src/api/corrections';
-import type { ImportBatchItemResponse } from '../../mobile/src/api/generated';
+import type { ActivityFilters, ImportBatchItemResponse } from '../../mobile/src/api/generated';
 import { BrowserFiles } from './files';
 import { BrowserSessions } from './session';
 
@@ -23,7 +23,7 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
   const cities = new CityExplorerStore(createCityExplorerApi(options));
   const planner = new RoutePlannerStore(createRouteApi(options));
   const imports = new ImportStore(createBrowserImportApi(options, files), () => crypto.randomUUID(), () => {
-    void activities.loadPage(); void activities.refreshImpact(); void explore.refreshAfterCorrection(); void cities.refreshAfterCorrection();
+    void activities.loadPage(); void activities.loadFilterOptions(); void activities.refreshImpact(); void explore.refreshAfterCorrection(); void cities.refreshAfterCorrection();
   });
   const corrections = new CorrectionStore(createCorrectionApi(options), (operation, id) => {
     if (operation === 'activity-delete') activities.activityDeleted(id);
@@ -32,7 +32,8 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
   });
   const reset = () => { files.clear(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); planner.reset(); };
   sessions.subscribe(reset);
-  return { sessions, files, api, activities, explore, cities, imports, corrections, planner, reset };
+  const applyFilters = (filters: ActivityFilters) => { activities.setFilters(filters); explore.setFilters(filters); };
+  return { sessions, files, api, activities, explore, cities, imports, corrections, planner, reset, applyFilters };
 }
 
 export type Runtime = ReturnType<typeof createRuntime>;
