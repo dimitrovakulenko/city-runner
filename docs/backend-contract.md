@@ -127,3 +127,7 @@ Coordinates are ordered `[longitude, latitude]`, finite WGS84 bounds; 2–20 way
 Store owner FK, name, ordered waypoints, bounded validated routed geometry, metrics/provider/attribution, revision and timestamps. The database owns the revision; no client-submitted geometry is trusted. Avoid redundant external recalculation for unchanged saved waypoints. Browser edits invalidate current previews immediately; stale responses and prior-account responses cannot repopulate the draft or saved list. Add/move/remove/reorder/undo must preserve waypoint order. Save/reopen/edit/delete/export are available on web; native route editor acceptance remains separate.
 
 Activity list/map selection and explicit lifetime/filtered GPS coverage follow [activity filters](activity-filters.md). Generated API types include canonical selection echoes and owner-scoped activity-type options.
+
+## Source status and foreground refresh: D19 / D25
+
+The [source/status contract](sync-status.md) pins owner-only file history/coverage status, bounded failed-source retry, transactional change detection and web foreground refresh. It also defines future connection/provenance/credential/cursor/retention boundaries; real cloud adapters remain D20–D24 and unavailable in this slice.
