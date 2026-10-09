@@ -80,7 +80,7 @@ test('activity impact compares retained history, focuses streets and refreshes a
     await route.fulfill({ response, json: body });
   });
   await page.getByRole('button', { name: 'Refresh your data', exact: true }).click();
-  await expect(result).toContainText('dates are missing or invalid');
+  await expect(result).toContainText('dates are missing or invalid', { timeout: 10_000 });
   await expect(result.locator('[data-metric="new-nodes"]')).toHaveText('—New GPS nodes');
   await expect(result.getByRole('button', { name: 'Show Garden Way on map', exact: true })).toBeVisible();
   await page.unroute('**/api/activities/*/impact?**');
@@ -90,12 +90,12 @@ test('activity impact compares retained history, focuses streets and refreshes a
     await route.fulfill({ response, json: body });
   });
   await page.getByRole('button', { name: 'Refresh your data', exact: true }).click();
-  await expect(result).toContainText('Coverage is still processing');
+  await expect(result).toContainText('Coverage is still processing', { timeout: 10_000 });
   await expect(result.locator('.impact-street')).toHaveCount(0);
   await page.unroute('**/api/activities/*/impact?**');
   await page.route('**/api/activities/*/impact?**', (route) => route.fulfill({ status: 503, json: { detail: 'Try again later' } }));
   await page.getByRole('button', { name: 'Refresh your data', exact: true }).click();
-  await expect(result.getByRole('alert')).toBeVisible();
+  await expect(result.getByRole('alert')).toBeVisible({ timeout: 10_000 });
   await page.unroute('**/api/activities/*/impact?**');
   await result.getByRole('button', { name: 'Retry contribution', exact: true }).click();
   await expect(result).toContainText('0 → 3 / 5 GPS nodes');

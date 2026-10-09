@@ -4,7 +4,7 @@ import { useStore } from './hooks';
 import { Icon } from './icons';
 import { prepareImportSelection } from '../../mobile/src/importSelection';
 
-const FILE_ERRORS = new Set(['invalid_fit_size', 'invalid_fit_file', 'fit_not_activity', 'fit_no_track_points', 'fit_record_limit', 'fit_message_limit', 'fit_multiple_streams', 'invalid_gpx_size', 'invalid_gpx_xml', 'invalid_gpx_root', 'invalid_gpx_coordinate', 'gpx_point_limit', 'gpx_no_track_points']);
+export const FILE_ERRORS = new Set(['invalid_fit_size', 'invalid_fit_file', 'fit_not_activity', 'fit_no_track_points', 'fit_record_limit', 'fit_message_limit', 'fit_multiple_streams', 'invalid_gpx_size', 'invalid_gpx_xml', 'invalid_gpx_root', 'invalid_gpx_coordinate', 'gpx_point_limit', 'gpx_no_track_points']);
 const STATUS = { queued: 'Waiting to process', processing: 'Processing activity', succeeded: 'Imported', failed: 'Needs attention', deleted: 'Deleted' };
 
 export function Imports({ runtime, onOpenActivity }: { runtime: Runtime; onOpenActivity: (id: string) => void }) {

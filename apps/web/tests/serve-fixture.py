@@ -78,7 +78,7 @@ try:
         command.upgrade(config, 'head')
         engine = create_engine(url, pool_pre_ping=True)
         with engine.begin() as db:
-            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race']:
+            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race', 'sync', 'sync-failure', 'sync-race']:
                 db.execute(text('INSERT INTO accounts(id) VALUES (:id)'), {'id': 'web-test-' + account})
                 db.execute(text('INSERT INTO sessions(token_digest,account_id,expires_at) VALUES (:digest,:id,:expires)'), {
                     'digest': hashlib.sha256(('web-synthetic-' + account).encode()).hexdigest(), 'id': 'web-test-' + account,
@@ -94,6 +94,27 @@ try:
             return {'code': 'Ok', 'waypoints': [{'location': point, 'distance': 0} for point in points],
                 'routes': [{'geometry': {'type': 'LineString', 'coordinates': points}, 'distance': 1234.5, 'duration': 900}]}
         app = create_app(engine, routing_provider=synthetic_route if os.environ.get('WEB_TEST_ROUTING') == '1' else None)
+        @app.post('/__test__/sync/fail-coverage/{source_id}', include_in_schema=False)
+        def fixture_coverage_failure(source_id: int):
+            # Only synthetic sync-test accounts can be changed by this fixture hook.
+            with engine.begin() as db:
+                source = db.execute(text("""SELECT account_id,revision FROM activity_sources
+                    WHERE id=:id AND account_id='web-test-sync-failure' AND status='succeeded'"""), {'id': source_id}).first()
+                if source is None: return {'status': 'missing'}
+                jobs = db.execute(text("""SELECT run.job_id FROM coverage_source_runs run
+                    JOIN map_datasets dataset ON dataset.id=run.dataset_id
+                    WHERE run.account_id=:account AND run.source_id=:source
+                      AND run.source_revision=:revision AND dataset.status='active'
+                    ORDER BY run.job_id"""), {'account': source.account_id, 'source': source_id, 'revision': source.revision}).scalars().all()
+                for job_id in jobs:
+                    db.execute(text("""UPDATE jobs SET status='failed',lease_token=NULL,leased_until=NULL,
+                        last_error='coverage_processing_failed',updated_at=clock_timestamp()
+                        WHERE account_id=:account AND id=:id"""), {'account': source.account_id, 'id': job_id})
+                    db.execute(text("""UPDATE coverage_source_runs SET status='failed',
+                        last_error='coverage_processing_failed',updated_at=clock_timestamp()
+                        WHERE account_id=:account AND job_id=:id"""), {'account': source.account_id, 'id': job_id})
+                db.execute(text('UPDATE activities SET processed=false WHERE user_id=:account AND id=(SELECT activity_id FROM activity_sources WHERE id=:source)'), {'account': source.account_id, 'source': source_id})
+            return {'status': 'failed' if jobs else 'missing'}
         @app.get('/__test__/account-deletions/{deletion_id}', include_in_schema=False)
         def fixture_deletion_state(deletion_id: str):
             with engine.connect() as db:

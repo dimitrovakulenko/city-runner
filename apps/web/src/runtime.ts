@@ -5,6 +5,8 @@ import { ImportStore } from '../../mobile/src/importStore';
 import { CorrectionStore } from '../../mobile/src/correctionStore';
 import { RoutePlannerStore } from '../../mobile/src/routePlannerStore';
 import { AccountStore } from '../../mobile/src/accountStore';
+import { SyncStatusStore } from '../../mobile/src/syncStatusStore';
+import { createSyncStatusApi } from '../../mobile/src/api/syncStatus';
 import { createAccountApi } from '../../mobile/src/api/account';
 import { createRouteApi } from '../../mobile/src/api/routes';
 import { createActivityApi, createApiRequest } from '../../mobile/src/api/client';
@@ -26,17 +28,35 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
   const cities = new CityExplorerStore(createCityExplorerApi(options));
   const planner = new RoutePlannerStore(createRouteApi(options));
   const imports = new ImportStore(createBrowserImportApi(options, files), () => crypto.randomUUID(), () => {
-    void activities.loadPage(); void activities.loadFilterOptions(); void activities.refreshImpact(); void explore.refreshAfterCorrection(); void cities.refreshAfterCorrection();
+    void sync.retryRefresh();
   });
   const corrections = new CorrectionStore(createCorrectionApi(options), (operation, id) => {
     if (operation === 'activity-delete') activities.activityDeleted(id);
-    void activities.refreshImpact();
-    void explore.refreshAfterCorrection(); void cities.refreshAfterCorrection(); void imports.refresh();
+    void sync.retryRefresh();
   });
-  const reset = () => { files.clear(); account.reset(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); planner.reset(); };
+  const sync = new SyncStatusStore(createSyncStatusApi(options), async (_status, generation) => {
+    const [activityReady, mapReady] = await Promise.all([
+      activities.refreshAfterSync(), explore.refreshAfterSync(), activities.loadFilterOptions(),
+      cities.refreshAfterCorrection(), imports.refresh(),
+    ]);
+    if (generation !== sync.getAccountGeneration()) return false;
+    const city = cities.getState();
+    const activity = activities.getState(); const map = explore.getState();
+    if (activity.listError || activity.detailError || activity.impactError || activity.filterOptionsError ||
+      map.progressStatus === 'error' || map.progressStatus === 'offline' || map.mapStatus === 'error' || map.mapStatus === 'offline' ||
+      city.progressError || city.selectedDatasetId && city.cityError || city.selectedCityId && city.streetError ||
+      city.selectedStreetId && (city.detailError || city.contributionError) || imports.getState().error) {
+      throw new Error('Some views could not refresh. Retry refresh when connected.');
+    }
+    return activityReady && mapReady && activity.filterOptionsStatus === 'ready' &&
+      city.progressStatus === 'ready' && (!city.selectedDatasetId || !city.cityError) &&
+      (!city.selectedCityId || !city.streetError) && (!city.selectedStreetId || !city.detailError && !city.contributionError) &&
+      !imports.getState().error;
+  });
+  const reset = () => { sync.reset(); files.clear(); account.reset(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); planner.reset(); };
   sessions.subscribe(reset);
   const applyFilters = (filters: ActivityFilters) => { activities.setFilters(filters); explore.setFilters(filters); };
-  return { sessions, files, api, account, activities, explore, cities, imports, corrections, planner, reset, applyFilters };
+  return { sessions, files, api, account, activities, explore, cities, imports, corrections, planner, sync, reset, applyFilters };
 }
 
 export type Runtime = ReturnType<typeof createRuntime>;

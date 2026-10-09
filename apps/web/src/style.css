@@ -41,3 +41,6 @@ dialog.modal{position:fixed;inset:0;margin:auto;height:fit-content;max-height:ca
 .account-delete { border-color: #e9c9bf; }
 .account-delete input { width: 100%; min-width: 0; border: 1px solid #dfe5d8; border-radius: 8px; padding: 10px; font: inherit; background: white; }
 .account-delete .filter-actions { flex-wrap: wrap; }
+
+.source-history{border:1px solid var(--line);border-radius:10px;padding:17px;background:#edf3e5;margin:14px 0}.source-history>strong{display:block;font-family:Manrope,sans-serif;font-size:26px;color:#28563c}.source-history>span{font-size:10px;color:#657958}.source-history dl,.source-counts{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 12px;font-size:11px;margin:15px 0 0}.source-history dt,.source-counts dt{color:#728468}.source-history dd,.source-counts dd{margin:0;text-align:right;overflow-wrap:anywhere}.source-card{border:1px solid var(--line);border-radius:10px;background:#fff;padding:15px;margin:12px 0}.source-card .note:last-child{margin-bottom:0}.source-failure .filter-actions{flex-wrap:wrap}.source-failure .secondary{padding:9px 12px}
+@media(max-width:720px){.top-nav{overflow-x:auto;justify-content:flex-start;gap:18px}.top-nav button{flex-shrink:0}}
