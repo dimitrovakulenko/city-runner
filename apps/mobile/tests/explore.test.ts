@@ -122,6 +122,62 @@ test('explore client rejects delayed successful response from replaced account',
   assert.equal(store.current, 'account-b');
 });
 
+test('sync refresh keeps the current map visible until bounded progress and viewport refresh finish', async () => {
+  const pendingMap = deferred<MapResponse>();
+  let mapCalls = 0;
+  const store = new ExploreStore(api({
+    getMap: async () => ++mapCalls === 1 ? mapResult({ tracks: [{ activity_id: 'old' }] } as unknown as Partial<MapResponse>) : pendingMap.promise,
+    getProgress: async () => progressResult({ state: 'ready', datasets: [] }),
+  }));
+  await store.refreshViewport(viewport);
+  const priorMap = store.getState().map;
+  const refresh = store.refreshAfterSync();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(store.getState().map, priorMap);
+  assert.equal(store.getState().mapStatus, 'ready');
+  pendingMap.resolve(mapResult({ tracks: [{ activity_id: 'new' }] } as unknown as Partial<MapResponse>));
+  assert.equal(await refresh, true);
+  assert.equal(store.getState().map?.tracks[0]?.activity_id, 'new');
+});
+
+test('successful sync map refresh clears a previous map error while retaining the displayed map', async () => {
+  let mapCalls = 0;
+  const store = new ExploreStore(api({
+    getMap: async () => {
+      mapCalls++;
+      if (mapCalls === 2) throw new Error('temporary map failure');
+      return mapResult({ tracks: [{ activity_id: `track-${mapCalls}` }] } as unknown as Partial<MapResponse>);
+    },
+    getProgress: async () => progressResult({ state: 'ready', datasets: [] }),
+  }));
+  await store.refreshViewport(viewport);
+  const displayedMap = store.getState().map;
+  assert.equal(await store.refreshAfterSync(), false);
+  assert.equal(store.getState().map, displayedMap);
+  assert.match(store.getState().mapError ?? '', /temporary map failure/);
+  assert.equal(await store.refreshAfterSync(), true);
+  assert.equal(store.getState().mapError, null);
+  assert.equal(store.getState().map?.tracks[0]?.activity_id, 'track-3');
+});
+
+test('sync refresh fails closed across offline and account transitions', async () => {
+  const pending = deferred<ProgressResponse>();
+  const store = new ExploreStore(api({ getProgress: () => pending.promise }));
+  const refresh = store.refreshAfterSync();
+  store.setConnection(false);
+  pending.resolve(progressResult({ state: 'ready', datasets: [] }));
+  assert.equal(await refresh, false);
+  assert.equal(store.getState().progressStatus, 'offline');
+
+  store.setConnection(true);
+  const delayed = deferred<ProgressResponse>();
+  const next = new ExploreStore(api({ getProgress: () => delayed.promise }));
+  const pendingRefresh = next.refreshAfterSync();
+  next.reset(); delayed.resolve(progressResult({ state: 'ready', datasets: [] }));
+  assert.equal(await pendingRefresh, false);
+  assert.equal(next.getState().progressStatus, 'idle');
+});
+
 test('fixture Explore API stays local and disables uploads', async () => {
   const fixture = createFixtureExploreApi();
   const map = await fixture.getMap(viewport.bbox, viewport.zoom, 'normal');

@@ -85,6 +85,106 @@ test('activity pagination carries the canonical filter selection to every page',
   assert.deepEqual(store.getState().items.map((item) => item.name), ['page-1', 'page-2']);
 });
 
+test('sync refresh reloads only already-loaded pages and preserves query, filters and selected activity', async () => {
+  const requested: Array<{ page: number; query: string; type: string | null }> = [];
+  let detailReads = 0;
+  const store = new ActivityStore(fakeApi({
+    listActivities: async (input) => {
+      const pageNum = input?.page ?? 1;
+      requested.push({ page: pageNum, query: input?.query ?? '', type: input?.filters?.activity_type ?? null });
+      return { items: [{ id: String(pageNum), name: `fresh-${pageNum}`, date: 'today', type: 'running', processed: true, unmapped_points: 0 }], page: pageNum, page_size: 1, total: 3 };
+    },
+    getActivity: async (id) => { detailReads++; return { ...detail(id), name: 'refreshed detail' }; },
+  }));
+  store.setFilters({ activity_type: ' RUNNING ', source: 'fit' });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await store.loadPage('morning'); await store.loadMore(); await store.selectActivity('1');
+  requested.length = 0; detailReads = 0;
+  assert.equal(await store.refreshAfterSync(), true);
+  assert.deepEqual(requested, [{ page: 1, query: 'morning', type: 'running' }, { page: 2, query: 'morning', type: 'running' }]);
+  assert.deepEqual(store.getState().items.map((item) => item.name), ['fresh-1', 'fresh-2']);
+  assert.equal(store.getState().page, 2); assert.equal(store.getState().query, 'morning');
+  assert.deepEqual(store.getState().filters, { date_from: null, date_to: null, activity_type: 'running', source: 'fit' });
+  assert.equal(store.getState().selectedId, '1'); assert.equal(store.getState().detail?.name, 'refreshed detail'); assert.equal(detailReads, 1);
+});
+
+test('sync refresh clears a selected activity that another client deleted', async () => {
+  let deleted = false;
+  const store = new ActivityStore(fakeApi({ getActivity: async (id) => {
+    if (deleted) throw new ApiError('http', 'Not found.', 404);
+    return detail(id);
+  } }));
+  await store.loadPage(); await store.selectActivity('1'); deleted = true;
+  assert.equal(await store.refreshAfterSync(), true);
+  assert.equal(store.getState().selectedId, null); assert.equal(store.getState().detail, null); assert.equal(store.getState().detailStatus, 'idle');
+});
+
+test('sync refresh failure keeps displayed history and leaves an error for retry', async () => {
+  let calls = 0;
+  const store = new ActivityStore(fakeApi({ listActivities: async () => {
+    calls++;
+    if (calls > 1) throw new Error('temporary sync refresh failure');
+    return page('current');
+  } }));
+  await store.loadPage();
+  assert.equal(await store.refreshAfterSync(), false);
+  assert.equal(store.getState().items[0]?.name, 'current');
+  assert.equal(store.getState().listStatus, 'error'); assert.match(store.getState().listError ?? '', /temporary sync/);
+});
+
+test('sync refresh caps work at five pages and leaves pagination ready to continue', async () => {
+  const requests: number[] = [];
+  const store = new ActivityStore(fakeApi({ listActivities: async (input) => {
+    const pageNum = input?.page ?? 1; requests.push(pageNum);
+    return { items: [{ id: String(pageNum), name: `p${pageNum}`, date: 'today', type: 'running', processed: true, unmapped_points: 0 }],
+      page: pageNum, page_size: 1, total: 5000 };
+  } }));
+  await store.loadPage('all', 250);
+  requests.length = 0;
+  assert.equal(await store.refreshAfterSync(), true);
+  assert.deepEqual(requests, [1, 2, 3, 4, 5]);
+  assert.equal(store.getState().page, 5);
+  requests.length = 0;
+  await store.loadMore();
+  assert.deepEqual(requests, [6]);
+});
+
+test('a stale sync-list error after filter change cannot overwrite the current ready list', async () => {
+  const stale = deferred<ActivityPage>();
+  let calls = 0;
+  const store = new ActivityStore(fakeApi({ listActivities: (input) => {
+    calls++;
+    if (calls === 2) return stale.promise;
+    return Promise.resolve({ ...page(input?.filters?.activity_type ? 'new-filter' : 'current'), page_size: 1 });
+  } }));
+  await store.loadPage();
+  const refresh = store.refreshAfterSync();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  store.setFilters({ activity_type: 'walking' });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  stale.reject(new Error('old refresh failed'));
+  assert.equal(await refresh, false);
+  assert.equal(store.getState().items[0]?.name, 'new-filter');
+  assert.equal(store.getState().listStatus, 'ready'); assert.equal(store.getState().listError, null);
+});
+
+test('sync refresh rejects mismatched page and detail identities without publishing them', async () => {
+  let wrongPage = false; let wrongDetail = false;
+  const store = new ActivityStore(fakeApi({
+    listActivities: async (input) => ({ ...page('fresh', input?.page ?? 1), page: wrongPage ? 99 : input?.page ?? 1, page_size: 1 }),
+    getActivity: async (id) => wrongDetail ? detail('different') : detail(id),
+  }));
+  await store.loadPage(); await store.selectActivity('1');
+  wrongPage = true;
+  assert.equal(await store.refreshAfterSync(), false);
+  assert.equal(store.getState().items[0]?.name, 'fresh');
+  assert.match(store.getState().listError ?? '', /page did not match/);
+  wrongPage = false; wrongDetail = true;
+  assert.equal(await store.refreshAfterSync(), false);
+  assert.equal(store.getState().detail?.id, '1');
+  assert.match(store.getState().listError ?? '', /detail did not match/);
+});
+
 test('filter option requests are account fenced and retryable', async () => {
   const old = deferred<{ activity_types: string[]; types_truncated: boolean }>(); let calls = 0;
   const store = new ActivityStore(fakeApi({ getActivityFilters: () => ++calls === 1 ? old.promise : Promise.resolve({ activity_types: ['walking'], types_truncated: false }) }));

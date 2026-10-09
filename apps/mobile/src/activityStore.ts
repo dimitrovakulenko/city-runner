@@ -1,7 +1,7 @@
 import { ApiError } from './api/client';
 import { canonicalizeActivityFilters } from './api/client';
 import type { ActivityApi, ApiErrorKind } from './api/client';
-import type { ActivityDetail, ActivityFilterOptions, ActivityFilters, ActivityImpactPage, ActivitySummary } from './api/generated';
+import type { ActivityDetail, ActivityFilterOptions, ActivityFilters, ActivityImpactPage, ActivityPage, ActivitySummary } from './api/generated';
 
 export type ListStatus = 'loading' | 'loading-more' | 'ready' | 'empty' | 'offline' | 'sign-in-required' | 'error';
 export type DetailStatus = 'idle' | 'loading' | 'ready' | 'offline' | 'sign-in-required' | 'error';
@@ -68,6 +68,8 @@ export class ActivityStore {
   getState(): ActivityExplorerState {
     return this.state;
   }
+
+  getAccountGeneration(): number { return this.accountGeneration; }
 
   subscribe(listener: (state: ActivityExplorerState) => void): () => void {
     this.listeners.add(listener);
@@ -138,6 +140,62 @@ export class ActivityStore {
 
   async retryList(): Promise<void> {
     return this.loadPage(this.state.query, 1);
+  }
+
+  /** Refresh only the pages already loaded and the selected activity; keep the current search and filters. */
+  async refreshAfterSync(): Promise<boolean> {
+    const account = this.accountGeneration;
+    const request = ++this.listRequest;
+    const detailRequest = this.detailRequest;
+    const impactRequest = this.impactRequest;
+    const query = this.state.query;
+    const filters = this.state.filters;
+    const filterKey = JSON.stringify(filters);
+    const pages = Math.min(5, Math.max(1, this.state.page));
+    const pageSize = this.state.pageSize;
+    const selectedId = this.state.selectedId;
+    const refreshDetail = selectedId !== null;
+    const current = () => account === this.accountGeneration && request === this.listRequest &&
+      detailRequest === this.detailRequest && impactRequest === this.impactRequest &&
+      query === this.state.query && filterKey === JSON.stringify(this.state.filters) && selectedId === this.state.selectedId;
+    try {
+      const refreshed: ActivitySummary[] = [];
+      let latest: ActivityPage | null = null;
+      for (let page = 1; page <= pages; page++) {
+        latest = await this.api.listActivities({ page, pageSize, query, filters }, this.accountController.signal);
+        if (!current()) return false;
+        if (latest.page !== page || latest.page_size !== pageSize) throw new Error('The refreshed activity page did not match the requested page.');
+        refreshed.push(...latest.items);
+      }
+      let detail: ActivityDetail | null = null;
+      let missing = false;
+      if (refreshDetail && selectedId) {
+        try { detail = await this.api.getActivity(selectedId, this.accountController.signal); }
+        catch (error) {
+          if (error instanceof ApiError && error.status === 404) missing = true;
+          else throw error;
+        }
+        if (!current()) return false;
+        if (!missing && detail?.id !== selectedId) throw new Error('The refreshed activity detail did not match the selection.');
+      }
+      const unique = [...new Map(refreshed.map((item) => [item.id, item])).values()];
+      this.update({ items: unique, page: latest?.page ?? 1, pageSize: latest?.page_size ?? pageSize,
+        total: latest?.total ?? 0, listStatus: unique.length ? 'ready' : 'empty', listError: null,
+        ...(refreshDetail && missing ? { selectedId: null, detail: null, detailStatus: 'idle' as const, detailError: null,
+          impact: null, impactPage: 1, impactStatus: 'idle' as const, impactError: null } :
+          refreshDetail ? { detail, detailStatus: 'ready' as const, detailError: null } : {}) });
+      if (!missing && refreshDetail && this.state.impactDatasetId && this.state.selectedId) {
+        await this.refreshImpact();
+        if (account !== this.accountGeneration || selectedId !== this.state.selectedId) return false;
+        if (this.state.impactStatus === 'error' || this.state.impactStatus === 'offline' || this.state.impactStatus === 'sign-in-required') return false;
+      }
+      return account === this.accountGeneration;
+    } catch (error) {
+      if (!current()) return false;
+      if (errorStatus(error) === 'sign-in-required') { this.expireSession(); return false; }
+      this.update({ listStatus: listFailureStatus(error), listError: errorMessage(error) });
+      return false;
+    }
   }
 
   setFilters(filters: ActivityFilters): void {

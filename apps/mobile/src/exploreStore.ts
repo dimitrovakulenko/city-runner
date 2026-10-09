@@ -133,6 +133,19 @@ export class ExploreStore {
     else await this.refreshProgress();
   }
 
+  /** Refresh retained progress and the current viewport without blanking the visible map. */
+  async refreshAfterSync(): Promise<boolean> {
+    if (!this.connected) return false;
+    const account = this.accountRevision;
+    const selection = this.selectionRevision;
+    const network = this.networkRevision;
+    await this.refreshProgress();
+    if (account !== this.accountRevision || selection !== this.selectionRevision || network !== this.networkRevision || !this.connected || this.state.progressStatus !== 'ready') return false;
+    if (!this.state.viewport) return true;
+    const refreshed = await this.refreshMapOnly();
+    return refreshed && account === this.accountRevision && selection === this.selectionRevision && network === this.networkRevision && this.connected;
+  }
+
   async refreshViewport(viewport: Viewport): Promise<void> {
     this.viewportChangePending = false;
     if (!this.connected) {
@@ -343,9 +356,9 @@ export class ExploreStore {
     else await this.refreshProgress();
   }
 
-  private async refreshMapOnly(): Promise<void> {
+  private async refreshMapOnly(): Promise<boolean> {
     const viewport = this.state.viewport;
-    if (!viewport || this.viewportChangePending) return;
+    if (!viewport || this.viewportChangePending || !this.connected) return false;
     const request = ++this.mapRequest;
     const revision = this.accountRevision;
     const selectionRevision = this.selectionRevision;
@@ -353,15 +366,17 @@ export class ExploreStore {
     const { filters, coverageScope, rule } = this.state;
     try {
       const map = await this.api.getMap(viewport.bbox, viewport.zoom, rule, this.accountController.signal, filters, coverageScope);
-      if (request !== this.mapRequest || revision !== this.accountRevision || selectionRevision !== this.selectionRevision || networkRevision !== this.networkRevision || !this.connected || this.viewportChangePending) return;
+      if (request !== this.mapRequest || revision !== this.accountRevision || selectionRevision !== this.selectionRevision || networkRevision !== this.networkRevision || !this.connected || this.viewportChangePending) return false;
       if (!activityFiltersMatch(map.filters, filters) || (map.coverage_scope ?? 'lifetime') !== coverageScope) {
-        this.update({ map: null, mapStatus: 'error', mapError: 'The map response did not match the selected activity filters and coverage scope.' }); return;
+        this.update({ mapStatus: 'error', mapError: 'The map response did not match the selected activity filters and coverage scope.' }); return false;
       }
-      this.update({ map, mapStatus: map.cities.length || map.tracks.length || map.streets.length || map.missing_nodes.length ? 'ready' : 'empty' });
+      this.update({ map, mapStatus: map.cities.length || map.tracks.length || map.streets.length || map.missing_nodes.length ? 'ready' : 'empty', mapError: null });
+      return true;
     } catch (error) {
-      if (request !== this.mapRequest || revision !== this.accountRevision || selectionRevision !== this.selectionRevision || networkRevision !== this.networkRevision || !this.connected) return;
-      if (errorKind(error) === 'sign-in-required') return this.clearForExpiredSession();
+      if (request !== this.mapRequest || revision !== this.accountRevision || selectionRevision !== this.selectionRevision || networkRevision !== this.networkRevision || !this.connected) return false;
+      if (errorKind(error) === 'sign-in-required') { this.clearForExpiredSession(); return false; }
       this.update({ mapStatus: errorState(error), mapError: errorMessage(error) });
+      return false;
     }
   }
 
