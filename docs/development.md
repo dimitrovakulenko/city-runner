@@ -32,3 +32,5 @@ The production API uses port 8001 so the PoC can remain on 8000. Run the worker 
 ## Browser UI
 
 From `apps/web`, run `rtk npm ci` and `rtk npm run dev`; open `http://127.0.0.1:5173`. The same-origin `/api` proxy targets the production API on port 8001. Start the API and worker as above. The [browser client README](../apps/web/README.md) covers web Google OAuth configuration, shared client contracts, resumable file imports and disposable synthetic Chrome checks. Run `rtk npm test` and `rtk npm run build` for adapter tests, typechecking and production assets.
+
+Apply migration `0012_sync_status` before using **Sources & sync** or automatic foreground refresh. It records transactional owner/geography revisions, including writes from existing workers; no additional service or polling worker is needed. The owner-only status/failure APIs and explicit matching retry are documented in [source status](sync-status.md). Provider connection credentials and adapters remain future work.
