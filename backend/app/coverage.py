@@ -383,7 +383,9 @@ def _refresh_activity_processing(db: Connection, *, account_id: str, source_id: 
     # matcher cannot commit success while this refresh still writes stale false.
     tracks = db.execute(text("SELECT tracks FROM activities WHERE id=:id AND user_id=:account_id FOR UPDATE"), {
         "id": activity_id, "account_id": account_id,
-    }).scalar_one()
+    }).scalar_one_or_none()
+    if tracks is None:
+        return
     points = _samples_from_tracks(tracks)
     active_count = _active_dataset_count(db)
     unmapped = _count_unsupported_samples(db, points)

@@ -33,7 +33,7 @@ export type ActivityDetail = {
 };
 
 export type ChallengeRequest = {
-  provider: 'google' | 'apple';
+  provider: "google" | "apple";
 };
 
 export type ChallengeResponse = {
@@ -60,7 +60,7 @@ export type MeResponse = {
 export type MapResponse = {
   bbox: [number, number, number, number];
   zoom: number;
-  geography_state: 'supported' | 'geography_pending';
+  geography_state: "supported" | "geography_pending";
   pending_imports: number;
   dataset_truncated: boolean;
   datasets: Array<DatasetStatus>;
@@ -68,33 +68,33 @@ export type MapResponse = {
   tracks: Array<TrackFeature>;
   streets: Array<StreetFeature>;
   missing_nodes: Array<MissingNode>;
-  node_state: 'ready' | 'pending' | 'not-requested' | 'geography_pending';
+  node_state: "ready" | "pending" | "not-requested" | "geography_pending";
   limits: MapLimits;
   filters?: ActivityFilters;
-  coverage_scope?: 'lifetime' | 'filtered';
+  coverage_scope?: "lifetime" | "filtered";
 };
 
 export type ProgressResponse = {
-  state: 'ready' | 'pending' | 'failed' | 'not-matched' | 'unsupported-geography';
-  rule: 'normal' | 'strict';
+  state: "ready" | "pending" | "failed" | "not-matched" | "unsupported-geography";
+  rule: "normal" | "strict";
   datasets: Array<ProgressDataset>;
   datasets_truncated: boolean;
   unmapped_points: number;
   pending_imports: number;
   filters?: ActivityFilters;
-  coverage_scope?: 'lifetime' | 'filtered';
+  coverage_scope?: "lifetime" | "filtered";
 };
 
 export type UploadResponse = {
   id: string;
-  status: 'queued' | 'processing' | 'succeeded' | 'failed' | 'cancelled';
+  status: "queued" | "processing" | "succeeded" | "failed" | "cancelled";
   job_id: string;
   duplicate: boolean;
 };
 
 export type UploadStatusResponse = {
   id: string;
-  status: 'queued' | 'processing' | 'succeeded' | 'failed' | 'cancelled';
+  status: "queued" | "processing" | "succeeded" | "failed" | "cancelled";
   activity_id: string | null;
   job_id: string | null;
   error: string | null;
@@ -102,8 +102,8 @@ export type UploadStatusResponse = {
 
 export type CityPage = {
   dataset_id: string;
-  dataset_state: 'active' | 'importing' | 'retired';
-  rule: 'normal' | 'strict';
+  dataset_state: "active" | "importing" | "retired";
+  rule: "normal" | "strict";
   coverage: DatasetCoverage;
   items: Array<CityItem>;
   page: number;
@@ -114,12 +114,12 @@ export type CityPage = {
 export type StreetPage = {
   dataset_id: string;
   city_id: string;
-  dataset_state: 'active' | 'importing' | 'retired';
-  rule: 'normal' | 'strict';
+  dataset_state: "active" | "importing" | "retired";
+  rule: "normal" | "strict";
   coverage: DatasetCoverage;
-  filter: 'all' | 'incomplete' | 'partial' | 'completed' | 'nearly-complete';
+  filter: "all" | "incomplete" | "partial" | "completed" | "nearly-complete";
   filter_applied: boolean;
-  sort: 'name' | 'completion-desc' | 'completion-asc' | 'remaining-asc';
+  sort: "name" | "completion-desc" | "completion-asc" | "remaining-asc";
   sort_applied: boolean;
   items: Array<StreetItem>;
   page: number;
@@ -132,16 +132,16 @@ export type StreetDetail = {
   dataset_id: string;
   city_id: string;
   name: string;
-  dataset_state: 'active' | 'importing' | 'retired';
-  rule: 'normal' | 'strict';
+  dataset_state: "active" | "importing" | "retired";
+  rule: "normal" | "strict";
   coverage: DatasetCoverage;
   visited_nodes: number | null;
   eligible_nodes: number | null;
   threshold: number | null;
-  state: 'complete' | 'partial' | 'missing' | null;
+  state: "complete" | "partial" | "missing" | null;
   manual_completed: boolean;
   manual_reason: string | null;
-  effective_state: 'complete' | 'partial' | 'missing' | null;
+  effective_state: "complete" | "partial" | "missing" | null;
   remaining_nodes: Array<RemainingNode> | null;
   remaining_nodes_page: PageInfo;
 };
@@ -149,7 +149,7 @@ export type StreetDetail = {
 export type ContributionPage = {
   dataset_id: string;
   street_id: string;
-  dataset_state: 'active' | 'importing' | 'retired';
+  dataset_state: "active" | "importing" | "retired";
   coverage: DatasetCoverage;
   activities_available: boolean;
   activities: Array<ContributingActivity>;
@@ -169,7 +169,7 @@ export type ImportBatchCreate = {
 
 export type ImportBatchResponse = {
   id: string;
-  state: 'open' | 'stopped';
+  state: "open" | "stopped";
   created_at: string;
   items: Array<ImportBatchItemResponse>;
   counts: ImportBatchCounts;
@@ -238,7 +238,7 @@ export type RoutePage = {
 };
 
 export type RouteGeometry = {
-  type: 'LineString';
+  type: "LineString";
   coordinates: Array<[number, number]>;
 };
 
@@ -252,10 +252,10 @@ export type RouteAttribution = {
 export type ActivityImpactPage = {
   activity_id: string;
   dataset_id: string;
-  dataset_state: 'active' | 'importing' | 'retired';
-  rule: 'normal' | 'strict';
+  dataset_state: "active" | "importing" | "retired";
+  rule: "normal" | "strict";
   coverage: DatasetCoverage;
-  history_status: 'ready' | 'unknown-dates' | 'history-limit' | 'missing-provenance';
+  history_status: "ready" | "unknown-dates" | "history-limit" | "missing-provenance";
   supported_nodes: number | null;
   new_nodes: number | null;
   streets_advanced: number | null;
@@ -286,7 +286,7 @@ export type ActivityFilters = {
   date_from?: string | null;
   date_to?: string | null;
   activity_type?: string | null;
-  source?: 'all' | 'gpx' | 'fit' | 'unknown';
+  source?: "all" | "gpx" | "fit" | "unknown";
 };
 
 export type ActivityFilterOptions = {
@@ -295,12 +295,31 @@ export type ActivityFilterOptions = {
 };
 
 export type AccountDeletionRequest = {
-  confirmation: 'DELETE';
+  confirmation: "DELETE";
 };
 
 export type AccountDeletionResponse = {
   id: string;
-  status: 'cleanup-pending' | 'complete';
+  status: "cleanup-pending" | "complete";
+};
+
+export type SyncStatusResponse = {
+  change_token: string;
+  activity_count: number;
+  oldest_activity_date: string | null;
+  last_import_at: string | null;
+  files: SyncFiles;
+  coverage: SyncCoverage;
+  batches: SyncBatches;
+  providers: Array<SyncProviderCapability>;
+};
+
+export type SyncFailurePage = {
+  items: Array<SyncFailure>;
+  page: number;
+  page_size: number;
+  total: number;
+  change_token: string;
 };
 
 export type CityItem = {
@@ -331,7 +350,7 @@ export type ContributingActivity = {
 };
 
 export type DatasetCoverage = {
-  status: 'ready' | 'pending' | 'failed';
+  status: "ready" | "pending" | "failed";
   progress_revision: string;
   pending_sources: number;
   failed_sources: number;
@@ -343,7 +362,7 @@ export type DatasetCoverage = {
 export type DatasetStatus = {
   id: string;
   region: string;
-  state: 'ready' | 'pending' | 'failed' | 'not-matched';
+  state: "ready" | "pending" | "failed" | "not-matched";
   progress_revision: string | null;
   visited_node_count: number | null;
   unsupported_sample_count: number | null;
@@ -362,14 +381,14 @@ export type ImportBatchCounts = {
 
 export type ImportBatchFile = {
   name: string;
-  format: 'gpx' | 'fit';
+  format: "gpx" | "fit";
 };
 
 export type ImportBatchItemResponse = {
   id: string;
   name: string;
-  format: 'gpx' | 'fit';
-  status: 'awaiting_upload' | 'queued' | 'processing' | 'succeeded' | 'failed' | 'deleted';
+  format: "gpx" | "fit";
+  status: "awaiting_upload" | "queued" | "processing" | "succeeded" | "failed" | "deleted";
   source_id: string | null;
   activity_id: string | null;
   duplicate: boolean;
@@ -407,7 +426,7 @@ export type PageInfo = {
 export type ProgressDataset = {
   dataset_id: string;
   region: string;
-  state: 'ready' | 'pending' | 'failed' | 'not-matched';
+  state: "ready" | "pending" | "failed" | "not-matched";
   progress_revision: string | null;
   visited_node_count: number | null;
   unsupported_sample_count: number | null;
@@ -449,10 +468,53 @@ export type StreetItem = {
   visited_nodes: number | null;
   eligible_nodes: number | null;
   threshold: number | null;
-  state: 'complete' | 'partial' | 'missing' | null;
+  state: "complete" | "partial" | "missing" | null;
   manual_completed: boolean;
   manual_reason: string | null;
-  effective_state: 'complete' | 'partial' | 'missing' | null;
+  effective_state: "complete" | "partial" | "missing" | null;
+};
+
+export type SyncBatches = {
+  waiting: number;
+  accepted: number;
+  duplicates: number;
+  deleted: number;
+  stopped: number;
+};
+
+export type SyncCoverage = {
+  ready: number;
+  pending: number;
+  failed: number;
+  unavailable: number;
+};
+
+export type SyncFailure = {
+  source_id: string;
+  file_kind: "gpx" | "fit";
+  activity_id: string | null;
+  stage: "import" | "coverage";
+  error: string | null;
+  retry_action: "retry-import" | "retry-coverage";
+};
+
+export type SyncFileCounts = {
+  queued: number;
+  processing: number;
+  imported: number;
+  failed: number;
+  unavailable: number;
+};
+
+export type SyncFiles = {
+  gpx: SyncFileCounts;
+  fit: SyncFileCounts;
+};
+
+export type SyncProviderCapability = {
+  provider: "garmin" | "strava";
+  available: false;
+  reason: string;
 };
 
 export type TrackFeature = {
