@@ -53,7 +53,7 @@ export class CorrectionStore {
       if (accountRevision !== this.accountRevision || controller.signal.aborted) return;
       this.onSuccess(operation, id);
       this.update({ pending: null, error: null, message: revision === this.revision ? operation === 'activity-delete'
-        ? 'Activity deleted. Its private source file cleanup is queued.' : operation === 'manual-complete'
+        ? 'Activity and its imported files deleted. Original-file cleanup is queued.' : operation === 'manual-complete'
           ? 'Manual completion saved. GPS visits and remaining nodes are unchanged.' : 'Manual completion removed.' : null });
     } catch (error) {
       if (accountRevision !== this.accountRevision || controller.signal.aborted) return;
