@@ -45,7 +45,7 @@ Reconnect requires fresh verified consent for the same provider subject and owne
 
 External activity identity is unique within its owned connection. Update/delete events advance source revision and fence leases before contributions change. New activity/event jobs retain priority 100 over history 10; backfill pagination/cursors must not starve new events. Reconciliation handles missed/out-of-order events and throttling without inventing progress or resetting completed backfill.
 
-Exact same-file dedupe remains account + file kind + bytes. Provider identity/event replay is idempotent within its connection. Similar date/distance/geometry across sources is insufficient to merge or delete records. Preserve independent sources and count account node visits as their distinct union. Removing one source removes only its support; file provenance cannot authorize retaining data derived solely from a revoked provider. Cross-source workout grouping and provider-specific retention implementations remain D24 / real adapter acceptance.
+Exact same-file dedupe remains account + file kind + bytes. [Equivalent file recordings](recording-groups.md) can share an activity when original coordinates, segments, complete timestamps and parsed activity type match exactly. Logical activity counts and unsupported-sample diagnostics count that activity once; file/job counts retain each independent import. Similar date/distance/geometry is insufficient to merge or delete records. Removing one import removes only its coverage support. Provider identity/event replay, reconciliation and retention still require real adapters; file provenance cannot authorize retaining data derived solely from a revoked provider.
 
 ## Verification
 

@@ -67,3 +67,15 @@ rtk .venv/bin/python scripts/dev/activity-stats-backfill.py --account-id OWNER -
 ```
 
 The command returns `processed`, `unavailable` and `after_id`. Rerun without a cursor to select the next unprocessed rows, including negative legacy IDs, or pass the returned signed integer with `--after-id`. Each activity commits independently; interrupted or timed-out work can be rerun safely. A processed unavailable recording stays unknown. Backfill changes statistics and the sync revision only; originals, source revisions, jobs, GPS coverage and activity IDs stay intact. Restart API and ingestion workers after applying the migration so new uploads use the current implementation.
+
+## Equivalent file recordings
+
+Apply migration `0014_recording_groups` and restart the API and ingestion workers. New GPX/FIT imports can share an activity only when their original coordinates, segments, complete timestamps and parsed activity type match exactly. Rounded or resampled exports remain separate. Each import keeps its own original file, jobs and coverage support; activity detail allows removing one import or the whole activity. See [recording groups](recording-groups.md).
+
+The migration does not scan or merge existing history. To allow new imports to attach to eligible historical activities, explicitly fingerprint one bounded owner page using the API's `DATABASE_URL`:
+
+```sh
+rtk .venv/bin/python scripts/dev/recording-backfill.py --account-id OWNER --batch-size 20 --max-activities 100
+```
+
+The command returns `processed`, `ineligible`, `conflicts` and `after_id`. Rerun without a cursor for remaining unexamined rows or pass the returned signed cursor with `--after-id`. Each activity commits independently. Existing duplicate activities remain separate, and conflicting/ineligible rows are marked examined without an indexed fingerprint. No source associations, GPS, IDs or coverage are rewritten. Replay the latest account-deletion journal before running maintenance after a backup restore; recording deletion watermarks cannot protect a backup that predates those deletions.
