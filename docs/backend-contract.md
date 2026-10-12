@@ -131,3 +131,7 @@ Activity list/map selection and explicit lifetime/filtered GPS coverage follow [
 ## Source status and foreground refresh: D19 / D25
 
 The [source/status contract](sync-status.md) pins owner-only file history/coverage status, bounded failed-source retry, transactional change detection and web foreground refresh. It also defines future connection/provenance/credential/cursor/retention boundaries; real cloud adapters remain D20–D24 and unavailable in this slice.
+
+## Recorded activity statistics: T05
+
+The [statistics contract](activity-statistics.md) defines persisted nullable GPS distance, recorded segment duration and average pace for activity list/detail, bounded owner-scoped existing-history backfill, transactional refresh revisions and unknown-data behavior. GPX/FIT share the same original-segment calculation; gaps and explicit pauses are never connected.
