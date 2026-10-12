@@ -260,13 +260,13 @@ class ImportBatchIntegrationTests(unittest.TestCase):
         self.assertEqual(self.detail(batch)["counts"]["awaiting_upload"], 1)
         self.assertEqual(list(Path(self.temp.name).iterdir()), [])
 
-    def test_deletion_between_duplicate_conflict_and_source_lookup_recovers(self):
+    def test_activity_deletion_waits_for_duplicate_submission_and_terminalizes_both_items(self):
         original = self.batch()
         source = self.upload(original)
         self.process()
         activity_id = self.detail(original)["items"][0]["activity_id"]
         new_batch = self.batch()
-        reached, release = threading.Event(), threading.Event()
+        reached, release, delete_waiting = threading.Event(), threading.Event(), threading.Event()
         paused = False
         def after_execute(connection, cursor, statement, parameters, context, many):
             nonlocal paused
@@ -278,23 +278,34 @@ class ImportBatchIntegrationTests(unittest.TestCase):
         def submit():
             with TestClient(self.app) as client:
                 return self.upload(new_batch, client=client)
+        def before_execute(connection, cursor, statement, parameters, context, many):
+            if "SELECT pg_advisory_xact_lock(" in statement:
+                delete_waiting.set()
         event.listen(self.engine, "after_cursor_execute", after_execute)
+        event.listen(self.engine, "before_cursor_execute", before_execute)
         try:
-            with ThreadPoolExecutor(max_workers=1) as pool:
+            with ThreadPoolExecutor(max_workers=2) as pool:
                 future = pool.submit(submit)
                 try:
                     self.assertTrue(reached.wait(timeout=5))
-                    response = self.client.delete("/api/activities/" + activity_id, headers=self.headers)
-                    self.assertEqual(response.status_code, 204, response.text)
+                    deletion = pool.submit(self.client.delete, "/api/activities/" + activity_id, headers=self.headers)
+                    self.assertTrue(delete_waiting.wait(timeout=5))
+                    self.assertFalse(deletion.done())
                 finally:
                     release.set()
                 result = future.result(timeout=10)
-            self.assertNotEqual(result["source_id"], source["source_id"])
+                response = deletion.result(timeout=10)
+                self.assertEqual(response.status_code, 204, response.text)
+            self.assertEqual(result["source_id"], source["source_id"])
             self.assertEqual(self.detail(original)["counts"]["deleted"], 1)
-            self.assertEqual(self.detail(new_batch)["counts"]["queued"], 1)
+            self.assertEqual(self.detail(new_batch)["counts"]["deleted"], 1)
+            self.assertEqual(self.client.get("/api/activities/" + activity_id, headers=self.headers).status_code, 404)
+            fresh = self.upload(self.batch())
+            self.assertNotEqual(fresh["source_id"], source["source_id"])
         finally:
             release.set()
             event.remove(self.engine, "after_cursor_execute", after_execute)
+            event.remove(self.engine, "before_cursor_execute", before_execute)
 
     def test_retry_between_duplicate_discovery_and_source_lock_revalidates(self):
         invalid = b"<gpx><trk>"

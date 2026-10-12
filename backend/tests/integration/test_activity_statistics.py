@@ -179,7 +179,7 @@ class ActivityStatisticsPostgisTests(unittest.TestCase):
                     raise TimeoutError("backfill interleaving did not resume")
 
         def observe_delete(conn, cursor, statement, parameters, context, executemany):
-            if "SELECT id FROM activities" in statement and "FOR UPDATE" in statement:
+            if "SELECT pg_advisory_xact_lock(" in statement:
                 delete_waiting.set()
 
         event.listen(self.engine, "after_cursor_execute", pause_backfill)
@@ -191,6 +191,7 @@ class ActivityStatisticsPostgisTests(unittest.TestCase):
                 self.assertTrue(row_locked.wait(2))
                 deletion = pool.submit(delete_activity, self.engine, self.account, activity_id)
                 self.assertTrue(delete_waiting.wait(2))
+                self.assertFalse(deletion.done())
                 release_backfill.set()
                 self.assertEqual(backfill.result(timeout=5)["processed"], 1)
                 self.assertTrue(deletion.result(timeout=5))

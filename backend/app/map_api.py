@@ -456,7 +456,7 @@ def _filtered_dataset_counts(db, account_id: str, dataset_id: int, filters: Acti
     source_filter = _selected_source_sql(filters, "src", params)
     row = db.execute(text(f"""
         WITH selected_runs AS (
-          SELECT src.account_id,src.id AS source_id,src.revision,r.source_revision,r.dataset_id,
+          SELECT src.account_id,src.id AS source_id,src.activity_id,src.revision,r.source_revision,r.dataset_id,
                  r.unsupported_sample_count
           FROM activity_sources src
           JOIN coverage_source_runs r ON r.account_id=src.account_id AND r.source_id=src.id
@@ -468,7 +468,10 @@ def _filtered_dataset_counts(db, account_id: str, dataset_id: int, filters: Acti
         SELECT (SELECT count(DISTINCT c.node_id)::integer FROM selected_runs r
           JOIN source_node_contributions c ON c.account_id=r.account_id AND c.source_id=r.source_id
             AND c.source_revision=r.source_revision AND c.dataset_id=r.dataset_id) AS visited,
-          COALESCE((SELECT sum(unsupported_sample_count) FROM selected_runs),0)::integer AS unsupported
+          COALESCE((SELECT sum(grouped.unsupported) FROM (
+              SELECT activity_id,max(unsupported_sample_count) AS unsupported
+              FROM selected_runs GROUP BY activity_id
+          ) grouped),0)::integer AS unsupported
     """), params).mappings().one()
     return int(row["visited"] or 0), int(row["unsupported"] or 0)
 

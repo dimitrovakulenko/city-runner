@@ -13,8 +13,10 @@ from backend.app.coverage import rebuild_account_coverage
 from backend.app.jobs import enqueue
 from backend.app.storage import LocalObjectStore
 from backend.app.owner_guard import owner_lock
+from backend.app.recording_groups import record_identity_deletion, stored_or_legacy_identity
 
 MAX_BIGINT = 9_223_372_036_854_775_807
+MIN_BIGINT = -(1 << 63)
 
 
 class ManualCompletionBody(BaseModel):
@@ -33,7 +35,7 @@ def create_corrections_router(engine: Engine, current_user: Callable[..., str]) 
 
     @router.delete("/api/activities/{activity_id}", status_code=204)
     def delete_activity_route(
-        activity_id: int = Path(ge=1, le=MAX_BIGINT),
+        activity_id: int = Path(ge=MIN_BIGINT, le=MAX_BIGINT),
         account_id: str = Depends(current_user),
     ):
         if not delete_activity(engine, account_id, activity_id):
@@ -125,7 +127,7 @@ class _RetryDelete(Exception):
 
 def _delete_activity_once(engine: Engine, account_id: str, activity_id: int) -> bool:
     with _read_committed_transaction(engine) as db:
-        owner_lock(db, account_id)
+        owner_lock(db, account_id, exclusive=True)
         # Discover IDs without locking source rows so the shared lock order starts with jobs.
         sources = db.execute(text("""SELECT id,revision FROM activity_sources
             WHERE account_id=:account AND activity_id=:activity ORDER BY id"""), {
@@ -155,12 +157,14 @@ def _delete_activity_once(engine: Engine, account_id: str, activity_id: int) -> 
             "account": account_id, "activity": activity_id,
         }).mappings().all()
         locked_source_ids = [int(row["id"]) for row in locked_sources]
-        activity = db.execute(text("""SELECT id FROM activities
+        activity = db.execute(text("""SELECT id,activity_type,tracks,timestamps,
+                recording_fingerprint,recording_fingerprint_version FROM activities
             WHERE id=:activity AND user_id=:account FOR UPDATE"""), {
             "activity": activity_id, "account": account_id,
-        }).first()
+        }).mappings().first()
         if activity is None:
             return False
+        record_identity_deletion(db, account_id, stored_or_legacy_identity(activity))
 
         locked_source_versions = [(int(row["id"]), int(row["revision"])) for row in locked_sources]
         if locked_source_versions != source_versions:
@@ -200,6 +204,12 @@ def _delete_activity_once(engine: Engine, account_id: str, activity_id: int) -> 
                 last_error='activity_deleted',updated_at=clock_timestamp()
                 WHERE id=ANY(:ids) AND account_id=:account AND status IN ('queued','running')"""), {
                 "ids": jobs, "account": account_id,
+            })
+        if source_ids:
+            db.execute(text("""UPDATE import_batch_items SET status='deleted',error_code=NULL,
+                    updated_at=clock_timestamp()
+                WHERE account_id=:account AND source_id=ANY(:ids) AND status<>'deleted'"""), {
+                "account": account_id, "ids": source_ids,
             })
         if affected:
             ordered_datasets = sorted(int(value) for value in affected)

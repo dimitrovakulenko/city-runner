@@ -46,6 +46,7 @@ DEFAULT_PG_BIN = Path(
 )
 REQUIRED_TABLES = frozenset({
     "activities", "accounts", "login_identities", "login_challenges", "sessions",
+    "recording_identity_deletions",
     "jobs", "map_datasets", "cities", "osm_nodes", "osm_ways", "streets",
     "street_ways", "street_nodes", "activity_sources", "source_node_contributions",
     "coverage_source_runs", "account_dataset_coverage", "account_street_coverage",

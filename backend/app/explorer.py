@@ -360,7 +360,7 @@ def _coverage(db, account_id: str, dataset_id: int, dataset: dict[str, Any]) -> 
 
 def _version_coverage(db, account_id: str, dataset_id: int, coverage_mode: str) -> dict[str, Any]:
     rows = db.execute(text("""WITH current_sources AS (
-            SELECT source.id,run.status AS run_status,job.status AS job_status,
+            SELECT source.id,source.activity_id,run.status AS run_status,job.status AS job_status,
                    run.unsupported_sample_count
             FROM activity_sources source
             LEFT JOIN coverage_source_runs run ON run.account_id=source.account_id
@@ -373,8 +373,11 @@ def _version_coverage(db, account_id: str, dataset_id: int, coverage_mode: str) 
         SELECT count(*) FILTER (WHERE run_status='failed' OR job_status IN ('failed','cancelled')) AS failed,
           count(*) FILTER (WHERE run_status IS NULL OR run_status<>'succeeded'
                OR job_status IS DISTINCT FROM 'succeeded') AS pending,
-          COALESCE(sum(unsupported_sample_count) FILTER (
-               WHERE run_status='succeeded' AND job_status='succeeded'),0) AS unsupported
+          COALESCE((SELECT sum(grouped.unsupported) FROM (
+               SELECT activity_id,max(unsupported_sample_count) AS unsupported
+               FROM current_sources WHERE run_status='succeeded' AND job_status='succeeded'
+               GROUP BY activity_id
+          ) grouped),0) AS unsupported
         FROM current_sources"""), {"dataset": dataset_id, "account": account_id}).mappings().one()
     visited = db.execute(text("""SELECT count(DISTINCT contribution.node_id)
         FROM source_node_contributions contribution

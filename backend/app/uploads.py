@@ -22,6 +22,13 @@ from backend.app.gpx import GpxError, MAX_GPX_BYTES, parse_gpx
 from backend.app.jobs import complete, enqueue, fail
 from backend.app.storage import LocalObjectStore, cleanup_unreferenced_original
 from backend.app.owner_guard import owner_lock
+from backend.app.recording_identity import canonical_recording, same_recording
+from backend.app.recording_groups import (
+    _enqueue_original_cleanup,
+    _terminalize_manifest_items,
+    has_predelete_pending_import,
+    stored_or_legacy_identity,
+)
 
 
 MAX_UPLOAD_REQUEST_BYTES = MAX_GPX_BYTES + 64 * 1024
@@ -132,8 +139,8 @@ def _persist_upload(engine: Engine, object_store: LocalObjectStore, account_id: 
             owner_lock(db, account_id)
             object_key = object_store.write(content, extension=source_kind, owner_id=account_id)
             row = db.execute(text("""INSERT INTO activity_sources
-                (account_id, source_kind, content_hash, revision, private_object_key, status)
-                VALUES (:account_id, :source_kind, :content_hash, 1, :object_key, 'queued')
+                (account_id, source_kind, content_hash, revision, private_object_key, status, created_at)
+                VALUES (:account_id, :source_kind, :content_hash, 1, :object_key, 'queued',clock_timestamp())
                 ON CONFLICT (account_id, source_kind, content_hash) DO NOTHING
                 RETURNING id, revision, status"""), {
                 "account_id": account_id,
@@ -147,6 +154,9 @@ def _persist_upload(engine: Engine, object_store: LocalObjectStore, account_id: 
                     WHERE account_id=:account_id AND source_kind=:source_kind AND content_hash=:content_hash"""), {
                     "account_id": account_id, "source_kind": source_kind, "content_hash": content_hash,
                 }).mappings().one()
+                if has_predelete_pending_import(db, account_id, int(row["id"]), source_kind, content):
+                    raise HTTPException(status_code=409,
+                                        detail="An earlier deleted recording import is still being processed; retry later.")
                 object_store.delete(object_key, owner_id=account_id)
             dedupe_key = f"upload:{row['id']}:r{row['revision']}"
             job = enqueue(db, account_id=account_id, kind="process_upload", dedupe_key=dedupe_key,
@@ -216,7 +226,8 @@ def _locked_context(db, job_id: int, lease_token: str, source_id: int, revision:
     }).mappings().first()
     if job is None:
         return None, None
-    source = db.execute(text("""SELECT id, account_id, activity_id, revision, private_object_key, status, source_kind
+    source = db.execute(text("""SELECT id, account_id, activity_id, revision, private_object_key, status,
+            source_kind, created_at
         FROM activity_sources WHERE id=:id FOR UPDATE"""), {"id": source_id}).mappings().first()
     if (source is None or source["account_id"] != job["account_id"] or job["kind"] != "process_upload"
             or source["revision"] != revision):
@@ -297,34 +308,82 @@ def process_upload(engine: Engine, job: dict[str, Any], store: LocalObjectStore 
                      account_id=account_id, revision=revision, error_code=exc.code, permanent=True)
         return
     statistics = calculate_activity_statistics(parsed.tracks, parsed.timestamps)
+    identity = canonical_recording(parsed.tracks, parsed.timestamps, parsed.activity_type)
 
     import json
 
     with engine.begin() as db:
-        owner_lock(db, str(job.get("account_id", "")))
+        owner_lock(db, str(job.get("account_id", "")), exclusive=True)
         locked_job, current_source = _locked_context(db, job_id, lease_token, source_id, revision)
         if locked_job is None:
             return
         if current_source is None:
             fail(db, job_id=job_id, lease_token=lease_token, error_code="stale_source", permanent=True)
             return
-        activity_id = db.execute(text("""INSERT INTO activities
-            (user_id, name, date, activity_type, processed, unmapped_points, tracks, timestamps,
-             distance_m, duration_s, pace_s_per_km, statistics_version)
-            VALUES (:account_id, :name, :date, :activity_type, false, 0,
-                CAST(:tracks AS json), CAST(:timestamps AS json),
-                :distance_m, :duration_s, :pace_s_per_km, :statistics_version) RETURNING id"""), {
-            "account_id": current_source["account_id"],
-            "name": parsed.name,
-            "date": parsed.date,
-            "activity_type": parsed.activity_type,
-            "tracks": json.dumps(parsed.tracks, allow_nan=False, separators=(",", ":")),
-            "timestamps": json.dumps(parsed.timestamps, allow_nan=False, separators=(",", ":")),
-            "distance_m": statistics.distance_m,
-            "duration_s": statistics.duration_s,
-            "pace_s_per_km": statistics.pace_s_per_km,
-            "statistics_version": statistics.version,
-        }).scalar_one()
+        deletion_time = db.execute(text("""SELECT max(deleted_at) FROM recording_identity_deletions
+            WHERE account_id=:account AND fingerprint=:fingerprint AND fingerprint_version=:version"""), {
+            "account": current_source["account_id"],
+            "fingerprint": identity.fingerprint if identity else "",
+            "version": identity.version if identity else 0,
+        }).scalar_one_or_none()
+        if deletion_time is not None and current_source["created_at"] <= deletion_time:
+            _enqueue_original_cleanup(db, current_source["account_id"], current_source["activity_id"],
+                                      source_id, revision, current_source["private_object_key"])
+            _terminalize_manifest_items(db, current_source["account_id"], source_id)
+            db.execute(text("DELETE FROM activity_sources WHERE id=:id AND account_id=:account"), {
+                "id": source_id, "account": current_source["account_id"],
+            })
+            cancelled = db.execute(text("""UPDATE jobs SET status='cancelled',lease_token=NULL,
+                    leased_until=NULL,last_error='source_deleted',updated_at=clock_timestamp()
+                WHERE id=:id AND account_id=:account AND kind='process_upload' AND status='running'
+                  AND lease_token=:token AND leased_until>clock_timestamp()"""), {
+                "id": job_id, "account": current_source["account_id"], "token": lease_token,
+            })
+            if cancelled.rowcount != 1:
+                raise RuntimeError("upload job lease expired")
+            return
+
+        activity = None
+        if identity is not None:
+            candidates = db.execute(text("""SELECT id,name,date,activity_type,tracks,timestamps,
+                    recording_fingerprint,recording_fingerprint_version
+                FROM activities WHERE user_id=:account AND recording_fingerprint=:fingerprint
+                    AND recording_fingerprint_version=:version ORDER BY id LIMIT 2 FOR UPDATE"""), {
+                "account": current_source["account_id"], "fingerprint": identity.fingerprint,
+                "version": identity.version,
+            }).mappings().all()
+            for candidate in candidates:
+                existing_identity = stored_or_legacy_identity(candidate)
+                if existing_identity is not None and same_recording(identity, existing_identity):
+                    activity = candidate
+                    break
+            if candidates and activity is None:
+                identity = None
+
+        if activity is None:
+            activity_id = db.execute(text("""INSERT INTO activities
+                (user_id, name, date, activity_type, processed, unmapped_points, tracks, timestamps,
+                 distance_m, duration_s, pace_s_per_km, statistics_version,
+                 recording_fingerprint,recording_fingerprint_version)
+                VALUES (:account_id, :name, :date, :activity_type, false, 0,
+                    CAST(:tracks AS json), CAST(:timestamps AS json),
+                    :distance_m, :duration_s, :pace_s_per_km, :statistics_version,
+                    :fingerprint,:fingerprint_version) RETURNING id"""), {
+                "account_id": current_source["account_id"],
+                "name": parsed.name,
+                "date": parsed.date,
+                "activity_type": parsed.activity_type,
+                "tracks": json.dumps(parsed.tracks, allow_nan=False, separators=(",", ":")),
+                "timestamps": json.dumps(parsed.timestamps, allow_nan=False, separators=(",", ":")),
+                "distance_m": statistics.distance_m,
+                "duration_s": statistics.duration_s,
+                "pace_s_per_km": statistics.pace_s_per_km,
+                "statistics_version": statistics.version,
+                "fingerprint": identity.fingerprint if identity else None,
+                "fingerprint_version": identity.version if identity else 1,
+            }).scalar_one()
+        else:
+            activity_id = activity["id"]
         result = db.execute(text("""UPDATE activity_sources SET activity_id=:activity_id,
                 status='succeeded', last_error=NULL, updated_at=clock_timestamp()
             WHERE id=:id AND account_id=:account_id AND revision=:revision"""), {

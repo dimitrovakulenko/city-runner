@@ -328,6 +328,20 @@ export type SyncFailurePage = {
   change_token: string;
 };
 
+export type ActivitySourceResponse = {
+  id: string;
+  source_kind: "gpx" | "fit";
+  created_at: string;
+};
+
+export type ActivitySourcePage = {
+  activity_id: string;
+  items: Array<ActivitySourceResponse>;
+  page: number;
+  page_size: number;
+  total: number;
+};
+
 export type CityItem = {
   id: string;
   name: string;

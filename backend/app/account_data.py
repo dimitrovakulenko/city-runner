@@ -187,7 +187,8 @@ def build_account_export(engine: Engine, account_id: str, store: LocalObjectStor
                 manifest["counts"]["original_files"] = len(source_files)
 
                 queries = {
-                    "activities": "SELECT id,name,date,activity_type,processed,unmapped_points,tracks,timestamps,distance_m,duration_s,pace_s_per_km,statistics_version FROM activities WHERE user_id=:account ORDER BY id",
+                    "activities": "SELECT id,name,date,activity_type,processed,unmapped_points,tracks,timestamps,distance_m,duration_s,pace_s_per_km,statistics_version,recording_fingerprint,recording_fingerprint_version FROM activities WHERE user_id=:account ORDER BY id",
+                    "recording_identity_deletions": "SELECT fingerprint,fingerprint_version,deleted_at FROM recording_identity_deletions WHERE account_id=:account ORDER BY fingerprint,fingerprint_version",
                     "sources": "SELECT id,activity_id,source_kind,source_connection_id,external_id,content_hash,revision,status,last_error,created_at,updated_at FROM activity_sources WHERE account_id=:account ORDER BY id",
                     "import_batches": "SELECT id,request_id,manifest_hash,state,created_at,updated_at FROM import_batches WHERE account_id=:account ORDER BY id",
                     "import_batch_items": "SELECT id,batch_id,ordinal,name,format,status,content_hash,source_id,duplicate,error_code,created_at,updated_at FROM import_batch_items WHERE account_id=:account ORDER BY batch_id,ordinal",

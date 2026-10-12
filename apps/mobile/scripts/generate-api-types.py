@@ -53,6 +53,8 @@ SCHEMAS = (
     "AccountDeletionResponse",
     "SyncStatusResponse",
     "SyncFailurePage",
+    "ActivitySourceResponse",
+    "ActivitySourcePage",
 )
 
 

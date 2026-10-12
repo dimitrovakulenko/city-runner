@@ -203,7 +203,8 @@ def _live_summary(db: Connection, account_id: str, dataset_id: int) -> dict[str,
                 "failed_sources": 0, "visited_node_count": None, "unsupported_sample_count": None,
                 "progress_revision": 0}
     counts = db.execute(text("""WITH current_sources AS (
-            SELECT source.id, source.revision, run.status AS run_status, job.status AS job_status,
+            SELECT source.id, source.revision, source.activity_id,
+                   run.status AS run_status, job.status AS job_status,
                    run.unsupported_sample_count
             FROM activity_sources source
             LEFT JOIN coverage_source_runs run ON run.account_id=source.account_id
@@ -216,8 +217,11 @@ def _live_summary(db: Connection, account_id: str, dataset_id: int) -> dict[str,
         SELECT count(*) FILTER (WHERE run_status='failed' OR job_status IN ('failed','cancelled')) AS failed,
                count(*) FILTER (WHERE run_status IS NULL OR run_status<>'succeeded'
                     OR job_status IS DISTINCT FROM 'succeeded') AS pending,
-               COALESCE(sum(unsupported_sample_count) FILTER (
-                    WHERE run_status='succeeded' AND job_status='succeeded'),0) AS unsupported
+               COALESCE((SELECT sum(grouped.unsupported) FROM (
+                    SELECT activity_id,max(unsupported_sample_count) AS unsupported
+                    FROM current_sources WHERE run_status='succeeded' AND job_status='succeeded'
+                    GROUP BY activity_id
+               ) grouped),0) AS unsupported
         FROM current_sources"""), {"account_id": account_id, "dataset_id": dataset_id}).mappings().one()
     visited = db.execute(text("""SELECT count(DISTINCT contribution.node_id)
         FROM source_node_contributions contribution
@@ -391,14 +395,19 @@ def _refresh_activity_processing(db: Connection, *, account_id: str, source_id: 
     unmapped = _count_unsupported_samples(db, points)
     pending = db.execute(text("""SELECT count(*) FROM map_datasets dataset
         WHERE dataset.status='active' AND dataset.coverage_mode='complete'
-          AND NOT EXISTS (
-              SELECT 1 FROM coverage_source_runs run JOIN jobs job
-                ON job.account_id=run.account_id AND job.id=run.job_id
-              WHERE run.account_id=:account_id AND run.source_id=:source_id
-                AND run.source_revision=:source_revision AND run.dataset_id=dataset.id
-                AND run.status='succeeded' AND job.status='succeeded'
+          AND EXISTS (
+              SELECT 1 FROM activity_sources group_source
+              WHERE group_source.account_id=:account_id AND group_source.activity_id=:activity_id
+                AND (group_source.status<>'succeeded' OR NOT EXISTS (
+                    SELECT 1 FROM coverage_source_runs run JOIN jobs job
+                      ON job.account_id=run.account_id AND job.id=run.job_id
+                    WHERE run.account_id=group_source.account_id
+                      AND run.source_id=group_source.id AND run.source_revision=group_source.revision
+                      AND run.dataset_id=dataset.id
+                      AND run.status='succeeded' AND job.status='succeeded'
+                ))
           )"""), {"account_id": account_id, "source_id": source_id,
-                   "source_revision": source_revision}).scalar_one()
+                   "source_revision": source_revision, "activity_id": activity_id}).scalar_one()
     db.execute(text("""UPDATE activities SET processed=:processed, unmapped_points=:unmapped
         WHERE id=:activity_id AND user_id=:account_id"""), {
         "processed": active_count > 0 and int(pending) == 0,

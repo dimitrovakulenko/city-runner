@@ -16,6 +16,7 @@ from starlette.concurrency import run_in_threadpool
 
 from backend.app.jobs import enqueue
 from backend.app.storage import LocalObjectStore, cleanup_unreferenced_original
+from backend.app.recording_groups import has_predelete_pending_import
 from backend.app.uploads import _job_state, _one_activity_file, _safe_error
 from backend.app.owner_guard import owner_lock
 
@@ -107,7 +108,9 @@ def _detail(db, account_id: str, batch_id: int) -> dict:
     }).mappings().all()
     items = []
     for row in rows:
-        if row["item_status"] == "awaiting_upload":
+        if row["item_status"] == "deleted":
+            item_status = "deleted"
+        elif row["item_status"] == "awaiting_upload":
             item_status = "awaiting_upload"
         elif row["source_id"] is not None and row["source_status"] is None:
             item_status = "deleted"
@@ -188,8 +191,8 @@ def _attach_once(db, store, account_id, batch_id, item_id, content, content_hash
     object_key = store.write(content, extension=file_format, owner_id=account_id)
     created_keys.append(object_key)
     source = db.execute(text("""INSERT INTO activity_sources
-            (account_id,source_kind,content_hash,revision,private_object_key,status)
-            VALUES (:account,:kind,:hash,1,:object,'queued')
+            (account_id,source_kind,content_hash,revision,private_object_key,status,created_at)
+            VALUES (:account,:kind,:hash,1,:object,'queued',clock_timestamp())
             ON CONFLICT (account_id,source_kind,content_hash) DO NOTHING
             RETURNING id,revision,status"""), {
             "account": account_id, "kind": file_format, "hash": content_hash, "object": object_key,
@@ -199,9 +202,12 @@ def _attach_once(db, store, account_id, batch_id, item_id, content, content_hash
         source = db.execute(text("""SELECT id,revision,status FROM activity_sources
                 WHERE account_id=:account AND source_kind=:kind AND content_hash=:hash"""), {
                 "account": account_id, "kind": file_format, "hash": content_hash,
-            }).mappings().first()
+        }).mappings().first()
         if source is None:
             raise _SourceChanged()
+        if has_predelete_pending_import(db, account_id, int(source["id"]), file_format, content):
+            raise HTTPException(status_code=409,
+                                detail="An earlier deleted recording import is still being processed; retry later.")
         source, job = _lock_source(db, account_id, source)
         store.delete(object_key, owner_id=account_id)
     else:
