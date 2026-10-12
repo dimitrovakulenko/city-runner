@@ -19,6 +19,27 @@ Set registered `GOOGLE_CLIENT_IDS` and/or `APPLE_CLIENT_IDS` to enable provider 
 
 The PostGIS integration runner creates a UUID-named `city_runner_test_*` database, runs migration up/down/up and synthetic owner/search/track API checks, then drops that database even when tests fail. It requires a PostgreSQL administrator URL that can create/drop databases and install the PostGIS extension. Run `rtk proxy env PATH="$PWD/.venv/bin:$PATH" scripts/dev/postgis-test.sh` from the repository root. The default admin URL uses the local Unix socket and current OS username. To select another local cluster, set `POSTGIS_ADMIN_DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:PORT/postgres`. The test URL is derived from the same admin URL, and the harness overrides any inherited `DATABASE_URL` before running migrations.
 
+## Persistent local web preview
+
+The persistent preview uses the existing PostgreSQL 16 binaries and stores its database, uploaded originals, deletion journal and synthetic owner under `.local-preview/`. It binds PostgreSQL and the API to `127.0.0.1` only. It creates no activities or streets; import public OSM data separately when needed.
+
+Initialize a new, empty preview once, then start its API and ordinary ingestion/coverage/cleanup worker:
+
+```sh
+rtk .venv/bin/python scripts/dev/preview.py --init --pg-bin /private/tmp/city-runner-postgres16-mount/Postgres.app/Contents/Versions/16/bin
+rtk .venv/bin/python scripts/dev/preview.py --pg-bin /private/tmp/city-runner-postgres16-mount/Postgres.app/Contents/Versions/16/bin
+```
+
+`--init` refuses any existing or partially populated preview. Normal start refuses a missing database, owner file or deletion journal. It applies current migrations but never creates a replacement database, journal or owner. Ctrl+C/SIGTERM stops the API and worker, and stops PostgreSQL only when this runner started that cluster; it never drops preview data. The dev session endpoint is added only by this runner and accepts loopback requests from the local web origin. The account is created empty once; if you delete it, dev login refuses to recreate it.
+
+In another terminal, from `apps/web`, opt into the local session and point Vite at this API:
+
+```sh
+rtk env VITE_DEV_TEST_LOGIN=1 API_PROXY_TARGET=http://127.0.0.1:8006 npm run dev
+```
+
+Open `http://127.0.0.1:5173`. The disposable browser QA backend in `apps/web/tests/serve-fixture.py` remains separate and continues to create and drop its own test database.
+
 ## Account data and history scale
 
 Account data operations use the [export/deletion contract and recovery commands](account-data.md). Configure and explicitly initialize the independent deletion journal for a fresh installation; share its path between API and worker. Missing configuration disables full account deletion, while a configured missing/corrupt journal fails closed. Never initialize a replacement journal during restore. The [synthetic history benchmark](history-benchmark.md) records the local 5-million-sample workload and measured map fix.
