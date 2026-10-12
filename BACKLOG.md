@@ -41,6 +41,8 @@ Source-status verification on 9 October: D19/D25 file-source status and automati
 
 Recorded activity statistics (T05) on 12 October: original segmented GPS distance, recorded time and pace now appear in activity list/detail, with honest nulls and explicit owner-scoped bounded history backfill. New uploads persist metadata with existing lease/revision fences; automatic status refresh notices backfill changes. Independent backend/client review and 109 PostGIS, 59 backend, 181 client, 13 web adapter and 18 production Chrome checks passed, plus generated types/typechecks/build and both JS exports. The old preview temporary PostgreSQL files were incomplete; verification used a separate disposable cluster and left remaining old data untouched. Backup restoration remains a local environment issue. See [statistics contract](docs/activity-statistics.md) and [operator command](docs/development.md#recorded-activity-statistics).
 
+Persistent localhost preview on 12 October: reviewed runner `95a7c67` now stores PostgreSQL, originals, deletion journal and a stable synthetic account outside temporary folders. Fresh Gent geography is available; no backup was found and previous temporary remnants were preserved. Actual GPX/FIT HTTP ingestion, stopped-manifest/source-byte restart recovery, terminal deletion, cleanup and Chrome login/reload passed. Default preview history is empty. See [local setup](docs/development.md#persistent-local-web-preview) and DEV_PLAN for evidence. Provider access and automatic imports remain T01/T07/T08 gates.
+
 ## Work packages
 
 | Task | Scope and requirements | Status | Estimate | Completion evidence |
