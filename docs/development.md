@@ -34,3 +34,15 @@ The production API uses port 8001 so the PoC can remain on 8000. Run the worker 
 From `apps/web`, run `rtk npm ci` and `rtk npm run dev`; open `http://127.0.0.1:5173`. The same-origin `/api` proxy targets the production API on port 8001. Start the API and worker as above. The [browser client README](../apps/web/README.md) covers web Google OAuth configuration, shared client contracts, resumable file imports and disposable synthetic Chrome checks. Run `rtk npm test` and `rtk npm run build` for adapter tests, typechecking and production assets.
 
 Apply migration `0012_sync_status` before using **Sources & sync** or automatic foreground refresh. It records transactional owner/geography revisions, including writes from existing workers; no additional service or polling worker is needed. The owner-only status/failure APIs and explicit matching retry are documented in [source status](sync-status.md). Provider connection credentials and adapters remain future work.
+
+## Recorded activity statistics
+
+Migration `0013_activity_statistics` adds persisted distance, recorded time and average pace to activity list/detail. Updated ingestion workers calculate them for new GPX/FIT uploads. Existing rows remain unknown until explicitly backfilled; GET requests never scan GPS to calculate statistics. See [metric definitions](activity-statistics.md).
+
+Use the same `DATABASE_URL` and deletion-journal configuration as the API/worker. After restoring a backup, replay the latest deletion journal before backfill, as required by the account recovery runbook. Run one bounded owner page:
+
+```sh
+rtk .venv/bin/python scripts/dev/activity-stats-backfill.py --account-id OWNER --batch-size 20 --max-activities 100
+```
+
+The command returns `processed`, `unavailable` and `after_id`. Rerun without a cursor to select the next unprocessed rows, including negative legacy IDs, or pass the returned signed integer with `--after-id`. Each activity commits independently; interrupted or timed-out work can be rerun safely. A processed unavailable recording stays unknown. Backfill changes statistics and the sync revision only; originals, source revisions, jobs, GPS coverage and activity IDs stay intact. Restart API and ingestion workers after applying the migration so new uploads use the current implementation.
