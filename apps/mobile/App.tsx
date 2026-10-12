@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, StatusBar, Styl
 import { Camera, GeoJSONSource, Layer, Map } from '@maplibre/maplibre-react-native';
 import type { Feature, MultiLineString } from 'geojson';
 import { ActivityStore } from './src/activityStore';
+import { formatActivityStatistics } from './src/activityStatistics';
 import { ExploreScreen } from './src/ExploreScreen';
 import { ExploreStore } from './src/exploreStore';
 import { CityExplorerScreen } from './src/CityExplorerScreen';
@@ -52,6 +53,7 @@ export default function App() {
   const accountChangeRequest = useRef(0);
   const knownSessionToken = useRef<string | null | undefined>(undefined);
   const selected = activity.detail;
+  const selectedStatistics = selected ? formatActivityStatistics(selected) : null;
   const selecting = activity.selectedId !== null;
   const styleUrl = fixtureMode ? demoStyle : process.env.EXPO_PUBLIC_MAP_STYLE_URL?.trim() || defaultMapStyle;
 
@@ -157,7 +159,10 @@ export default function App() {
               <Pressable onPress={() => activityStore.clearSelection()}><Text style={styles.link}>← All activities</Text></Pressable>
               {activity.detailStatus === 'loading' && <Message text="Loading activity…" loading />}
               {activity.detailError && <Message text={activity.detailError} action="Retry" onPress={() => { if (activity.selectedId) void activityStore.selectActivity(activity.selectedId); }} />}
-              {selected && <><Text style={styles.meta}>{selected.date} · {selected.type}</Text><Text style={styles.meta}>{selected.tracks.length} track segments preserved</Text>
+              {selected && <><Text style={styles.meta}>{selected.date} · {selected.type}</Text>
+                <Text style={styles.meta}>Distance {selectedStatistics!.distance} · Time {selectedStatistics!.time} · Pace {selectedStatistics!.pace}</Text>
+                <Text style={styles.meta}>Recorded GPS segments; gaps between segments are excluded from time, and unmarked stops are included.</Text>
+                <Text style={styles.meta}>{selected.tracks.length} track segments preserved</Text>
                 {correctionsEnabled && deleteConfirmationFor !== selected.id && <Pressable disabled={correction.pending !== null} onPress={() => { correctionStore.clearFeedback(); setDeleteConfirmationFor(selected.id); }}><Text style={styles.dangerLink}>Delete activity</Text></Pressable>}
                 {correction.error && <Text accessibilityRole="alert" style={styles.error}>{correction.error}</Text>}
                 {correctionsEnabled && deleteConfirmationFor === selected.id && <View style={styles.confirmation}>
@@ -175,9 +180,13 @@ export default function App() {
                 {signedOut && <Message text="Sign in to view your activities." />}
                 {listFailure && <Message text={activity.listError ?? 'Could not load activities.'} action="Retry" onPress={() => void activityStore.retryList()} />}
                 {activity.listStatus === 'empty' && <Message text="No activities found." />}
-                {activity.items.map((item) => <Pressable key={item.id} style={styles.row} onPress={() => void activityStore.selectActivity(item.id)}>
-                  <Text style={styles.rowTitle}>{item.name}</Text><Text style={styles.meta}>{item.date} · {item.type}</Text>
-                </Pressable>)}
+                {activity.items.map((item) => {
+                  const statistics = formatActivityStatistics(item);
+                  return <Pressable key={item.id} style={styles.row} onPress={() => void activityStore.selectActivity(item.id)}>
+                    <Text style={styles.rowTitle}>{item.name}</Text><Text style={styles.meta}>{item.date} · {item.type}</Text>
+                    <Text style={styles.meta}>{statistics.distance} · {statistics.time} · {statistics.pace}</Text>
+                  </Pressable>;
+                })}
                 {activity.listStatus === 'ready' && activity.items.length < activity.total && <Pressable style={styles.more} onPress={() => void activityStore.loadMore()}><Text style={styles.link}>Load more</Text></Pressable>}
                 {activity.listStatus === 'loading-more' && <Message text="Loading more activities…" loading />}
               </ScrollView>

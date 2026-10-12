@@ -108,6 +108,40 @@ test('sync refresh reloads only already-loaded pages and preserves query, filter
   assert.equal(store.getState().selectedId, '1'); assert.equal(store.getState().detail?.name, 'refreshed detail'); assert.equal(detailReads, 1);
 });
 
+test('sync refresh replaces activity statistics on the loaded list and selected detail', async () => {
+  let revision = 1;
+  const store = new ActivityStore(fakeApi({
+    async listActivities() {
+      return { ...page(`row-${revision}`), items: [{ id: '1', name: `row-${revision}`, date: 'today', type: 'running',
+        processed: true, unmapped_points: 0, distance_m: revision * 1_000, duration_s: revision * 100, pace_s_per_km: revision * 100 }] };
+    },
+    async getActivity(id) { return { ...detail(id), distance_m: revision * 1_000, duration_s: revision * 100, pace_s_per_km: revision * 100 }; },
+  }));
+  await store.loadPage(); await store.selectActivity('1');
+  assert.equal(store.getState().items[0]?.distance_m, 1_000);
+  assert.equal(store.getState().detail?.duration_s, 100);
+  revision = 2;
+  assert.equal(await store.refreshAfterSync(), true);
+  assert.equal(store.getState().items[0]?.distance_m, 2_000);
+  assert.equal(store.getState().detail?.distance_m, 2_000);
+  assert.equal(store.getState().detail?.pace_s_per_km, 200);
+});
+
+test('account reset fences old activity statistics from replacing the next account', async () => {
+  const stale = deferred<ActivityDetail>(); let calls = 0;
+  const store = new ActivityStore(fakeApi({ getActivity: (id) => ++calls === 1 ? stale.promise : Promise.resolve({
+    ...detail(id), distance_m: 2_000, duration_s: 200, pace_s_per_km: 100,
+  }) }));
+  const oldRead = store.selectActivity('old-account');
+  store.reset();
+  await store.selectActivity('new-account');
+  stale.resolve({ ...detail('old-account'), distance_m: 9_000, duration_s: 900, pace_s_per_km: 100 });
+  await oldRead;
+  assert.equal(store.getState().detail?.id, 'new-account');
+  assert.equal(store.getState().detail?.distance_m, 2_000);
+  assert.equal(store.getState().detail?.duration_s, 200);
+});
+
 test('sync refresh clears a selected activity that another client deleted', async () => {
   let deleted = false;
   const store = new ActivityStore(fakeApi({ getActivity: async (id) => {
