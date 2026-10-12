@@ -1,7 +1,9 @@
 """Disposable local browser QA backend; never opens an existing activity database."""
 import hashlib
+import json
 import os
 import secrets
+import subprocess
 import sys
 import tempfile
 import threading
@@ -78,7 +80,7 @@ try:
         command.upgrade(config, 'head')
         engine = create_engine(url, pool_pre_ping=True)
         with engine.begin() as db:
-            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race', 'sync', 'sync-failure', 'sync-race']:
+            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race', 'sync', 'sync-failure', 'sync-race', 'stats', 'stats-backfill']:
                 db.execute(text('INSERT INTO accounts(id) VALUES (:id)'), {'id': 'web-test-' + account})
                 db.execute(text('INSERT INTO sessions(token_digest,account_id,expires_at) VALUES (:digest,:id,:expires)'), {
                     'digest': hashlib.sha256(('web-synthetic-' + account).encode()).hexdigest(), 'id': 'web-test-' + account,
@@ -94,6 +96,19 @@ try:
             return {'code': 'Ok', 'waypoints': [{'location': point, 'distance': 0} for point in points],
                 'routes': [{'geometry': {'type': 'LineString', 'coordinates': points}, 'distance': 1234.5, 'duration': 900}]}
         app = create_app(engine, routing_provider=synthetic_route if os.environ.get('WEB_TEST_ROUTING') == '1' else None)
+        @app.post('/__test__/statistics/legacy/{activity_id}', include_in_schema=False)
+        def fixture_legacy_statistics(activity_id: int):
+            with engine.begin() as db:
+                changed = db.execute(text("""UPDATE activities SET distance_m=NULL,duration_s=NULL,
+                    pace_s_per_km=NULL,statistics_version=0
+                    WHERE id=:id AND user_id='web-test-stats-backfill'"""), {'id': activity_id})
+            return {'changed': changed.rowcount}
+        @app.post('/__test__/statistics/backfill', include_in_schema=False)
+        def fixture_statistics_backfill():
+            completed = subprocess.run([sys.executable, str(ROOT / 'scripts/dev/activity-stats-backfill.py'),
+                '--account-id', 'web-test-stats-backfill', '--max-activities', '10'],
+                check=True, capture_output=True, text=True, timeout=15)
+            return json.loads(completed.stdout)
         @app.post('/__test__/sync/fail-coverage/{source_id}', include_in_schema=False)
         def fixture_coverage_failure(source_id: int):
             # Only synthetic sync-test accounts can be changed by this fixture hook.
@@ -147,6 +162,14 @@ try:
             while run_once(engine, handlers): pass
         (fixtures / 'browser.gpx').write_bytes(gpx('Browser GPX [synthetic]', [2]))
         (fixtures / 'browser.fit').write_bytes(fit_fixture(records=[(1167609600 + offset, semicircles(51.044 + 5 * .002), semicircles(3.716 + offset * .004)) for offset in range(5)]))
+        from backend.app.fit import FIT_EPOCH
+        stats_start = int((datetime(2026, 10, 7, 8, tzinfo=timezone.utc) - FIT_EPOCH).total_seconds())
+        (fixtures / 'statistics.fit').write_bytes(fit_fixture(records=[
+            (stats_start, semicircles(51.044), semicircles(3.716)),
+            (stats_start + 60, semicircles(51.044), semicircles(3.717)),
+            (stats_start + 600, semicircles(51.056), semicircles(3.730)),
+            (stats_start + 660, semicircles(51.056), semicircles(3.731)),
+        ], events=[(2, stats_start + 60, 1), (2, stats_start + 600, 0)]))
         valid_fit = (fixtures / 'browser.fit').read_bytes()
         (fixtures / 'corrupt.fit').write_bytes(valid_fit[:-1] + bytes([valid_fit[-1] ^ 1]))
         def work():
