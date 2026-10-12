@@ -39,7 +39,9 @@ class AuthApiTests(unittest.TestCase):
             db.execute(text("""CREATE TABLE activities (
                 id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, name TEXT NOT NULL,
                 date TEXT, activity_type TEXT, processed BOOLEAN NOT NULL DEFAULT 0,
-                unmapped_points INTEGER NOT NULL DEFAULT 0, tracks JSON, timestamps JSON)"""))
+                unmapped_points INTEGER NOT NULL DEFAULT 0, tracks JSON, timestamps JSON,
+                distance_m REAL, duration_s REAL, pace_s_per_km REAL,
+                statistics_version INTEGER NOT NULL DEFAULT 0)"""))
         self.client = TestClient(create_app(self.engine))
         self.env = patch.dict(os.environ, {
             "GOOGLE_CLIENT_IDS": "com.example.app", "APPLE_CLIENT_IDS": "com.example.apple",

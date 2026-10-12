@@ -170,7 +170,8 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
             params["q"] = f"%{q}%"
         with engine.connect() as db:
             total = db.execute(text(f"SELECT count(*) FROM activities WHERE {filters}"), params).scalar_one()
-            rows = db.execute(text(f"""SELECT id, name, date, activity_type, processed, unmapped_points FROM activities
+            rows = db.execute(text(f"""SELECT id, name, date, activity_type, processed, unmapped_points,
+                distance_m, duration_s, pace_s_per_km FROM activities
                 WHERE {filters} ORDER BY CASE WHEN date IS NULL OR date='' OR date='unknown' THEN 1 ELSE 0 END,
                 date DESC, id DESC LIMIT :limit OFFSET :offset"""), params).mappings().all()
         items = [{
@@ -180,6 +181,8 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
             "type": r["activity_type"] or "unknown",
             "processed": bool(r["processed"]),
             "unmapped_points": r["unmapped_points"],
+            "distance_m": r["distance_m"], "duration_s": r["duration_s"],
+            "pace_s_per_km": r["pace_s_per_km"],
         } for r in rows]
         return {"items": items, "page": page, "page_size": page_size, "total": total}
 
@@ -187,7 +190,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
     def activity(activity_id: int, user_id: str = Depends(current_user)):
         with engine.connect() as db:
             row = db.execute(text("""SELECT id, name, date, activity_type, tracks, timestamps,
-                processed, unmapped_points
+                processed, unmapped_points, distance_m, duration_s, pace_s_per_km
                 FROM activities WHERE id=:id AND user_id=:user_id"""),
                 {"id": activity_id, "user_id": user_id}).mappings().first()
         if row is None:
@@ -204,6 +207,8 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
         return {"id": str(row["id"]), "name": row["name"], "date": row["date"] or "unknown",
                 "type": row["activity_type"] or "unknown", "processed": bool(row["processed"]),
                 "unmapped_points": row["unmapped_points"], "tracks": tracks,
+                "distance_m": row["distance_m"], "duration_s": row["duration_s"],
+                "pace_s_per_km": row["pace_s_per_km"],
                 "timestamps": timestamps, "bounds": bounds}
 
     return app

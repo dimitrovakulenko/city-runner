@@ -16,6 +16,7 @@ from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.concurrency import run_in_threadpool
 
 from backend.app.coverage import queue_source_coverage
+from backend.app.activity_statistics import calculate_activity_statistics
 from backend.app.fit import parse_fit
 from backend.app.gpx import GpxError, MAX_GPX_BYTES, parse_gpx
 from backend.app.jobs import complete, enqueue, fail
@@ -295,6 +296,7 @@ def process_upload(engine: Engine, job: dict[str, Any], store: LocalObjectStore 
         _mark_failed(engine, job_id=job_id, lease_token=lease_token, source_id=source_id,
                      account_id=account_id, revision=revision, error_code=exc.code, permanent=True)
         return
+    statistics = calculate_activity_statistics(parsed.tracks, parsed.timestamps)
 
     import json
 
@@ -307,15 +309,21 @@ def process_upload(engine: Engine, job: dict[str, Any], store: LocalObjectStore 
             fail(db, job_id=job_id, lease_token=lease_token, error_code="stale_source", permanent=True)
             return
         activity_id = db.execute(text("""INSERT INTO activities
-            (user_id, name, date, activity_type, processed, unmapped_points, tracks, timestamps)
+            (user_id, name, date, activity_type, processed, unmapped_points, tracks, timestamps,
+             distance_m, duration_s, pace_s_per_km, statistics_version)
             VALUES (:account_id, :name, :date, :activity_type, false, 0,
-                CAST(:tracks AS json), CAST(:timestamps AS json)) RETURNING id"""), {
+                CAST(:tracks AS json), CAST(:timestamps AS json),
+                :distance_m, :duration_s, :pace_s_per_km, :statistics_version) RETURNING id"""), {
             "account_id": current_source["account_id"],
             "name": parsed.name,
             "date": parsed.date,
             "activity_type": parsed.activity_type,
             "tracks": json.dumps(parsed.tracks, allow_nan=False, separators=(",", ":")),
             "timestamps": json.dumps(parsed.timestamps, allow_nan=False, separators=(",", ":")),
+            "distance_m": statistics.distance_m,
+            "duration_s": statistics.duration_s,
+            "pace_s_per_km": statistics.pace_s_per_km,
+            "statistics_version": statistics.version,
         }).scalar_one()
         result = db.execute(text("""UPDATE activity_sources SET activity_id=:activity_id,
                 status='succeeded', last_error=NULL, updated_at=clock_timestamp()

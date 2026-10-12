@@ -11,6 +11,9 @@ export type ActivitySummary = {
   type: string;
   processed: boolean;
   unmapped_points: number;
+  distance_m?: number | null;
+  duration_s?: number | null;
+  pace_s_per_km?: number | null;
 };
 
 export type ActivityPage = {
@@ -27,6 +30,9 @@ export type ActivityDetail = {
   type: string;
   processed: boolean;
   unmapped_points: number;
+  distance_m?: number | null;
+  duration_s?: number | null;
+  pace_s_per_km?: number | null;
   tracks: Array<Array<[number, number]>>;
   timestamps: Array<Array<string | null>>;
   bounds: [[number, number], [number, number]] | null;

@@ -11,6 +11,9 @@ class ActivitySummary(BaseModel):
     type: str
     processed: bool
     unmapped_points: int
+    distance_m: float | None = None
+    duration_s: float | None = None
+    pace_s_per_km: float | None = None
 
 
 class ActivityPage(BaseModel):

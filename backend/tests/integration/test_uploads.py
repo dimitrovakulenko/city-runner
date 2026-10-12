@@ -12,7 +12,7 @@ from unittest.mock import patch
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import make_url
 
 from backend.app.jobs import claim
@@ -148,9 +148,30 @@ class UploadIntegrationTests(unittest.TestCase):
         self.assertEqual(detail.json()["timestamps"], [[
             "2026-10-04T08:00:00Z", None,
         ], ["2026-10-04T08:05:00+00:00"]])
+        self.assertGreater(detail.json()["distance_m"], 0)
+        self.assertIsNone(detail.json()["duration_s"])
+        self.assertIsNone(detail.json()["pace_s_per_km"])
+        with self.engine.connect() as db:
+            stats_row = db.execute(text("""SELECT distance_m,duration_s,pace_s_per_km,statistics_version
+                FROM activities WHERE id=:id"""), {"id": int(state["activity_id"])}).one()
+        self.assertEqual(stats_row.statistics_version, 1)
+        self.assertEqual((stats_row.duration_s, stats_row.pace_s_per_km), (None, None))
         self.assertFalse(detail.json()["processed"])
-        listed = self.client.get("/api/activities", headers=self.alice_headers).json()
+        list_sql = []
+        def capture_list_query(conn, cursor, statement, parameters, context, executemany):
+            if "FROM activities" in statement and "LIMIT" in statement and "OFFSET" in statement:
+                list_sql.append(statement)
+        event.listen(self.engine, "before_cursor_execute", capture_list_query)
+        try:
+            listed = self.client.get("/api/activities", headers=self.alice_headers).json()
+        finally:
+            event.remove(self.engine, "before_cursor_execute", capture_list_query)
         self.assertEqual([item["name"] for item in listed["items"]], ["Segmented run"])
+        self.assertGreater(listed["items"][0]["distance_m"], 0)
+        self.assertIsNone(listed["items"][0]["duration_s"])
+        self.assertTrue(list_sql)
+        self.assertNotIn("tracks", list_sql[0].lower())
+        self.assertNotIn("timestamps", list_sql[0].lower())
         other_detail = self.client.get(f"/api/activities/{other_state['activity_id']}", headers=self.bob_headers)
         self.assertEqual(other_detail.status_code, 200)
         self.assertEqual(self.client.get(f"/api/activities/{state['activity_id']}", headers=self.bob_headers).status_code,
@@ -203,6 +224,9 @@ class UploadIntegrationTests(unittest.TestCase):
         self.assertAlmostEqual(detail["tracks"][0][0][0], 4.2, places=5)
         self.assertAlmostEqual(detail["tracks"][0][0][1], 50.1, places=5)
         self.assertEqual(detail["timestamps"][0][0], "2026-12-31T00:00:00Z")
+        self.assertIsNone(detail["distance_m"])
+        self.assertIsNone(detail["duration_s"])
+        self.assertIsNone(detail["pace_s_per_km"])
 
         duplicate = self.upload(content, filename="again.fit")
         self.assertEqual(duplicate.status_code, 202)

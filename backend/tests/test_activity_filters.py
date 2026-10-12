@@ -15,15 +15,17 @@ class ActivityFilterUnitTests(unittest.TestCase):
             db.execute(text("""CREATE TABLE activities (
                 id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, name TEXT NOT NULL,
                 date TEXT, activity_type TEXT, processed BOOLEAN NOT NULL DEFAULT 0,
-                unmapped_points INTEGER NOT NULL DEFAULT 0, tracks JSON, timestamps JSON)"""))
+                unmapped_points INTEGER NOT NULL DEFAULT 0, tracks JSON, timestamps JSON,
+                distance_m REAL, duration_s REAL, pace_s_per_km REAL,
+                statistics_version INTEGER NOT NULL DEFAULT 0)"""))
             db.execute(text("""INSERT INTO activities VALUES
-                (1,'alice','First','2026-01-01',' Running ',1,2,'[]','[]'),
-                (2,'alice','Second','2026-01-02','WALKING',0,3,'[]','[]'),
-                (3,'alice','Unknown date','unknown',NULL,0,4,'[]','[]'),
-                (4,'alice','Invalid date','2026-02-30','unknown',0,5,'[]','[]'),
-                (6,'alice','Year zero','0000-01-01','unknown',0,0,'[]','[]'),
-                (7,'alice','Malformed date','not-a-date','unknown',0,0,'[]','[]'),
-                (5,'bob','Private','2026-01-01','cycling',0,6,'[]','[]')"""))
+                (1,'alice','First','2026-01-01',' Running ',1,2,'[]','[]',NULL,NULL,NULL,0),
+                (2,'alice','Second','2026-01-02','WALKING',0,3,'[]','[]',NULL,NULL,NULL,0),
+                (3,'alice','Unknown date','unknown',NULL,0,4,'[]','[]',NULL,NULL,NULL,0),
+                (4,'alice','Invalid date','2026-02-30','unknown',0,5,'[]','[]',NULL,NULL,NULL,0),
+                (6,'alice','Year zero','0000-01-01','unknown',0,0,'[]','[]',NULL,NULL,NULL,0),
+                (7,'alice','Malformed date','not-a-date','unknown',0,0,'[]','[]',NULL,NULL,NULL,0),
+                (5,'bob','Private','2026-01-01','cycling',0,6,'[]','[]',NULL,NULL,NULL,0)"""))
             db.execute(text("""CREATE TABLE activity_sources (
                 id INTEGER PRIMARY KEY, account_id TEXT, activity_id INTEGER, source_kind TEXT)"""))
             db.execute(text("""INSERT INTO activity_sources VALUES

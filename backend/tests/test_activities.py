@@ -16,12 +16,14 @@ class ActivityApiTests(unittest.TestCase):
             db.execute(text("""CREATE TABLE activities (
                 id INTEGER PRIMARY KEY, user_id TEXT NOT NULL, name TEXT NOT NULL,
                 date TEXT, activity_type TEXT, processed BOOLEAN NOT NULL DEFAULT 0,
-                unmapped_points INTEGER NOT NULL DEFAULT 0, tracks JSON, timestamps JSON)"""))
+                unmapped_points INTEGER NOT NULL DEFAULT 0, tracks JSON, timestamps JSON,
+                distance_m REAL, duration_s REAL, pace_s_per_km REAL,
+                statistics_version INTEGER NOT NULL DEFAULT 0)"""))
             db.execute(text("""INSERT INTO activities VALUES
-                (1,'alice','Morning Run','2026-10-04','running',1,2,'[[[4,50]],[[5,51]]]','[["a"],["b"]]'),
-                (2,'alice','Evening run','2026-10-03','running',0,0,'[]','[]'),
-                (3,'alice','Walk','2026-10-04','walking',0,1,'[]','[]'),
-                (4,'bob','Private Run','2026-10-05','running',1,0,'[]','[]')"""))
+                (1,'alice','Morning Run','2026-10-04','running',1,2,'[[[4,50]],[[5,51]]]','[["a"],["b"]]',NULL,NULL,NULL,0),
+                (2,'alice','Evening run','2026-10-03','running',0,0,'[]','[]',NULL,NULL,NULL,0),
+                (3,'alice','Walk','2026-10-04','walking',0,1,'[]','[]',NULL,NULL,NULL,0),
+                (4,'bob','Private Run','2026-10-05','running',1,0,'[]','[]',NULL,NULL,NULL,0)"""))
         self.identity = ["alice"]
         self.app = create_app(self.engine, lambda: self.identity[0])
         self.client = TestClient(self.app)
@@ -40,7 +42,8 @@ class ActivityApiTests(unittest.TestCase):
         response = self.client.get("/api/activities?page=2&page_size=1&q=Run")
         self.assertEqual(response.json(), {
             "items": [{"id": "2", "name": "Evening run", "date": "2026-10-03",
-                       "type": "running", "processed": False, "unmapped_points": 0}],
+                       "type": "running", "processed": False, "unmapped_points": 0,
+                       "distance_m": None, "duration_s": None, "pace_s_per_km": None}],
             "page": 2, "page_size": 1, "total": 2,
         })
         self.assertEqual(self.client.get("/api/activities/4").status_code, 404)
@@ -52,6 +55,7 @@ class ActivityApiTests(unittest.TestCase):
         self.assertEqual(detail, {
             "id": "1", "name": "Morning Run", "date": "2026-10-04", "type": "running",
             "processed": True, "unmapped_points": 2,
+            "distance_m": None, "duration_s": None, "pace_s_per_km": None,
             "tracks": [[[4, 50]], [[5, 51]]], "timestamps": [["a"], ["b"]],
             "bounds": [[4, 50], [5, 51]],
         })
