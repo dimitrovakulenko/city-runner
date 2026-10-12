@@ -1,0 +1,39 @@
+# D24: equivalent file recordings
+
+This slice groups GPX/FIT recordings conservatively. Real provider identity, event reconciliation and provider retention remain gated on approved adapters. Similar routes, dates or statistics do not establish recording identity.
+
+## Recording identity
+
+New successful imports can attach independent sources to one owned activity when every ordered GPS coordinate, segment boundary and point timestamp matches. Require at least two points, complete aligned absolute timestamps, strictly increasing times within segments and nondecreasing times between segments, and the same parsed activity type. Compare timestamps as UTC instants; accept alternate offsets and trailing fractional zeros. Refuse grouping when nonzero timestamp precision exceeds six fractional digits, because Python datetime would discard it. Missing/invalid timing and different activity types stay separate. Coordinates compare exactly as finite doubles, normalizing signed zero only; no rounding, tolerance, interpolation or resampling is allowed.
+
+A versioned SHA-256 fingerprint indexes eligible recordings within an account. Before attaching, revalidate the original ordered arrays and canonical times/type against the candidate; a hash alone never authorizes attachment. A conflicting candidate remains separate and receives no indexed fingerprint. Files with different names/XML metadata or different formats can group; ordinary rounded or resampled GPX/FIT exports can remain separate. Stored original coordinates/timestamp strings, first activity ID/name/statistics and each source's private original bytes remain intact.
+
+Same-file dedupe remains account + format + bytes. It reuses a source; equivalent-recording grouping keeps separate source IDs/files/jobs associated with one activity. Do not reinterpret the existing `duplicate` response flag. Activity counts count logical activities, while file/source counts count retained sources. Contributions remain keyed by owner/source/revision/dataset/node, and coverage remains their distinct union.
+
+## Provenance and removal API
+
+- `GET /api/activities/{activity_id}/sources?page=1&page_size=20` returns `{ activity_id, items, page, page_size, total }`. Page size is 1–20, IDs are decimal strings, activity IDs accept signed BIGINT legacy values, source IDs are positive, and items contain only `id`, `source_kind` (`gpx`/`fit`) and `created_at`. Stable source-ID order; no fingerprint, content hash, object key or credential exposure. Other-owner/missing activity returns 404.
+- `DELETE /api/activities/{activity_id}/sources/{source_id}` returns 204 after removing that owned, currently associated source. Missing/other-owner/stale association returns 404. Cancel/fence its ingestion/matching jobs, remove its contributions/runs, make associated accepted manifest items terminal, and enqueue durable original cleanup. Retain the activity and its ID while other sources support it; removing the final source removes the activity. Rebuild affected account/dataset summaries and activity readiness from surviving current source/run/job truth.
+- Existing `DELETE /api/activities/{activity_id}` still removes the activity and all its imports. Browser confirmation explicitly states that scope. An explicit later upload through a fresh manifest may create or attach a fresh source; deleted historical manifest items never submit again automatically.
+
+Group attachment and both deletion operations serialize per owner before acquiring jobs, sources, activity and coverage summary locks. Existing lease/revision checks must be revalidated in the final ingest transaction; stale workers cannot create or attach a source after deletion. Existing correction rollback/retry, account deletion journal and account/export isolation stay intact.
+
+Whole-activity deletion and final-source removal persist an owner/fingerprint deletion watermark using database wall time. Compute eligible identity during deletion if a legacy row has not been fingerprinted. An already accepted unassociated import can still be parsing: when decoded, a matching source accepted at or before the watermark must become terminal deleted with cancelled work and durable original cleanup, instead of recreating the activity. Source acceptance time uses database wall time after acquiring the owner guard; a genuinely later explicit upload may create a fresh group. Watermarks retain identity hashes/version/time only, survive ordinary database/process restart, are removed with account deletion and are included in owner exports. They do not establish recovery from an old backup that predates activity deletion; the independent journal continues to protect whole-account deletion.
+
+If a fresh same-file submission would reuse a still-unassociated pending source accepted before an owner deletion watermark, return a retryable 409 until that earlier import resolves. Leave a fresh manifest item unsubmitted and instruct the caller to wait, then select/retry the file. Do not refresh the original source acceptance timestamp or authorize old manifests to replay. This conservative conflict may also briefly affect an unrelated pending same-file copy after another workout was deleted; once decoded, the worker resolves it against its actual identity.
+
+An activity is processed only when every surviving successful source has succeeded current run/job pairs for every active complete dataset. Adding another source makes readiness pending until its matching completes. Removing a failed/pending source recomputes readiness; it cannot remove coverage supported by a survivor.
+
+Activity and account unsupported-sample diagnostics count each logical activity once. Import/source status counts continue to report independent files and jobs.
+
+## Existing history
+
+Migration adds a nullable fingerprint without scanning GPS or merging historical activities. An explicit owner-scoped CLI fingerprints at most 100 existing activities per invocation in pages up to 20, using signed BIGINT cursors and per-activity transactions. Ineligible recordings and conflicts remain separate and are reported. It never rewires historical source associations, changes GPS/metadata/IDs, or reimports deleted sources. Repeated invocations are safe; fingerprint only previously unexamined rows using a persisted version marker. New uploads can subsequently attach to a fingerprinted historical activity.
+
+Account archives include identity/version metadata for activities so logical associations survive export/restore; original files remain included independently. No read endpoint scans GPS to calculate fingerprints.
+
+## Client behavior and verification
+
+Generate client types from the implemented backend before wiring the client. Activity detail shows paged retained imports, explains that equivalent imports share one activity, and offers explicit removal of one import alongside deletion of the whole activity. After removal, refresh activity/detail, import history, coverage and source status; removing the final import clears the selection. Fence list/detail/mutation responses across account switches, activity selections and repeated requests. Existing same-file duplicate labels remain accurate.
+
+Synthetic checks cover GPX/FIT and altered XML metadata equivalence, UTC offsets/fractions, signed zero, timing/coordinate/segment/sport differences, missing/nonmonotonic/sub-microsecond timing, concurrent grouping and both deletions, rollback/retry/stale leases, owner isolation, terminal manifests, final-source cleanup, history fingerprinting and account archives. Actual HTTP and browser checks prove one logical activity with two independent originals, unchanged original samples, source removal preserving coverage, API/worker restart and explicit reimport. Native/provider acceptance is outside this slice.

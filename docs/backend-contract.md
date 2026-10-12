@@ -135,3 +135,7 @@ The [source/status contract](sync-status.md) pins owner-only file history/covera
 ## Recorded activity statistics: T05
 
 The [statistics contract](activity-statistics.md) defines persisted nullable GPS distance, recorded segment duration and average pace for activity list/detail, bounded owner-scoped existing-history backfill, transactional refresh revisions and unknown-data behavior. GPX/FIT share the same original-segment calculation; gaps and explicit pauses are never connected.
+
+## Equivalent file recordings: D24
+
+Equivalent GPX/FIT recordings follow the [D24 grouping contract](recording-groups.md): conservative sample/time identity, independently retained sources, bounded provenance, source-level removal and terminal manifests. Provider reconciliation remains gated on approved adapters.
