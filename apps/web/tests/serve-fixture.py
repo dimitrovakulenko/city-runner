@@ -80,7 +80,7 @@ try:
         command.upgrade(config, 'head')
         engine = create_engine(url, pool_pre_ping=True)
         with engine.begin() as db:
-            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race', 'sync', 'sync-failure', 'sync-race', 'stats', 'stats-backfill']:
+            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race', 'sync', 'sync-failure', 'sync-race', 'stats', 'stats-backfill', 'recordings', 'recording-race']:
                 db.execute(text('INSERT INTO accounts(id) VALUES (:id)'), {'id': 'web-test-' + account})
                 db.execute(text('INSERT INTO sessions(token_digest,account_id,expires_at) VALUES (:digest,:id,:expires)'), {
                     'digest': hashlib.sha256(('web-synthetic-' + account).encode()).hexdigest(), 'id': 'web-test-' + account,
@@ -172,6 +172,19 @@ try:
         ], events=[(2, stats_start + 60, 1), (2, stats_start + 600, 0)]))
         valid_fit = (fixtures / 'browser.fit').read_bytes()
         (fixtures / 'corrupt.fit').write_bytes(valid_fit[:-1] + bytes([valid_fit[-1] ^ 1]))
+        from backend.app.fit import parse_fit
+        equivalent_fit = fit_fixture(records=[
+            (stats_start + offset * 60, semicircles(51.044), semicircles(3.716 + offset * .004))
+            for offset in range(5)
+        ], events=[(2, stats_start + 60, 1), (3, stats_start + 180, 0)])
+        recording = parse_fit(equivalent_fit)
+        segments = ''.join('<trkseg>' + ''.join(
+            f'<trkpt lon="{lon!r}" lat="{lat!r}"><time>{timestamp}</time></trkpt>'
+            for (lon, lat), timestamp in zip(points, timestamps)) + '</trkseg>'
+            for points, timestamps in zip(recording.tracks, recording.timestamps))
+        (fixtures / 'equivalent.gpx').write_bytes(
+            f'<gpx version="1.1"><trk><name>Equivalent recording [synthetic]</name><type>running</type>{segments}</trk></gpx>'.encode())
+        (fixtures / 'equivalent.fit').write_bytes(equivalent_fit)
         def work():
             while not stop.is_set():
                 cleaned = process_account_deletion_cleanup(engine)

@@ -123,3 +123,17 @@ test('runtime acknowledges status only after views refresh and unchanged polls s
   await sessions.setToken('bob');
   assert.equal(runtime.sync.getState().data, null); assert.equal(runtime.sync.getState().eligible, false);
 });
+
+test('runtime session replacement fences a delayed private imported-file page', async () => {
+  const sessions = new BrowserSessions(storage()); await sessions.setToken('alice');
+  let finish!: (response: Response) => void;
+  const runtime = createRuntime(sessions, '', () => new Promise<Response>((resolve) => { finish = resolve; }));
+  const pending = runtime.activitySources.load('9007199254740993');
+  await Promise.resolve(); await Promise.resolve();
+  await sessions.setToken('bob');
+  finish(Response.json({ activity_id: '9007199254740993', items: [{ id: '9007199254740995', source_kind: 'gpx', created_at: '2026-10-12T12:00:00Z' }], page: 1, page_size: 20, total: 1 }));
+  assert.equal(await pending, false);
+  assert.deepEqual(runtime.activitySources.getState().items, []);
+  assert.equal(runtime.activitySources.getState().activityId, null);
+  assert.equal(runtime.activitySources.getState().removingSourceId, null);
+});
