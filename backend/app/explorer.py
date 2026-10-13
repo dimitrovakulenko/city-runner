@@ -43,6 +43,7 @@ class CityItem(BaseModel):
     id: str
     name: str
     admin_level: str
+    bounds: tuple[float, float, float, float]
     visited_nodes: int | None
     eligible_nodes: int | None
     completed_streets: int | None
@@ -168,6 +169,7 @@ def create_explorer_router(engine: Engine, current_user: Callable[..., str]) -> 
                 stats = progress.get(int(row["id"]))
                 items.append(CityItem(
                     id=str(row["id"]), name=row["name"], admin_level=row["admin_level"],
+                    bounds=(row["west"], row["south"], row["east"], row["north"]),
                     visited_nodes=stats["visited_nodes"] if stats and coverage.status == "ready" else None,
                     eligible_nodes=stats["eligible_nodes"] if stats and coverage.status == "ready" else None,
                     completed_streets=stats["completed_streets"] if stats and coverage.status == "ready" else None,
@@ -541,7 +543,10 @@ def _contribution_count(db, dataset_id: int, street_id: int, account_id: str) ->
 
 
 _CITY_LIST_QUERY = """
-    SELECT id,name,admin_level,count(*) OVER() AS total FROM cities
+    SELECT id,name,admin_level,
+      ST_XMin(Box2D(boundary)) AS west,ST_YMin(Box2D(boundary)) AS south,
+      ST_XMax(Box2D(boundary)) AS east,ST_YMax(Box2D(boundary)) AS north,
+      count(*) OVER() AS total FROM cities
     WHERE dataset_id=:dataset_id AND (:q='' OR strpos(lower(name),lower(:q))>0)
     ORDER BY lower(name),id LIMIT :limit OFFSET :offset
 """

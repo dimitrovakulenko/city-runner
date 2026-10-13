@@ -6,4 +6,5 @@ __pycache__/
 .DS_Store
 .poc-data/
 backend/.uploads/
+backend/.map-imports/
 .local-preview/

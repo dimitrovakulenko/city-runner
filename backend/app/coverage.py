@@ -14,6 +14,7 @@ from sqlalchemy import Connection, Engine, create_engine, text
 
 from backend.app.jobs import complete, enqueue, fail
 from backend.app.owner_guard import owner_lock
+from backend.app.map_imports import lock_active_datasets_for_enqueue
 
 
 DEFAULT_BATCH_SIZE = 1000
@@ -129,6 +130,7 @@ def queue_source_coverage(db: Connection, *, account_id: str, source_id: int,
     }).scalar_one()
     points = _samples_from_tracks(tracks)
     if dataset_ids is None:
+        lock_active_datasets_for_enqueue(db)
         datasets = db.execute(text("""SELECT id FROM map_datasets
             WHERE status='active' AND coverage_mode='complete' ORDER BY id""")).scalars().all()
     else:
@@ -391,6 +393,7 @@ def _refresh_activity_processing(db: Connection, *, account_id: str, source_id: 
     if tracks is None:
         return
     points = _samples_from_tracks(tracks)
+    lock_active_datasets_for_enqueue(db)
     active_count = _active_dataset_count(db)
     unmapped = _count_unsupported_samples(db, points)
     pending = db.execute(text("""SELECT count(*) FROM map_datasets dataset

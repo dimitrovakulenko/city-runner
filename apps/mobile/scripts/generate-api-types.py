@@ -26,6 +26,8 @@ SCHEMAS = (
     "MeResponse",
     "MapResponse",
     "ProgressResponse",
+    "DatasetPage",
+    "DatasetItem",
     "UploadResponse",
     "UploadStatusResponse",
     "CityPage",

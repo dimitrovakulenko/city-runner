@@ -32,6 +32,7 @@ class PreviewTests(unittest.TestCase):
             "PGDATA": root / "postgres",
             "PGSOCKETS": root / "run",
             "SOURCES": root / "sources",
+            "MAP_IMPORTS": root / "map-imports",
             "JOURNAL_DIR": root / "journal",
             "JOURNAL": root / "journal" / "deletions.jsonl",
             "LOGS": root / "logs",
@@ -69,7 +70,8 @@ class PreviewTests(unittest.TestCase):
                 for context in contexts:
                     context.__enter__()
                 preview._fresh_install_preflight()
-                for path in (root / "postgres", root / "run", root / "sources", root / "journal", root / "logs"):
+                for path in (root / "postgres", root / "run", root / "sources", root / "map-imports",
+                             root / "journal", root / "logs"):
                     self.assertTrue(path.is_dir())
                     self.assertEqual(list(path.iterdir()), [])
             finally:
@@ -94,7 +96,7 @@ class PreviewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / ".local-preview"
             paths = self.preview_paths(root)
-            for name in ("PREVIEW_ROOT", "PGDATA", "PGSOCKETS", "SOURCES", "JOURNAL_DIR", "LOGS"):
+            for name in ("PREVIEW_ROOT", "PGDATA", "PGSOCKETS", "SOURCES", "MAP_IMPORTS", "JOURNAL_DIR", "LOGS"):
                 paths[name].mkdir(mode=0o700, parents=True, exist_ok=True)
             (paths["PGDATA"] / "PG_VERSION").write_text("16\n", encoding="ascii")
             owner = str(uuid.uuid4())

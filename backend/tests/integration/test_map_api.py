@@ -107,6 +107,35 @@ class MapApiPostgisTests(unittest.TestCase):
     def headers(self, account):
         return {"Authorization": f"Bearer {self.tokens[account]}"}
 
+    def test_dataset_catalog_detail_and_city_items_include_public_bounds(self):
+        catalog = self.client.get("/api/datasets", headers=self.headers(self.account))
+        self.assertEqual(catalog.status_code, 200)
+        payload = catalog.json()
+        self.assertEqual((payload["rule"], payload["page"], payload["page_size"], payload["total"]),
+                         ("normal", 1, 20, 1))
+        item = payload["items"][0]
+        self.assertEqual(item["dataset_id"], str(self.dataset))
+        self.assertEqual(item["bounds"], [0.0, 0.0, 2.0, 2.0])
+        self.assertEqual(item["state"], "pending")
+        self.assertIsNone(item["eligible_nodes"])
+
+        detail = self.client.get(f"/api/datasets/{self.dataset}?rule=strict",
+                                 headers=self.headers(self.account))
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()["bounds"], [0.0, 0.0, 2.0, 2.0])
+        self.assertEqual(detail.json()["state"], "pending")
+        self.assertEqual(self.client.get("/api/datasets/999999999", headers=self.headers(self.account)).status_code,
+                         404)
+
+        cities = self.client.get("/api/cities", params={"dataset_id": self.dataset},
+                                 headers=self.headers(self.account))
+        self.assertEqual(cities.status_code, 200)
+        self.assertEqual(cities.json()["items"][0]["bounds"], [0.0, 0.0, 2.0, 2.0])
+
+        other = self.client.get("/api/datasets", headers=self.headers(self.other)).json()["items"][0]
+        self.assertEqual(other["state"], "pending")
+        self.assertIsNone(other["visited_node_count"])
+
     def add_activity(self, account, *, tracks, activity_id=None, source_status="succeeded"):
         activity_id = activity_id or (9007199254740993 if account == self.account else 9007199254740995)
         with self.engine.begin() as db:

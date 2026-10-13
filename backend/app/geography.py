@@ -24,6 +24,11 @@ EXCLUDED_HIGHWAYS = {
 DEFAULT_NEARBY_RADIUS_M = 25.0
 MAX_NEARBY_RADIUS_M = 1000.0
 MAX_LOOKUP_ROWS = 500
+MAX_OSM_XML_BYTES = 64 * 1024 * 1024
+MAX_IMPORT_CITIES = 50
+MAX_OSM_NODES = 250_000
+MAX_OSM_WAYS = 100_000
+MAX_OSM_REFERENCES = 1_000_000
 
 
 @dataclass(frozen=True)
@@ -55,6 +60,8 @@ def parse_osm_xml(path: str | Path, city_relation_ids: set[int]) -> OSMDocument:
 
 
 def _parse_osm_stream(source, city_relation_ids: set[int]) -> OSMDocument:
+    if len(city_relation_ids) > MAX_IMPORT_CITIES:
+        raise ValueError("invalid_osm_import_selection")
     root = ElementTree.parse(source).getroot()
     if root.tag != "osm":
         raise ValueError("Expected an OSM XML document with an <osm> root.")
@@ -62,8 +69,11 @@ def _parse_osm_stream(source, city_relation_ids: set[int]) -> OSMDocument:
     nodes: dict[int, tuple[float, float]] = {}
     ways: dict[int, Way] = {}
     relations: dict[int, Relation] = {}
+    reference_count = 0
     for element in root:
         if element.tag == "node":
+            if len(nodes) >= MAX_OSM_NODES:
+                raise ValueError("osm_node_limit_exceeded")
             osm_id = _positive_id(element.get("id"), "node")
             lon = _coordinate(element.get("lon"), -180, 180, "longitude")
             lat = _coordinate(element.get("lat"), -90, 90, "latitude")
@@ -71,6 +81,11 @@ def _parse_osm_stream(source, city_relation_ids: set[int]) -> OSMDocument:
                 raise ValueError(f"Conflicting duplicate OSM node {osm_id}.")
             nodes[osm_id] = (lon, lat)
         elif element.tag == "way":
+            if len(ways) >= MAX_OSM_WAYS:
+                raise ValueError("osm_way_limit_exceeded")
+            reference_count += len(element.findall("nd"))
+            if reference_count > MAX_OSM_REFERENCES:
+                raise ValueError("osm_reference_limit_exceeded")
             osm_id = _positive_id(element.get("id"), "way")
             refs = tuple(_positive_id(node.get("ref"), "way node") for node in element.findall("nd"))
             tags = _tags(element)
@@ -85,6 +100,9 @@ def _parse_osm_stream(source, city_relation_ids: set[int]) -> OSMDocument:
                 way = Way(osm_id, refs, {**previous.tags, **tags})
             ways[osm_id] = way
         elif element.tag == "relation":
+            reference_count += len(element.findall("member"))
+            if reference_count > MAX_OSM_REFERENCES:
+                raise ValueError("osm_reference_limit_exceeded")
             osm_id = _positive_id(element.get("id"), "relation")
             if osm_id not in city_relation_ids:
                 continue
@@ -258,7 +276,11 @@ def _read_osm_snapshot(path: Path, relation_ids: set[int]) -> tuple[OSMDocument,
     digest = hashlib.sha256()
     with path.open("rb") as source, tempfile.TemporaryFile(mode="w+b") as snapshot:
         before = os.fstat(source.fileno())
+        size = 0
         for block in iter(lambda: source.read(1024 * 1024), b""):
+            size += len(block)
+            if size > MAX_OSM_XML_BYTES:
+                raise ValueError("osm_xml_too_large")
             digest.update(block)
             snapshot.write(block)
         after = os.fstat(source.fileno())
@@ -279,12 +301,15 @@ def import_osm_xml(
     source_timestamp: str | None = None,
     coverage_mode: str = "sampled",
     coverage_evidence: str | None = None,
+    _map_task: tuple[int, str] | None = None,
+    _expected_checksum: str | None = None,
 ) -> dict:
     """Atomically stage a regional XML snapshot, activating only the first version."""
     file_path = Path(path)
     region = region.strip()
     relation_ids = sorted(set(int(value) for value in city_relation_ids))
-    if not region or len(region) > 128 or not relation_ids or any(value <= 0 for value in relation_ids):
+    if (not region or len(region) > 128 or not relation_ids or len(relation_ids) > MAX_IMPORT_CITIES
+            or any(value <= 0 for value in relation_ids)):
         raise ValueError("A region and one or more positive city relation IDs are required.")
     if coverage_mode not in {"complete", "sampled"}:
         raise ValueError("coverage_mode must be 'complete' or 'sampled'.")
@@ -294,11 +319,18 @@ def import_osm_xml(
     if len(evidence) > 2048:
         raise ValueError("coverage_evidence must be at most 2048 characters.")
     document, digest = _read_osm_snapshot(file_path, set(relation_ids))
+    if _expected_checksum is not None and digest != _expected_checksum:
+        raise ValueError("osm_snapshot_checksum_mismatch")
     snapshot = _iso_timestamp(source_timestamp or document.source_timestamp)
     selection_config = f"{coverage_mode}:{','.join(map(str, relation_ids))}"
     selection_key = hashlib.sha256(selection_config.encode("ascii")).hexdigest()
 
     with engine.begin() as db:
+        task = None
+        if _map_task is not None:
+            from backend.app.map_imports import _task_lock
+
+            task = _task_lock(db, _map_task[0], _map_task[1])
         db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:region, 11011))"), {"region": region})
         existing = db.execute(text("""
             SELECT id, status, validated_at, coverage_mode FROM map_datasets
@@ -307,6 +339,12 @@ def import_osm_xml(
         """), {"region": region, "checksum": digest, "rule": ELIGIBILITY_RULE_VERSION,
               "selection": selection_key}).mappings().first()
         if existing:
+            if task is not None:
+                from backend.app.map_imports import _finalize_import
+
+                _finalize_import(db, task_id=_map_task[0], lease_token=_map_task[1],
+                                 dataset_id=int(existing["id"]), source_timestamp=snapshot,
+                                 activate_and_backfill=False)
             return {"dataset_id": existing["id"], "status": existing["status"],
                     "validated": existing["validated_at"] is not None,
                     "coverage_mode": existing["coverage_mode"], "reused": True}
@@ -347,14 +385,31 @@ def import_osm_xml(
             db.execute(text(f"ANALYZE {table}"))
 
         db.execute(text("UPDATE map_datasets SET validated_at=now() WHERE id=:id"), {"id": dataset_id})
-        has_active = db.execute(text("""
-            SELECT 1 FROM map_datasets WHERE region=:region AND status='active'
-        """), {"region": region}).first()
-        if not has_active and coverage_mode == "complete":
-            db.execute(text("UPDATE map_datasets SET status='active' WHERE id=:id"), {"id": dataset_id})
-            status = "active"
+        activate_and_backfill = False
+        if coverage_mode == "complete":
+            from backend.app.map_imports import _active_dataset_fence
+            _active_dataset_fence(db, exclusive=True)
+            has_active = db.execute(text("""
+                SELECT 1 FROM map_datasets WHERE region=:region AND status='active'
+            """), {"region": region}).first()
+            if not has_active:
+                db.execute(text("UPDATE map_datasets SET status='active' WHERE id=:id"), {"id": dataset_id})
+                status = "active"
+                activate_and_backfill = True
+                if task is None:
+                    from backend.app.map_imports import _ensure_backfill_task
+
+                    _ensure_backfill_task(db, int(dataset_id))
+            else:
+                status = "importing"
         else:
             status = "importing"
+        if task is not None:
+            from backend.app.map_imports import _finalize_import
+
+            _finalize_import(db, task_id=_map_task[0], lease_token=_map_task[1],
+                             dataset_id=int(dataset_id), source_timestamp=snapshot,
+                             activate_and_backfill=activate_and_backfill)
     return {"dataset_id": dataset_id, "status": status, "validated": True,
             "coverage_mode": coverage_mode, "reused": False}
 

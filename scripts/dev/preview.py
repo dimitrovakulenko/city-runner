@@ -32,6 +32,7 @@ PREVIEW_ROOT = ROOT / ".local-preview"
 PGDATA = PREVIEW_ROOT / "postgres"
 PGSOCKETS = PREVIEW_ROOT / "run"
 SOURCES = PREVIEW_ROOT / "sources"
+MAP_IMPORTS = PREVIEW_ROOT / "map-imports"
 JOURNAL_DIR = PREVIEW_ROOT / "journal"
 JOURNAL = JOURNAL_DIR / "deletions.jsonl"
 LOGS = PREVIEW_ROOT / "logs"
@@ -53,6 +54,7 @@ REQUIRED_TABLES = frozenset({
     "manual_street_completions", "import_histories", "import_batches", "import_batch_items", "saved_routes",
     "routing_provider_quota", "account_deletions", "account_deletion_outbox",
     "sync_account_revisions", "sync_geography_revision", "sync_revision_events",
+    "map_import_tasks",
 })
 ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",
@@ -117,7 +119,7 @@ def _validate_root(*, create: bool) -> None:
     if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
             or stat.S_IMODE(info.st_mode) & 0o077):
         raise PreviewError("Preview root must be a private, user-owned directory.")
-    for path in (PGDATA, PGSOCKETS, SOURCES, JOURNAL_DIR, LOGS):
+    for path in (PGDATA, PGSOCKETS, SOURCES, MAP_IMPORTS, JOURNAL_DIR, LOGS):
         _private_directory(path, create=create)
 
 
@@ -134,6 +136,7 @@ def _fresh_install_preflight() -> None:
         PGDATA.name: PGDATA,
         PGSOCKETS.name: PGSOCKETS,
         SOURCES.name: SOURCES,
+        MAP_IMPORTS.name: MAP_IMPORTS,
         JOURNAL_DIR.name: JOURNAL_DIR,
         LOGS.name: LOGS,
     }
@@ -230,6 +233,7 @@ def _runtime_environment(database_url: str) -> dict[str, str]:
     return {
         "DATABASE_URL": database_url,
         "UPLOAD_STORAGE_DIR": str(SOURCES),
+        "MAP_IMPORT_STORAGE_ROOT": str(MAP_IMPORTS),
         "ACCOUNT_DELETION_LEDGER": str(JOURNAL),
     }
 
@@ -267,7 +271,7 @@ def _read_owner() -> str:
 
 
 def _write_fresh_layout() -> None:
-    for path in (PREVIEW_ROOT, PGDATA, PGSOCKETS, SOURCES, JOURNAL_DIR, LOGS):
+    for path in (PREVIEW_ROOT, PGDATA, PGSOCKETS, SOURCES, MAP_IMPORTS, JOURNAL_DIR, LOGS):
         path.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chmod(path, 0o700)
 

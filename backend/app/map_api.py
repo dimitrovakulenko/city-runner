@@ -8,7 +8,7 @@ from collections.abc import Callable
 from contextlib import contextmanager
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
@@ -128,6 +128,18 @@ class ProgressDataset(BaseModel):
     eligible_nodes: int | None
 
 
+class DatasetItem(ProgressDataset):
+    bounds: tuple[float, float, float, float]
+
+
+class DatasetPage(BaseModel):
+    rule: Literal["normal", "strict"]
+    items: list[DatasetItem]
+    page: int
+    page_size: int
+    total: int
+
+
 class ProgressResponse(BaseModel):
     state: Literal["ready", "pending", "failed", "not-matched", "unsupported-geography"]
     rule: Literal["normal", "strict"]
@@ -175,6 +187,38 @@ class BBox(BaseModel):
 
 def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRouter:
     router = APIRouter()
+
+    @router.get("/api/datasets", response_model=DatasetPage)
+    def datasets(rule: Literal["normal", "strict"] = Query("normal"),
+                 page: int = Query(1, ge=1, le=1_000_000),
+                 page_size: int = Query(20, ge=1, le=20),
+                 q: str | None = Query(None, max_length=200),
+                 account_id: str = Depends(current_user)):
+        with _query_connection(engine) as db:
+            with db.begin():
+                db.execute(text(f"SET LOCAL statement_timeout = '{STATEMENT_TIMEOUT_MS}ms'"))
+                where = "status='active' AND coverage_mode='complete' AND (:q='' OR strpos(lower(region),lower(:q))>0)"
+                params = {"q": q or "", "limit": page_size, "offset": (page - 1) * page_size}
+                total = int(db.execute(text(f"SELECT count(*) FROM map_datasets WHERE {where}"), params).scalar_one())
+                rows = db.execute(text(f"""SELECT id,region FROM map_datasets WHERE {where}
+                    ORDER BY lower(region),id LIMIT :limit OFFSET :offset"""), params).mappings().all()
+                items = [_dataset_catalog_item(db, account_id, row, rule) for row in rows]
+        return DatasetPage(rule=rule, items=items, page=page, page_size=page_size, total=total)
+
+    @router.get("/api/datasets/{dataset_id}", response_model=DatasetItem)
+    def dataset_detail(dataset_id: int = Path(ge=1, le=9_223_372_036_854_775_807),
+                       rule: Literal["normal", "strict"] = Query("normal"),
+                       account_id: str = Depends(current_user)):
+        with _query_connection(engine) as db:
+            with db.begin():
+                db.execute(text(f"SET LOCAL statement_timeout = '{STATEMENT_TIMEOUT_MS}ms'"))
+                row = db.execute(text("""SELECT id,region FROM map_datasets
+                    WHERE id=:id AND status='active' AND coverage_mode='complete'"""),
+                    {"id": dataset_id}).mappings().first()
+                if row is None:
+                    raise HTTPException(status_code=404, detail="Dataset not found.")
+                item = _dataset_catalog_item(db, account_id, row, rule)
+        return item
 
     @router.get("/api/map", response_model=MapResponse)
     def map_view(
@@ -382,6 +426,31 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
                                 pending_imports=pending_imports, filters=filters, coverage_scope=coverage_scope)
 
     return router
+
+
+def _dataset_catalog_item(db, account_id: str, row, rule: str) -> DatasetItem:
+    dataset_id = int(row["id"])
+    coverage = _get_account_coverage(db, account_id, dataset_id)
+    status = _dataset_status(coverage, dataset_id, row["region"])
+    ready = status.state in {"ready", "not-matched"}
+    counts = (_progress_counts(db, account_id, dataset_id, rule) if ready else
+              {"manual_completed_streets": _manual_completed_count(db, account_id, dataset_id)})
+    bounds = db.execute(text("""SELECT ST_XMin(extent) AS west,ST_YMin(extent) AS south,
+            ST_XMax(extent) AS east,ST_YMax(extent) AS north
+        FROM (SELECT ST_Extent(boundary) AS extent FROM cities WHERE dataset_id=:dataset) region"""), {
+        "dataset": dataset_id,
+    }).mappings().one()
+    return DatasetItem(
+        dataset_id=str(dataset_id), region=row["region"], state=status.state,
+        progress_revision=status.progress_revision,
+        visited_node_count=status.visited_node_count, unsupported_sample_count=status.unsupported_sample_count,
+        pending_sources=status.pending_sources, failed_sources=status.failed_sources,
+        eligible_streets=counts.get("eligible_streets"), completed_streets=counts.get("completed_streets"),
+        manual_completed_streets=counts["manual_completed_streets"],
+        effective_completed_streets=counts.get("effective_completed_streets"),
+        eligible_nodes=counts.get("eligible_nodes"),
+        bounds=(bounds["west"], bounds["south"], bounds["east"], bounds["north"]),
+    )
 
 
 def _dataset_status(coverage: dict[str, Any], dataset_id: int, region: str) -> DatasetStatus:

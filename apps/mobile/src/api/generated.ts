@@ -91,6 +91,31 @@ export type ProgressResponse = {
   coverage_scope?: "lifetime" | "filtered";
 };
 
+export type DatasetPage = {
+  rule: "normal" | "strict";
+  items: Array<DatasetItem>;
+  page: number;
+  page_size: number;
+  total: number;
+};
+
+export type DatasetItem = {
+  dataset_id: string;
+  region: string;
+  state: "ready" | "pending" | "failed" | "not-matched";
+  progress_revision: string | null;
+  visited_node_count: number | null;
+  unsupported_sample_count: number | null;
+  pending_sources: number | null;
+  failed_sources: number | null;
+  eligible_streets: number | null;
+  completed_streets: number | null;
+  manual_completed_streets: number;
+  effective_completed_streets: number | null;
+  eligible_nodes: number | null;
+  bounds: [number, number, number, number];
+};
+
 export type UploadResponse = {
   id: string;
   status: "queued" | "processing" | "succeeded" | "failed" | "cancelled";
@@ -378,6 +403,7 @@ export type CityItem = {
   id: string;
   name: string;
   admin_level: string;
+  bounds: [number, number, number, number];
   visited_nodes: number | null;
   eligible_nodes: number | null;
   completed_streets: number | null;
