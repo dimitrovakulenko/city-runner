@@ -137,6 +137,16 @@ class CityGeographyProviderTests(unittest.TestCase):
         world["features"][0]["properties"]["iso3166-1:alpha2"] = ["BE", "BE"]
         with self.assertRaisesRegex(CityGeographyError, "invalid_city_provider_response"):
             self.provider(httpx.Response(200, json=world)).fetch_world_catalog()
+        world = json.loads(json.dumps(WORLD))
+        with patch("backend.app.city_geography_provider.MAX_POLYGON_POSITIONS", 12):
+            # Eight physical positions expand to sixteen for the two country scopes.
+            with self.assertRaisesRegex(CityGeographyError, "city_catalog_limit"):
+                self.provider(httpx.Response(200, json=world)).fetch_world_catalog()
+        body = json.dumps(world, separators=(',', ':')).encode()
+        with patch("backend.app.city_geography_provider.MAX_CATALOG_BYTES", len(body) + 1):
+            # The normalized result duplicates country geometry; bound that too.
+            with self.assertRaisesRegex(CityGeographyError, "city_catalog_limit"):
+                self.provider(httpx.Response(200, content=body)).fetch_world_catalog()
 
     def test_http_errors_redirects_and_response_bounds_are_safe(self):
         for response, code in (

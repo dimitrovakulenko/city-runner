@@ -184,12 +184,22 @@ class CityGeographyProvider:
             if len(regions) + len(countries) > MAX_CATALOG_FEATURES:
                 raise CityGeographyError("city_catalog_limit")
             # All physical geometry counts against the bound, even non-country extracts.
+            before = remaining[0]
             geometry = _geometry(feature.get("geometry"), remaining)
+            remaining[0] -= (before - remaining[0]) * max(0, len(countries) - 1)
+            if remaining[0] < 0:
+                raise CityGeographyError("city_catalog_limit")
             for country in countries:
                 regions.append({"country_code": _country(country), "geometry": geometry})
         if not regions:
             raise CityGeographyError("invalid_city_provider_response")
-        return {"regions": regions}
+        result = {"regions": regions}
+        size = 0
+        for chunk in json.JSONEncoder(ensure_ascii=True, allow_nan=False).iterencode(result):
+            size += len(chunk)
+            if size > MAX_CATALOG_BYTES:
+                raise CityGeographyError("city_catalog_limit")
+        return result
 
     def fetch_country_catalog(self, country: str, levels: list[int]) -> dict:
         country = _country(country)
