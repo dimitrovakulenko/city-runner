@@ -97,7 +97,8 @@ try:
             return {'code': 'Ok', 'waypoints': [{'location': point, 'distance': 0} for point in points],
                 'routes': [{'geometry': {'type': 'LineString', 'coordinates': points}, 'distance': 1234.5, 'duration': 900}]}
         app = create_app(engine, routing_provider=synthetic_route if os.environ.get('WEB_TEST_ROUTING') == '1' else None)
-        provisioning = {'hold': True, 'fail_retry': True, 'requests': []}
+        provisioning = {'fail_retry': True, 'requests': []}
+        provisioning_release = threading.Event()
         class SyntheticCityProvider:
             def fetch_world_catalog(self):
                 provisioning['requests'].append(['world'])
@@ -112,7 +113,7 @@ try:
             def fetch_city_extract(self, relation_id):
                 from backend.app.city_geography_provider import CityGeographyError
                 provisioning['requests'].append(['city', relation_id])
-                if relation_id == 903 and provisioning['hold']:
+                if relation_id == 903 and not provisioning_release.wait(60):
                     raise CityGeographyError('city_provider_unavailable')
                 if relation_id == 904 and provisioning['fail_retry']:
                     # Rehearse the final failed attempt without a minute of backoff.
@@ -130,7 +131,7 @@ try:
             return {'enabled': True}
         @app.post('/__test__/provisioning/release', include_in_schema=False)
         def fixture_release_provisioning():
-            provisioning['hold'] = False
+            provisioning_release.set()
             return {'released': True}
         @app.post('/__test__/provisioning/allow-retry', include_in_schema=False)
         def fixture_allow_provisioning_retry():
@@ -264,6 +265,7 @@ try:
             uvicorn.run(app, host='127.0.0.1', port=int(os.environ.get('WEB_TEST_API_PORT', '8003')), log_level='warning')
         finally:
             stop.set()
+            provisioning_release.set()
             worker.join(timeout=5)
 finally:
     stop.set()
