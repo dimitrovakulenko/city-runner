@@ -74,5 +74,7 @@ caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 systemctl daemon-reload
 systemctl enable --now city-runner-api city-runner-worker
 systemctl reload caddy
-systemctl is-active --quiet city-runner-api city-runner-worker caddy
+for unit in city-runner-api city-runner-worker caddy; do
+  systemctl is-active --quiet "$unit" || fail "$unit is not active; inspect its journal."
+done
 echo "Installed. Point DNS at this host, then verify https://$domain and real Google sign-in."

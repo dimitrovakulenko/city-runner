@@ -8,6 +8,24 @@ permissions:
   contents: read
 
 jobs:
+  hosting:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: "1.13.5"
+          terraform_wrapper: false
+      - name: Check deployment scripts
+        run: |
+          bash -n scripts/deploy/build-release.sh scripts/deploy/install-hetzner.sh
+          shellcheck scripts/deploy/build-release.sh scripts/deploy/install-hetzner.sh
+      - name: Validate Hetzner configuration without cloud credentials
+        run: |
+          terraform -chdir=infra/hetzner fmt -check -recursive
+          terraform -chdir=infra/hetzner init -backend=false -lockfile=readonly
+          terraform -chdir=infra/hetzner validate
+
   backend:
     runs-on: ubuntu-latest
     steps:
