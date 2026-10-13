@@ -8,7 +8,7 @@ Build the street-exploration loop first: import history → understand coverage 
 
 The spike demonstrates one real GPX upload and partial coverage. It does not demonstrate production provider sync, multi-user isolation, history-scale performance, or store-ready apps. Continue independent product work while provider feasibility is investigated; mandatory Garmin/Strava support remains a public-launch gate.
 
-Implement comparable user capabilities with our own code and interface. Start with a supported regional dataset, not a worldwide coverage promise. A complete regional dataset and local city lookup are necessary before we can evaluate full-run accuracy reliably.
+Implement comparable user capabilities with our own code and interface. Worldwide availability is required, using automatic on-demand complete-city indexing triggered by retained activities. Public country/city catalogs support local discovery without exposing private GPS to external services; detailed city geography is shared across users. Regional fixtures validate accuracy, while country policy coverage, reliable hosted preparation and complete-city data remain worldwide acceptance gates. See [city provisioning](docs/city-provisioning.md).
 
 ## Feature comparison and release scope
 
