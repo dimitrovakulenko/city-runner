@@ -25,6 +25,7 @@ Open <http://127.0.0.1:8000> using `poc` / `demo`. The demo uses synthetic activ
 
 - [Production development setup](docs/development.md)
 - [Private GPX upload API](docs/gpx-import.md)
+- [Resumable GPX/FIT ZIP and folder history imports](docs/history-imports.md)
 - [Equivalent GPX/FIT recordings and import removal](docs/recording-groups.md)
 - [Regional OSM import](docs/osm-import.md)
 - [Build plan and risks](BUILD_PLAN.md)

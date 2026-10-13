@@ -56,6 +56,10 @@ From `apps/web`, run `rtk npm ci` and `rtk npm run dev`; open `http://127.0.0.1:
 
 Apply migration `0012_sync_status` before using **Sources & sync** or automatic foreground refresh. It records transactional owner/geography revisions, including writes from existing workers; no additional service or polling worker is needed. The owner-only status/failure APIs and explicit matching retry are documented in [source status](sync-status.md). Provider connection credentials and adapters remain future work.
 
+## ZIP and folder histories
+
+Apply migration `0015_import_histories` and restart the API and ingestion workers before using browser ZIP/folder imports. The persistent preview runner applies this migration on normal restart; do not initialize a replacement preview. Histories add durable owner-scoped parents to existing 20-file manifests, without a new worker or automatic backfill. See [history contract](history-imports.md) and [browser controls](../apps/web/README.md#history-imports).
+
 ## Recorded activity statistics
 
 Migration `0013_activity_statistics` adds persisted distance, recorded time and average pace to activity list/detail. Updated ingestion workers calculate them for new GPX/FIT uploads. Existing rows remain unknown until explicitly backfilled; GET requests never scan GPS to calculate statistics. See [metric definitions](activity-statistics.md).

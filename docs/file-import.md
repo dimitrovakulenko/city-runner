@@ -8,6 +8,16 @@ For backward compatibility, `.fit` filenames select FIT parsing and `.gpx` filen
 
 `fitdecode` is MIT-licensed and available from [PyPI](https://pypi.org/project/fitdecode/0.11.0/); its reader exposes decoded data messages and optional CRC matching in the [maintainer documentation](https://github.com/polyvertex/fitdecode). Synthetic FIT fixtures exercise coordinates, segmentation, timer pauses, no-GPS, record/message limits, file types, truncation, CRC, concatenated-stream rejection, big-endian fields, and compressed timestamp rollover. A developer-field collision check ensures custom fields cannot impersonate native coordinates. No real activity file is included in tests.
 
+## ZIP and folder histories
+
+The browser accepts up to 1,000 GPX/FIT files from a file selection, folder or ZIP. Limits are 10 MiB per activity, 256 MiB combined and 64 MiB per ZIP, with at most 10,000 archive entries. Preparation validates paths, archive metadata and extracted activity CRC/size, computes exact byte hashes and skips unrelated files without decompressing them. No device path is sent to the server.
+
+`POST /api/import-histories` atomically creates an owner-scoped parent and ordered child batches of at most 20 files. Replaying the same request UUID and manifest returns the same history. Parent summary/list and paged child APIs provide durable overall and per-file progress. The existing item upload checks declared SHA-256 and size before storing or attaching bytes; uploads remain sequential.
+
+Parent **Stop uploading** pauses all unsubmitted files; accepted jobs continue. Resume and retry reuse existing manifests. After reload, select the original ZIP/folder/files again to match waiting items by basename, format, size and hash, then explicitly resume a stopped history. Deleted items remain terminal. Account archives include histories; account deletion cascades their manifests. Standalone 20-file batches remain compatible. See [history contract](history-imports.md) and [browser controls](../apps/web/README.md#history-imports).
+
+The extension passed 75 backend unit tests, 124 disposable PostGIS tests and 23 production Chrome flows, including duplicate/retry/deletion, stop during upload, account replacement and reload reselection. Actual HTTP and full API/worker/PostgreSQL restart preserved manifests, original bytes, paused/deleted states and coverage; explicit resume completed remaining files.
+
 ## Durable bulk imports
 
 `POST /api/import-batches` records an ordered manifest of 1–20 files and a client UUID `request_id`. Replaying the same request returns the same batch; changing its manifest returns 409. The manifest keeps sanitized basenames and formats, never device paths. Owner-scoped list/detail endpoints provide per-file status, source/activity IDs, duplicate flags, safe errors and six status counts. Lists are bounded and paginated. See the [D18 contract](backend-contract.md#fit-and-resumable-batches-d18--migration-0009).

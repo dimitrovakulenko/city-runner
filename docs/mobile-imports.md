@@ -1,5 +1,7 @@
 # Mobile GPX/FIT batch imports
 
+The shared API/store also supports [history parents](history-imports.md), ordered 20-file children, hash-qualified reselection, a single sequential upload queue and account-fenced polling/cleanup. The browser enables this shared path for ZIP/folder histories. Native screens and pickers still use the existing 20-file batch flow; native ZIP/folder selection is not implemented here. The extension passed 210 shared/mobile tests, typecheck, generated-type checks and both JavaScript exports. Device execution remains separate.
+
 Explore accepts batches of up to 20 GPX or FIT files. The client creates the authenticated server manifest first, then submits each selected file in order as its own bounded multipart request. The list shows server counts and each file's queued, processing, imported, failed or deleted state; exact duplicates remain visible as accepted duplicate items.
 
 The manifest is the durable recovery record. On sign-in and app restart, the client loads the newest 20 manifests and offers bounded pagination for older ones. Local file URIs stay in memory only. An item still awaiting upload asks the user to select that exact name and format again; each row invokes the picker separately, so identical basenames cannot attach bytes to the wrong manifest item. Already accepted items do not need another upload. Failed ingestions with a source offer the server retry operation. Deleted items remain terminal and cannot be selected, retried or reimported through that manifest.
