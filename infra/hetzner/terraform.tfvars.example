@@ -1,0 +1,12 @@
+# Supply the provider token through HCLOUD_TOKEN in the environment; do not store it here.
+location = "nbg1"
+
+# Choose and uncomment an explicit server type before planning/applying.
+# server_type = "cx33"
+
+# Paste a public key generated on the operator's machine.
+# ssh_public_key = "ssh-ed25519 AAAA... operator@host"
+
+# Set to trusted admin address(es), such as ["203.0.113.5/32"].
+# Empty means port 22 stays closed at the cloud firewall.
+ssh_allowed_cidrs = []
