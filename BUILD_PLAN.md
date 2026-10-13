@@ -10,6 +10,8 @@ The spike demonstrates one real GPX upload and partial coverage. It does not dem
 
 Implement comparable user capabilities with our own code and interface. Worldwide availability is required, using automatic on-demand complete-city indexing triggered by retained activities. Public country/city catalogs support local discovery without exposing private GPS to external services; detailed city geography is shared across users. Regional fixtures validate accuracy, while country policy coverage, reliable hosted preparation and complete-city data remain worldwide acceptance gates. See [city provisioning](docs/city-provisioning.md).
 
+The current development adapter ships 32 municipal country policies and automatically reconsiders retained recordings when their country policy expands or changes. Public snapshots and original recordings stay intact. Some countries require subnational/type selectors rather than a uniform administrative level; US coverage is explicitly partial. Policy availability does not certify country-wide OSM completeness, large-city capacity or worldwide release acceptance. Deployment is currently deferred by the owner.
+
 ## Feature comparison and release scope
 
 CityStrides currently advertises lifetime maps, street search, city progress and competition. Its pricing page lists free unlimited activities/cities and a lifetime map; supporter features include advanced maps, missing-node discovery, route building, challenges, replay and faster processing. Listed recurring pricing is $5/month or $50/year, with EUR prices shown as €4/month or €43/year. These are today's advertised prices, not our target cost. [Homepage](https://citystrides.com/), [pricing](https://citystrides.com/pricing).
