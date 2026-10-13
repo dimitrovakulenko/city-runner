@@ -21,7 +21,7 @@ trap 'rm -rf -- "$release_stage"' EXIT
 # Archive tracked application code only: no local sources, database, dotenv or PoC.
 git archive --format=tar HEAD backend infra/hetzner/templates scripts/deploy > "$release_stage/release.tar"
 git rev-parse HEAD > "$release_stage/RELEASE_COMMIT"
-tar -rf "$release_stage/release.tar" -C "$root" apps/web/dist
-tar -rf "$release_stage/release.tar" -C "$release_stage" RELEASE_COMMIT
+COPYFILE_DISABLE=1 tar -rf "$release_stage/release.tar" -C "$root" apps/web/dist
+COPYFILE_DISABLE=1 tar -rf "$release_stage/release.tar" -C "$release_stage" RELEASE_COMMIT
 gzip -c "$release_stage/release.tar" > "$archive"
 echo "Built $archive"
