@@ -32,7 +32,8 @@ from backend.app.activity_filters import (
 from backend.app.sync_status import create_sync_status_router
 from backend.app.account_data import create_account_data_router
 from backend.app.recording_groups import create_recording_groups_router
-from backend.app.city_provisioning import create_city_provisioning_router, enabled as city_discovery_enabled
+from backend.app.city_provisioning import (activity_preparation_processed_sql, create_city_provisioning_router,
+    enabled as city_discovery_enabled, preparation_policy_parameters)
 
 
 class ChallengeRequest(BaseModel):
@@ -167,16 +168,9 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
         selection = canonical_filters(date_from, date_to, activity_type, source)
         processed_sql = "processed"
         if engine.dialect.name == "postgresql" and city_discovery_enabled():
-            processed_sql = """CASE WHEN EXISTS (
-                SELECT 1 FROM activity_sources source
-                LEFT JOIN activity_preparation_requests request
-                  ON request.account_id=source.account_id AND request.source_id=source.id
-                  AND request.source_revision=source.revision
-                WHERE source.account_id=activities.user_id AND source.activity_id=activities.id
-                  AND (source.status<>'succeeded' OR request.state IS NULL
-                    OR request.state NOT IN ('ready','unsupported'))
-            ) THEN FALSE ELSE processed END"""
+            processed_sql = activity_preparation_processed_sql()
         params: dict[str, Any] = {
+            **(preparation_policy_parameters() if processed_sql != "processed" else {}),
             "user_id": user_id,
             "limit": page_size,
             "offset": (page - 1) * page_size,
@@ -210,21 +204,14 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
     def activity(activity_id: int, user_id: str = Depends(current_user)):
         processed_sql = "processed"
         if engine.dialect.name == "postgresql" and city_discovery_enabled():
-            processed_sql = """CASE WHEN EXISTS (
-                SELECT 1 FROM activity_sources source
-                LEFT JOIN activity_preparation_requests request
-                  ON request.account_id=source.account_id AND request.source_id=source.id
-                  AND request.source_revision=source.revision
-                WHERE source.account_id=activities.user_id AND source.activity_id=activities.id
-                  AND (source.status<>'succeeded' OR request.state IS NULL
-                    OR request.state NOT IN ('ready','unsupported'))
-            ) THEN FALSE ELSE processed END"""
+            processed_sql = activity_preparation_processed_sql()
         with engine.connect() as db:
             row = db.execute(text(f"""SELECT id, name, date, activity_type, tracks, timestamps,
                 {processed_sql} AS processed,
                 unmapped_points, distance_m, duration_s, pace_s_per_km
                 FROM activities WHERE id=:id AND user_id=:user_id"""),
-                {"id": activity_id, "user_id": user_id}).mappings().first()
+                {"id": activity_id, "user_id": user_id,
+                 **(preparation_policy_parameters() if processed_sql != "processed" else {})}).mappings().first()
         if row is None:
             raise HTTPException(status_code=404, detail="Activity not found.")
         tracks = row["tracks"] or []

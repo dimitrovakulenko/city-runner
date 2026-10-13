@@ -4,6 +4,7 @@ import os
 import tempfile
 import unittest
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,6 +15,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
 from backend.app.city_provisioning import (
+    _enroll_existing_sources,
+    _enqueue_country_page,
     _perform_public_request,
     _provider_versions,
     _world_candidate_countries,
@@ -123,6 +126,208 @@ class CityProvisioningPostgisTests(unittest.TestCase):
             os.environ.pop("MAP_IMPORT_STORAGE_ROOT", None)
         else:
             os.environ["MAP_IMPORT_STORAGE_ROOT"] = self.previous_storage
+
+    def _set_policy_request(self, country, state='unsupported', old_levels=None):
+        with self.engine.begin() as db:
+            db.execute(text("""UPDATE activity_preparation_requests SET state=:state,phase='done',
+                country_codes=CAST(:countries AS jsonb),country_cursor=:country,
+                candidate_cursor=17,unsupported_sample_count=2,safe_error='city_provider_unavailable'
+                WHERE account_id=:account AND source_id=:source"""), {
+                "state": state, "countries": json.dumps([country]), "country": country,
+                "account": self.account, "source": self.source_id,
+            })
+            db.execute(text("UPDATE activities SET processed=TRUE WHERE id=:id"), {"id": self.activity_id})
+            if old_levels is not None:
+                profile, query = _provider_versions()
+                key = f"country:{country}:{profile}:{','.join(map(str, old_levels))}:{query}"
+                db.execute(text("""INSERT INTO city_public_tasks(task_key,task_kind,country_code,admin_levels)
+                    VALUES (:key,'country',:country,CAST(:levels AS jsonb)) ON CONFLICT DO NOTHING"""), {
+                    "key": key, "country": country, "levels": json.dumps(old_levels),
+                })
+                db.execute(text("""INSERT INTO activity_preparation_countries
+                    (account_id,source_id,source_revision,country_code,task_key,state,candidate_cursor)
+                    VALUES (:account,:source,1,:country,:key,'done',12)"""), {
+                    "account": self.account, "source": self.source_id, "country": country, "key": key,
+                })
+        return key if old_levels is not None else None
+
+    def test_new_country_policy_recovers_retained_unsupported_without_reupload(self):
+        self._set_policy_request('ZZ')
+        client = TestClient(create_app(self.engine, identity_resolver=lambda: self.account))
+        self.assertEqual(client.get('/api/coverage-preparation').json()['state'], 'unsupported')
+        with patch.dict(os.environ, {'CITY_ADMIN_LEVELS': '{"ZZ":[7]}'}, clear=False):
+            status = client.get('/api/coverage-preparation').json()
+            self.assertEqual((status['state'], status['pending_sources'], status['unsupported_sources']),
+                             ('pending', 1, 0))
+            self.assertFalse(client.get(f'/api/activities/{self.activity_id}').json()['processed'])
+            self.assertFalse(client.get('/api/activities').json()['items'][0]['processed'])
+            self.assertTrue(_enroll_existing_sources(self.engine))
+            self.assertFalse(_enroll_existing_sources(self.engine))
+        with self.engine.connect() as db:
+            request = db.execute(text("""SELECT state,phase,country_codes,country_cursor,candidate_cursor,
+                unsupported_sample_count,safe_error FROM activity_preparation_requests
+                WHERE account_id=:account AND source_id=:source"""), {
+                "account": self.account, "source": self.source_id,
+            }).one()
+            self.assertEqual(tuple(request), ('pending', 'catalog', [], None, None, None, None))
+            original = db.execute(text("SELECT tracks,timestamps,processed FROM activities WHERE id=:id"),
+                                  {"id": self.activity_id}).one()
+            self.assertEqual(tuple(original), ([[[0.002, 0.001], [0.004, 0.001]]], [[None, None]], False))
+            self.assertEqual(db.execute(text("SELECT count(*) FROM activity_sources WHERE account_id=:account"),
+                                       {"account": self.account}).scalar_one(), 1)
+
+    def test_changed_levels_rebind_pending_request_and_preserve_shared_tasks(self):
+        old_key = self._set_policy_request('BE', state='pending', old_levels=[8])
+        with patch.dict(os.environ, {'CITY_ADMIN_LEVELS': '{"BE":[7]}'}, clear=False):
+            self.assertTrue(_enroll_existing_sources(self.engine))
+            with self.engine.connect() as db:
+                self.assertEqual(db.execute(text("""SELECT count(*) FROM activity_preparation_countries
+                    WHERE account_id=:account"""), {"account": self.account}).scalar_one(), 0)
+                self.assertEqual(db.execute(text("SELECT count(*) FROM city_public_tasks WHERE task_key=:key"),
+                                           {"key": old_key}).scalar_one(), 1)
+            self.assertFalse(_enroll_existing_sources(self.engine))
+            with self.engine.begin() as db:
+                _enqueue_country_page(db, self.account, self.source_id, 1, ['BE'], None)
+                scope = db.execute(text("""SELECT task_key,candidate_cursor,state
+                    FROM activity_preparation_countries WHERE account_id=:account"""), {
+                    "account": self.account,
+                }).one()
+                self.assertEqual(tuple(scope), (old_key.replace(':8:', ':7:'), None, 'pending'))
+                db.execute(text('DELETE FROM activity_preparation_countries WHERE account_id=:account'),
+                           {'account': self.account})
+                db.execute(text('DELETE FROM city_public_tasks WHERE task_key=:key'), {'key': scope.task_key})
+
+    def test_pending_country_pagination_does_not_reset_missing_supported_links(self):
+        self._set_policy_request('BE', state='pending')
+        self.assertFalse(_enroll_existing_sources(self.engine))
+
+    def test_unchanged_terminal_policy_and_unknown_country_do_not_reenroll(self):
+        self._set_policy_request('BE', old_levels=[8])
+        self.assertFalse(_enroll_existing_sources(self.engine))
+        with self.engine.begin() as db:
+            db.execute(text("""UPDATE activity_preparation_requests SET country_codes='["ZZ"]'::jsonb
+                WHERE account_id=:account"""), {"account": self.account})
+        self.assertFalse(_enroll_existing_sources(self.engine))
+
+    def test_concurrent_policy_recovery_is_owner_fenced_and_idempotent(self):
+        self._set_policy_request('ZZ')
+        with patch.dict(os.environ, {'CITY_ADMIN_LEVELS': '{"ZZ":[7]}'}, clear=False):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                results = list(pool.map(lambda _: _enroll_existing_sources(self.engine), range(2)))
+            self.assertTrue(any(results))
+            self.assertFalse(_enroll_existing_sources(self.engine))
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("""SELECT count(*) FROM activity_preparation_requests
+                WHERE account_id=:account AND source_id=:source AND state='pending'"""), {
+                "account": self.account, "source": self.source_id,
+            }).scalar_one(), 1)
+
+    def test_deleted_source_between_policy_selection_and_owner_lock_is_not_revived(self):
+        self._set_policy_request('ZZ')
+        from backend.app.owner_guard import owner_lock
+        def delete_before_lock(db, account):
+            with self.engine.begin() as deletion:
+                deletion.execute(text("DELETE FROM activity_sources WHERE account_id=:account AND id=:source"),
+                                 {"account": account, "source": self.source_id})
+            owner_lock(db, account)
+        with patch.dict(os.environ, {'CITY_ADMIN_LEVELS': '{"ZZ":[7]}'}, clear=False), patch(
+                'backend.app.city_provisioning.owner_lock', side_effect=delete_before_lock):
+            _enroll_existing_sources(self.engine)
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("""SELECT count(*) FROM activity_preparation_requests
+                WHERE account_id=:account"""), {"account": self.account}).scalar_one(), 0)
+
+    def test_source_revision_change_between_policy_selection_and_owner_lock_is_fenced(self):
+        self._set_policy_request('ZZ')
+        from backend.app.owner_guard import owner_lock
+        def revise_before_lock(db, account):
+            with self.engine.begin() as revision:
+                revision.execute(text("UPDATE activity_sources SET revision=2 WHERE id=:source"),
+                                 {"source": self.source_id})
+            owner_lock(db, account)
+        with patch.dict(os.environ, {'CITY_ADMIN_LEVELS': '{"ZZ":[7]}'}, clear=False), patch(
+                'backend.app.city_provisioning.owner_lock', side_effect=revise_before_lock):
+            _enroll_existing_sources(self.engine)
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("""SELECT state FROM activity_preparation_requests
+                WHERE account_id=:account AND source_revision=1"""), {
+                "account": self.account,
+            }).scalar_one(), 'unsupported')
+        self.assertTrue(_enroll_existing_sources(self.engine))
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text("""SELECT state FROM activity_preparation_requests
+                WHERE account_id=:account AND source_revision=2"""), {
+                "account": self.account,
+            }).scalar_one(), 'pending')
+
+    def test_multicountry_discovery_uses_local_original_samples_and_distinct_municipal_levels(self):
+        profile = 'country-policy-' + uuid.uuid4().hex
+        tracks = [[[0.002, 0.001]], [[4.002, 0.001]]]
+        timestamps = [['2026-10-13T07:00:00Z'], ['2026-10-13T08:00:00Z']]
+        calls = []
+        with self.engine.begin() as db:
+            admission = db.execute(text('SELECT requests_reserved,bytes_reserved FROM city_provider_admission WHERE singleton=TRUE')).one()
+            db.execute(text('UPDATE city_provider_admission SET requests_reserved=0,bytes_reserved=0 WHERE singleton=TRUE'))
+
+        class MultiCountryProvider:
+            def fetch_world_catalog(self):
+                return {'regions': [{'country_code': country, 'geometry': {
+                    'type': 'Polygon', 'coordinates': [[[west, -1], [west + 2, -1],
+                        [west + 2, 1], [west, 1], [west, -1]]],
+                }} for country, west in [('BR', -1), ('US', 1), ('JP', 3)]]}
+
+            def fetch_country_catalog(self, country, levels):
+                calls.append((country, levels))
+                relation, west = {'BR': (900, 0), 'JP': (902, 4)}[country]
+                return {'source_timestamp': '2026-10-13T00:00:00+00:00', 'cities': [{
+                    'relation_id': relation, 'name': country + ' Municipality',
+                    'bounds': [west, 0, west + 0.01, 0.01],
+                }]}
+
+            def fetch_city_extract(self, relation_id):
+                from xml.etree.ElementTree import fromstring, tostring
+                root = fromstring(_city_fixture())
+                if relation_id == 902:
+                    for node in root.findall('node'):
+                        node.set('lon', str(float(node.get('lon')) + 4))
+                    root.find('relation').set('id', '902')
+                    root.find("relation/tag[@k='admin_level']").set('v', '7')
+                return {'source_timestamp': '2026-10-13T00:00:00+00:00', 'xml': tostring(root)}
+
+        try:
+            with self.engine.begin() as db:
+                db.execute(text("UPDATE activities SET tracks=CAST(:tracks AS json),timestamps=CAST(:times AS json) WHERE id=:id"),
+                           {'tracks': json.dumps(tracks), 'times': json.dumps(timestamps), 'id': self.activity_id})
+            with patch('backend.app.city_geography_provider.PROFILE_VERSION', profile), patch(
+                    'backend.app.city_geography_provider.get_city_geography_provider', return_value=MultiCountryProvider()):
+                with self.engine.begin() as db:
+                    enqueue_preparation_request(db, account_id=self.account, source_id=self.source_id, source_revision=1)
+                for _ in range(80):
+                    with self.engine.begin() as db:
+                        db.execute(text("UPDATE city_provider_admission SET next_request_at=clock_timestamp()-interval '1 second' WHERE singleton=TRUE"))
+                    process_city_provisioning_step(self.engine)
+                    process_map_task_step(self.engine)
+                    with self.engine.connect() as db:
+                        state = db.execute(text("SELECT state FROM activity_preparation_requests WHERE account_id=:account"),
+                                           {'account': self.account}).scalar_one()
+                    if state in ('ready', 'unsupported', 'failed'):
+                        break
+                self.assertEqual(state, 'ready')
+                self.assertEqual(calls, [('BR', [8]), ('JP', [7])])
+                self.assertFalse(_enroll_existing_sources(self.engine))
+                with self.engine.connect() as db:
+                    self.assertEqual(db.execute(text("SELECT tracks,timestamps FROM activities WHERE id=:id"),
+                                                {'id': self.activity_id}).one(), (tracks, timestamps))
+                    self.assertEqual(db.execute(text("SELECT count(*) FROM activity_preparation_cities WHERE account_id=:account AND touched=TRUE"),
+                                                {'account': self.account}).scalar_one(), 2)
+        finally:
+            with self.engine.begin() as db:
+                db.execute(text('DELETE FROM activity_preparation_requests WHERE account_id=:account'), {'account': self.account})
+                db.execute(text('DELETE FROM city_public_tasks WHERE task_key LIKE :pattern'), {'pattern': '%:' + profile + '%'})
+                db.execute(text("DELETE FROM map_import_tasks WHERE region IN ('auto:BR:900','auto:JP:902')"))
+                db.execute(text("DELETE FROM map_datasets WHERE region IN ('auto:BR:900','auto:JP:902')"))
+                db.execute(text('UPDATE city_provider_admission SET requests_reserved=:requests,bytes_reserved=:bytes WHERE singleton=TRUE'),
+                           {'requests': admission.requests_reserved, 'bytes': admission.bytes_reserved})
 
     def test_worker_discovers_imports_and_verifies_city_from_original_samples(self):
         app = create_app(self.engine, identity_resolver=lambda: self.account)

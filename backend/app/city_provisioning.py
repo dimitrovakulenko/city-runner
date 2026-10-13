@@ -73,6 +73,47 @@ def _city_task_key(relation_id: int) -> str:
     return f"city:{relation_id}:{profile_version}:{query_version}:{ELIGIBILITY_RULE_VERSION}"
 
 
+def preparation_policy_parameters() -> dict[str, str]:
+    from backend.app.city_geography_provider import CityGeographyError, country_admin_levels
+    profile, query = _provider_versions()
+    try:
+        policies = country_admin_levels()
+    except CityGeographyError:
+        # The country checkpoint persists the safe configuration error.
+        policies = {}
+    return {"city_policy_tasks": json.dumps({country:
+        f"country:{country}:{profile}:{','.join(map(str, levels))}:{query}"
+        for country, levels in policies.items()})}
+
+
+def preparation_policy_changed_sql() -> str:
+    """Metadata-only predicate; callers bind the current public policy task map."""
+    return """(EXISTS (SELECT 1 FROM activity_preparation_countries scope
+        WHERE scope.account_id=request.account_id AND scope.source_id=request.source_id
+          AND scope.source_revision=request.source_revision
+          AND CAST(:city_policy_tasks AS jsonb) ? scope.country_code::text
+          AND scope.task_key IS DISTINCT FROM
+              (CAST(:city_policy_tasks AS jsonb)->>scope.country_code::text))
+        OR (request.state IN ('ready','unsupported','failed') AND EXISTS (
+            SELECT 1 FROM jsonb_array_elements_text(request.country_codes) country(code)
+            WHERE CAST(:city_policy_tasks AS jsonb) ? country.code
+              AND NOT EXISTS (SELECT 1 FROM activity_preparation_countries scope
+                WHERE scope.account_id=request.account_id AND scope.source_id=request.source_id
+                  AND scope.source_revision=request.source_revision AND scope.country_code=country.code))))"""
+
+
+def activity_preparation_processed_sql() -> str:
+    return """CASE WHEN EXISTS (
+        SELECT 1 FROM activity_sources source
+        LEFT JOIN activity_preparation_requests request
+          ON request.account_id=source.account_id AND request.source_id=source.id
+          AND request.source_revision=source.revision
+        WHERE source.account_id=activities.user_id AND source.activity_id=activities.id
+          AND (source.status<>'succeeded' OR request.state IS NULL
+            OR request.state NOT IN ('ready','unsupported') OR {changed})
+        ) THEN FALSE ELSE processed END""".format(changed=preparation_policy_changed_sql())
+
+
 def enqueue_preparation_request(db: Connection, *, account_id: str, source_id: int,
                                 source_revision: int) -> None:
     """Call from the successful source-ingestion transaction; deliberately stores no GPS."""
@@ -96,14 +137,15 @@ def get_coverage_preparation(db: Connection, account_id: str) -> dict[str, Any]:
         return {"enabled": False, "state": "ready", "pending_sources": 0,
                 "failed_sources": 0, "unsupported_sources": 0, "cities": [], "cities_truncated": False}
     counts = db.execute(text("""SELECT
-            count(*) FILTER (WHERE request.source_id IS NULL OR request.state='pending') AS pending,
-            count(*) FILTER (WHERE request.state='failed') AS failed,
-            count(*) FILTER (WHERE request.state='unsupported') AS unsupported
+            count(*) FILTER (WHERE request.source_id IS NULL OR request.state='pending' OR {changed}) AS pending,
+            count(*) FILTER (WHERE request.state='failed' AND NOT {changed}) AS failed,
+            count(*) FILTER (WHERE request.state='unsupported' AND NOT {changed}) AS unsupported
         FROM activity_sources source
         LEFT JOIN activity_preparation_requests request ON request.account_id=source.account_id
           AND request.source_id=source.id AND request.source_revision=source.revision
-        WHERE source.account_id=:account AND source.status='succeeded' AND source.activity_id IS NOT NULL"""), {
-        "account": account_id,
+        WHERE source.account_id=:account AND source.status='succeeded' AND source.activity_id IS NOT NULL""".format(
+            changed=preparation_policy_changed_sql())), {
+        "account": account_id, **preparation_policy_parameters(),
     }).mappings().one()
     failed, pending, unsupported = (int(counts[name]) for name in ("failed", "pending", "unsupported"))
     state = "failed" if failed else "pending" if pending else "unsupported" if unsupported else "ready"
@@ -559,15 +601,18 @@ def _finalize_preparation(db: Connection, account: str, source_id: int, revision
 def _enroll_existing_sources(engine: Engine) -> bool:
     if not enabled():
         return False
+    policy_parameters = preparation_policy_parameters()
     with engine.connect() as db:
         candidates = db.execute(text("""SELECT source.account_id,source.id,source.revision
             FROM activity_sources source
+            LEFT JOIN activity_preparation_requests request
+              ON request.account_id=source.account_id AND request.source_id=source.id
+                AND request.source_revision=source.revision
             WHERE source.status='succeeded' AND source.activity_id IS NOT NULL
-              AND NOT EXISTS (SELECT 1 FROM activity_preparation_requests request
-                WHERE request.account_id=source.account_id AND request.source_id=source.id
-                  AND request.source_revision=source.revision)
-            ORDER BY source.account_id,source.id LIMIT :limit"""), {
-            "limit": MAX_OWNER_ENROLLMENT,
+              AND (request.source_id IS NULL OR {changed})
+            ORDER BY source.account_id,source.id LIMIT :limit""".format(
+                changed=preparation_policy_changed_sql())), {
+            "limit": MAX_OWNER_ENROLLMENT, **policy_parameters,
         }).mappings().all()
     if not candidates:
         return False
@@ -581,6 +626,26 @@ def _enroll_existing_sources(engine: Engine) -> bool:
                     continue
                 raise
             ensure_public_task(db, "world:" + _provider_versions()[0], "world")
+            reset = db.execute(text("""UPDATE activity_preparation_requests request SET
+                state='pending',phase='catalog',country_codes='[]'::jsonb,country_cursor=NULL,
+                candidate_cursor=NULL,unsupported_sample_count=NULL,safe_error=NULL,
+                updated_at=clock_timestamp()
+                WHERE request.account_id=:account AND request.source_id=:source
+                  AND request.source_revision=:revision AND {changed}
+                  AND EXISTS (SELECT 1 FROM activity_sources source
+                    WHERE source.account_id=request.account_id AND source.id=request.source_id
+                      AND source.revision=request.source_revision AND source.status='succeeded'
+                      AND source.activity_id IS NOT NULL)
+                RETURNING source_id""".format(changed=preparation_policy_changed_sql())), {
+                "account": account, "source": row["id"], "revision": row["revision"],
+                **policy_parameters,
+            }).scalar_one_or_none()
+            if reset is not None:
+                for table in ("activity_preparation_countries", "activity_preparation_cities"):
+                    db.execute(text(f"""DELETE FROM {table} WHERE account_id=:account
+                        AND source_id=:source AND source_revision=:revision"""), {
+                        "account": account, "source": row["id"], "revision": row["revision"],
+                    })
             db.execute(text("""INSERT INTO activity_preparation_requests
                 (account_id,source_id,source_revision,state,phase)
                 SELECT CAST(:account AS varchar),CAST(:source AS bigint),CAST(:revision AS integer),
@@ -828,11 +893,11 @@ def process_city_provisioning_step(engine: Engine) -> bool:
     """Advance one bounded owner checkpoint or one globally admitted public request."""
     if not enabled():
         return _reconcile_disabled_requests(engine)
-    if _prepare_one_owner_step(engine):
-        return True
     # Enrollment is an independent bounded lane: a blocked public request must not
     # prevent previously imported sources from entering preparation.
     if _enroll_existing_sources(engine):
+        return True
+    if _prepare_one_owner_step(engine):
         return True
     task = _reserve_public_request(engine)
     if task is None:

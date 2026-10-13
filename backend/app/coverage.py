@@ -549,14 +549,16 @@ def _refresh_activity_processing(db: Connection, *, account_id: str, source_id: 
     })
     discovery_waiting = 0
     if os.getenv("CITY_GEOGRAPHY_PROVIDER", "").strip().lower() == "overpass":
+        from backend.app.city_provisioning import preparation_policy_changed_sql, preparation_policy_parameters
         discovery_waiting = int(db.execute(text("""SELECT count(*) FROM activity_sources source
             WHERE source.account_id=:account AND source.activity_id=:activity
               AND (source.status<>'succeeded' OR NOT EXISTS (
                 SELECT 1 FROM activity_preparation_requests request
                 WHERE request.account_id=source.account_id AND request.source_id=source.id
                   AND request.source_revision=source.revision
-                  AND request.state IN ('ready','unsupported')))"""), {
-            "account": account_id, "activity": activity_id,
+                  AND request.state IN ('ready','unsupported') AND NOT {changed}))""".format(
+                      changed=preparation_policy_changed_sql())), {
+            "account": account_id, "activity": activity_id, **preparation_policy_parameters(),
         }).scalar_one())
     db.execute(text("""UPDATE activities SET processed=:processed, unmapped_points=:unmapped
         WHERE id=:activity_id AND user_id=:account_id"""), {
