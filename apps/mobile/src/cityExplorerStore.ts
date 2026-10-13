@@ -498,6 +498,10 @@ export class CityExplorerStore {
   }
 
   async retry(): Promise<void> {
+    if (this.datasetApi && this.state.selectedDatasetId && (this.state.datasetError !== null || this.state.datasetStatus === 'offline' || this.state.datasetStatus === 'error' || this.state.datasetStatus === 'sign-in-required')) {
+      await this.refreshDatasets();
+      return;
+    }
     if (this.state.progressStatus === 'offline' || this.state.progressStatus === 'error' || this.state.progressStatus === 'sign-in-required') return this.refreshProgress();
     if (!this.state.selectedDatasetId) return this.refreshProgress();
     if (this.state.selectedStreetId) {

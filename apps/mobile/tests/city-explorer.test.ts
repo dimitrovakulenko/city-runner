@@ -163,6 +163,28 @@ test('selected region refresh stays exact outside the search page and never repl
   assert.ok(exactReads >= 1);
 });
 
+test('Retry reloads a failed selected-region catalog refresh', async () => {
+  let exactReads = 0;
+  const catalog = catalogApi({ async listDatasets(input) { return datasetPage([catalogDataset('d1')], input.page, input.rule); },
+    async getDataset(id) {
+      if (++exactReads === 1) throw new Error('temporary region refresh failure');
+      return catalogDataset(id, [4, 49, 5, 50]);
+    } });
+  const store = new CityExplorerStore(api(), catalog);
+  await store.loadDatasets();
+  store.selectDataset('d1'); await tick();
+  assert.equal(await store.refreshDatasets(), false);
+  assert.equal(store.getState().datasetStatus, 'error');
+  assert.equal(store.getState().datasetError, 'temporary region refresh failure');
+
+  await store.retry();
+
+  assert.equal(exactReads, 2);
+  assert.equal(store.getState().datasetStatus, 'ready');
+  assert.equal(store.getState().datasetError, null);
+  assert.deepEqual(store.getState().selectedDataset?.bounds, [4, 49, 5, 50]);
+});
+
 test('region and city clicks issue repeatable map-focus bounds; pending progress stays null', async () => {
   const pending = { ...catalogDataset('d1', [-1, 49, 1, 51]), state: 'pending' as const,
     visited_node_count: null, eligible_streets: null, completed_streets: null, effective_completed_streets: null, eligible_nodes: null };
