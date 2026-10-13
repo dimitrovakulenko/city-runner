@@ -1,18 +1,29 @@
 import { ApiError } from './api/client';
 import type { ApiErrorKind } from './api/client';
 import type { CityExplorerApi, StreetFilter, StreetSort } from './api/cities';
-import type { CityItem, ContributionPage, ContributingActivity, DatasetCoverage, ProgressDataset, ProgressResponse, RemainingNode, StreetDetail, StreetItem } from './api/generated';
+import type { DatasetApi } from './api/datasets';
+import type { CityItem, ContributionPage, ContributingActivity, DatasetCoverage, DatasetItem, ProgressDataset, ProgressResponse, RemainingNode, StreetDetail, StreetItem } from './api/generated';
 
 export type CityLoadState = 'idle' | 'loading' | 'loading-more' | 'ready' | 'empty' | 'offline' | 'sign-in-required' | 'error';
 const PAGE_SIZE = 50;
+const DATASET_PAGE_SIZE = 20;
+const MAX_REFRESH_DATASET_PAGES = 5;
+export type CityExplorerDataset = ProgressDataset & { bounds?: DatasetItem['bounds'] };
 
 export interface CityExplorerState {
   rule: 'normal' | 'strict';
   progress: ProgressResponse | null;
   progressStatus: CityLoadState;
   progressError: string | null;
-  datasets: ProgressDataset[];
+  datasets: CityExplorerDataset[];
   selectedDatasetId: string | null;
+  selectedDataset: CityExplorerDataset | null;
+  datasetQuery: string;
+  datasetPage: number;
+  datasetTotal: number;
+  datasetStatus: CityLoadState;
+  datasetError: string | null;
+  mapFocus: { revision: number; bounds: [number, number, number, number] } | null;
   cityQuery: string;
   cities: CityItem[];
   cityPage: number;
@@ -50,6 +61,7 @@ export interface CityExplorerState {
 
 const INITIAL: CityExplorerState = {
   rule: 'normal', progress: null, progressStatus: 'idle', progressError: null, datasets: [], selectedDatasetId: null,
+  selectedDataset: null, datasetQuery: '', datasetPage: 0, datasetTotal: 0, datasetStatus: 'idle', datasetError: null, mapFocus: null,
   cityQuery: '', cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null, cityStatus: 'idle', cityError: null, selectedCityId: null, selectedCityName: null,
   streetQuery: '', streetFilter: 'all', streetSort: 'name', streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null,
   selectedStreetId: null, detail: null, remainingNodes: null, detailPage: 0, detailStatus: 'idle', detailError: null,
@@ -63,6 +75,10 @@ function errorState(error: unknown): 'offline' | 'sign-in-required' | 'error' {
   const kind = errorKind(error);
   return kind === 'offline' || kind === 'sign-in-required' ? kind : 'error';
 }
+function validBounds(bounds: readonly number[]): bounds is [number, number, number, number] {
+  return bounds.length === 4 && bounds.every(Number.isFinite) && bounds[0]! >= -180 && bounds[2]! <= 180 &&
+    bounds[1]! >= -90 && bounds[3]! <= 90 && bounds[0]! < bounds[2]! && bounds[1]! < bounds[3]!;
+}
 const MAX_BIGINT_ID = 9223372036854775807n;
 function validBigintId(id: string): boolean { return /^[1-9]\d{0,18}$/.test(id) && BigInt(id) <= MAX_BIGINT_ID; }
 
@@ -71,10 +87,12 @@ export class CityExplorerStore {
   private accountGeneration = 0;
   private accountController = new AbortController();
   private requests = { progress: 0, cities: 0, streets: 0, detail: 0, contributions: 0 };
+  private datasetRequest = 0;
+  private selectedDatasetRequest = 0;
   private mapStreetContext = false;
   private listeners = new Set<(state: CityExplorerState) => void>();
 
-  constructor(private readonly api: CityExplorerApi) {}
+  constructor(private readonly api: CityExplorerApi, private readonly datasetApi?: DatasetApi) {}
   getState(): CityExplorerState { return this.state; }
   subscribe(listener: (state: CityExplorerState) => void): () => void {
     this.listeners.add(listener);
@@ -89,6 +107,8 @@ export class CityExplorerStore {
   }
   private invalidateAll(): void {
     this.requests.progress++;
+    this.datasetRequest++;
+    this.selectedDatasetRequest++;
     this.invalidateSelectionRequests();
   }
   private invalidateSelectionRequests(): void {
@@ -103,18 +123,20 @@ export class CityExplorerStore {
     this.accountController.abort();
     this.accountController = new AbortController();
     this.invalidateSelectionRequests();
+    this.datasetRequest++; this.selectedDatasetRequest++;
     this.update({ ...INITIAL });
   }
   private expireSession(): void {
     this.reset();
     const message = 'Your session expired. Sign in again.';
     this.update({ progressStatus: 'sign-in-required', progressError: message,
+      datasetStatus: 'sign-in-required', datasetError: message,
       cityStatus: 'sign-in-required', cityError: message, streetStatus: 'sign-in-required', streetError: message,
       detailStatus: 'sign-in-required', detailError: message, contributionStatus: 'sign-in-required', contributionError: message });
   }
   private datasetBecameInactive(): void {
     this.invalidateSelectionRequests();
-    this.update({ datasets: [], selectedDatasetId: null, cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null,
+    this.update({ datasets: [], selectedDatasetId: null, selectedDataset: null, cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null,
       cityStatus: 'error', cityError: 'This dataset is no longer active. Refresh the dataset list.',
       selectedCityId: null, selectedCityName: null, streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null,
       selectedStreetId: null, detail: null, remainingNodes: null, detailStatus: 'idle', detailError: null,
@@ -129,14 +151,16 @@ export class CityExplorerStore {
     try {
       const progress = await this.api.getProgress(rule, this.accountController.signal);
       if (!this.current('progress', request, generation) || rule !== this.state.rule) return;
-      const datasets = [...progress.datasets];
+      const datasets: CityExplorerDataset[] = this.datasetApi ? this.state.datasets : [...progress.datasets];
       const selectedDatasetId = this.state.selectedDatasetId;
-      const listedSelected = selectedDatasetId === null || datasets.some((item) => item.dataset_id === selectedDatasetId);
-      if (!listedSelected && progress.datasets_truncated) {
+      const listedSelected = this.datasetApi || selectedDatasetId === null || datasets.some((item) => item.dataset_id === selectedDatasetId);
+      if (!this.datasetApi && !listedSelected && progress.datasets_truncated) {
         const lastKnown = this.state.datasets.find((item) => item.dataset_id === selectedDatasetId);
         if (lastKnown) datasets.push(lastKnown);
-      } else if (!listedSelected) this.datasetBecameInactive();
-      this.update({ progress, datasets, progressStatus: 'ready' });
+      } else if (!this.datasetApi && !listedSelected) this.datasetBecameInactive();
+      const selectedDataset = this.state.selectedDatasetId ? datasets.find((item) => item.dataset_id === this.state.selectedDatasetId) ?? this.state.selectedDataset : null;
+      this.update({ progress, datasets, selectedDataset, progressStatus: 'ready' });
+      if (this.datasetApi) await this.refreshDatasets();
       if (this.state.selectedCityId) await Promise.all([this.loadCities(1, false), this.loadStreets(1, false)]);
       else if (this.state.selectedDatasetId) await this.loadCities(1, false);
     } catch (error) {
@@ -150,6 +174,7 @@ export class CityExplorerStore {
     if (rule === this.state.rule) return;
     this.invalidateAll();
     this.update({ rule, cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null, cityStatus: 'idle', cityError: null,
+      datasetStatus: this.datasetApi ? 'loading' : this.state.datasetStatus, datasetError: null,
       streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null,
       selectedStreetId: null, detail: null, remainingNodes: null, detailPage: 0, detailStatus: 'idle', detailError: null,
       contributions: [], contributionPage: 0, contributionTotal: null, contributionAvailable: false, contributionCoverage: null,
@@ -162,12 +187,109 @@ export class CityExplorerStore {
     if (datasetId !== null && !this.state.datasets.some((dataset) => dataset.dataset_id === datasetId)) return;
     this.mapStreetContext = false;
     this.invalidateSelectionRequests();
-    this.update({ selectedDatasetId: datasetId, cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null,
+    this.selectedDatasetRequest++;
+    const selectedDataset = datasetId ? this.state.datasets.find((dataset) => dataset.dataset_id === datasetId) ?? null : null;
+    this.update({ selectedDatasetId: datasetId, selectedDataset, cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null,
       cityStatus: datasetId ? 'loading' : 'idle', cityError: null, selectedCityId: null, selectedCityName: null,
       streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null,
       selectedStreetId: null, detail: null, remainingNodes: null, detailStatus: 'idle', detailError: null,
       contributions: [], contributionPage: 0, contributionTotal: null, contributionAvailable: false, contributionCoverage: null, contributionStatus: 'idle', contributionError: null });
+    if (selectedDataset?.bounds) this.focusMap(selectedDataset.bounds);
     if (datasetId) void this.loadCities(1, false);
+  }
+
+  async loadDatasets(page = 1): Promise<boolean> {
+    if (!this.datasetApi || !Number.isInteger(page) || page < 1 || page > 1_000_000) return false;
+    return this.loadDatasetPage(page, page > 1);
+  }
+
+  async loadMoreDatasets(): Promise<boolean> {
+    if (this.state.datasetStatus === 'loading' || this.state.datasetStatus === 'loading-more' || this.state.datasets.length >= this.state.datasetTotal) return false;
+    return this.loadDatasets(this.state.datasetPage + 1);
+  }
+
+  setDatasetQuery(query: string): void {
+    if (query === this.state.datasetQuery) return;
+    this.datasetRequest++;
+    this.update({ datasetQuery: query, datasets: [], datasetPage: 0, datasetTotal: 0, datasetStatus: 'idle', datasetError: null });
+    if (this.datasetApi) void this.loadDatasets(1);
+  }
+
+  async refreshDatasets(): Promise<boolean> {
+    if (!this.datasetApi) return false;
+    const loadedPages = Math.max(1, Math.min(MAX_REFRESH_DATASET_PAGES, this.state.datasetPage || 1));
+    const revision = this.accountGeneration;
+    const request = ++this.datasetRequest;
+    const query = this.state.datasetQuery;
+    const rule = this.state.rule;
+    const selectedId = this.state.selectedDatasetId;
+    this.update({ datasetStatus: 'loading', datasetError: null });
+    try {
+      const pages = [] as DatasetItem[][];
+      let total = 0;
+      for (let page = 1; page <= loadedPages; page++) {
+        const response = await this.datasetApi.listDatasets({ rule, query, page, pageSize: DATASET_PAGE_SIZE }, this.accountController.signal);
+        if (revision !== this.accountGeneration || request !== this.datasetRequest) return false;
+        if (response.rule !== rule || response.page !== page || response.page_size !== DATASET_PAGE_SIZE || !Number.isInteger(response.total) || response.total < 0 ||
+            response.items.some((item) => !validBounds(item.bounds))) throw new Error('The region list response was invalid. Refresh and retry.');
+        pages.push(response.items); total = response.total;
+        if (page * DATASET_PAGE_SIZE >= total) break;
+      }
+      const datasetById = new Map<string, DatasetItem>();
+      for (const items of pages) for (const item of items) datasetById.set(item.dataset_id, item);
+      const datasets = [...datasetById.values()];
+      let selectedDataset = selectedId ? datasets.find((item) => item.dataset_id === selectedId) ?? this.state.selectedDataset : null;
+      if (selectedId) {
+        const detailRequest = ++this.selectedDatasetRequest;
+        const detail = await this.datasetApi.getDataset(selectedId, rule, this.accountController.signal);
+        if (revision !== this.accountGeneration || request !== this.datasetRequest) return false;
+        if (selectedId === this.state.selectedDatasetId && detailRequest === this.selectedDatasetRequest) {
+          if (detail.dataset_id !== selectedId || !validBounds(detail.bounds)) throw new Error('The selected region response was invalid. Refresh and retry.');
+          selectedDataset = detail;
+          const index = datasets.findIndex((item) => item.dataset_id === selectedId);
+          if (index >= 0) datasets[index] = detail;
+        }
+      }
+      if (revision !== this.accountGeneration || request !== this.datasetRequest) return false;
+      const currentSelected = selectedId === this.state.selectedDatasetId ? selectedDataset : this.state.selectedDataset;
+      this.update({ datasets, selectedDataset: currentSelected, datasetPage: pages.length || 1, datasetTotal: Math.max(total, datasets.length), datasetStatus: 'ready', datasetError: null });
+      return true;
+    } catch (error) {
+      if (revision !== this.accountGeneration || request !== this.datasetRequest) return false;
+      if (errorKind(error) === 'sign-in-required') { this.expireSession(); return false; }
+      this.update({ datasetStatus: errorState(error), datasetError: errorMessage(error) });
+      return false;
+    }
+  }
+
+  private async loadDatasetPage(page: number, append: boolean): Promise<boolean> {
+    if (!this.datasetApi) return false;
+    const request = ++this.datasetRequest;
+    const generation = this.accountGeneration;
+    const query = this.state.datasetQuery;
+    const rule = this.state.rule;
+    this.update({ datasetStatus: append ? 'loading-more' : 'loading', datasetError: null });
+    try {
+      const response = await this.datasetApi.listDatasets({ rule, query, page, pageSize: DATASET_PAGE_SIZE }, this.accountController.signal);
+      if (generation !== this.accountGeneration || request !== this.datasetRequest || query !== this.state.datasetQuery || rule !== this.state.rule) return false;
+      if (response.rule !== rule || response.page !== page || response.page_size !== DATASET_PAGE_SIZE || !Number.isInteger(response.total) || response.total < 0 ||
+          response.items.some((item) => !validBounds(item.bounds))) throw new Error('The region list response was invalid. Refresh and retry.');
+      const byId = new Map((append ? this.state.datasets : []).map((item) => [item.dataset_id, item]));
+      for (const item of response.items) byId.set(item.dataset_id, item);
+      const datasets = append ? [...byId.values()] : response.items;
+      this.update({ datasets, datasetPage: response.page, datasetTotal: Math.max(response.total, datasets.length), datasetStatus: datasets.length ? 'ready' : 'empty' });
+      return true;
+    } catch (error) {
+      if (generation !== this.accountGeneration || request !== this.datasetRequest) return false;
+      if (errorKind(error) === 'sign-in-required') { this.expireSession(); return false; }
+      this.update({ datasetStatus: errorState(error), datasetError: errorMessage(error) });
+      return false;
+    }
+  }
+
+  private focusMap(bounds: [number, number, number, number]): void {
+    const revision = (this.state.mapFocus?.revision ?? 0) + 1;
+    this.update({ mapFocus: { revision, bounds } });
   }
 
   setCityQuery(query: string): void {
@@ -209,10 +331,12 @@ export class CityExplorerStore {
     if (!this.state.cities.some((city) => city.id === cityId)) return;
     this.invalidateSelectionRequests();
     this.mapStreetContext = false;
-    this.update({ selectedCityId: cityId, selectedCityName: this.state.cities.find((city) => city.id === cityId)?.name ?? null, streetQuery: '', streetFilter: 'all', streetSort: 'name', streets: [], streetPage: 0,
+    const city = this.state.cities.find((item) => item.id === cityId)!;
+    this.update({ selectedCityId: cityId, selectedCityName: city.name, streetQuery: '', streetFilter: 'all', streetSort: 'name', streets: [], streetPage: 0,
       streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'loading', streetError: null, selectedStreetId: null,
       detail: null, remainingNodes: null, detailStatus: 'idle', detailError: null,
       contributions: [], contributionPage: 0, contributionTotal: null, contributionCoverage: null, contributionStatus: 'idle', contributionError: null });
+    this.focusMap(city.bounds);
     void this.loadStreets(1, false);
   }
   backToCities(): void {
@@ -401,7 +525,7 @@ export class CityExplorerStore {
   clearSelection(): void {
     this.mapStreetContext = false;
     this.invalidateSelectionRequests();
-    this.update({ selectedDatasetId: null, cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null, cityStatus: 'idle', cityError: null,
+    this.update({ selectedDatasetId: null, selectedDataset: null, cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null, cityStatus: 'idle', cityError: null,
       selectedCityId: null, selectedCityName: null, streets: [], streetPage: 0, streetTotal: 0, streetCoverage: null, streetFilterApplied: true, streetSortApplied: true, streetStatus: 'idle', streetError: null,
       selectedStreetId: null, detail: null, remainingNodes: null, detailStatus: 'idle', detailError: null,
       contributions: [], contributionPage: 0, contributionTotal: null, contributionAvailable: false, contributionCoverage: null,
