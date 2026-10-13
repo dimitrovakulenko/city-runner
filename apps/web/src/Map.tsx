@@ -28,6 +28,8 @@ export function ExploreMap({ runtime, enabled, accountId, planning, selected, se
   const [showTracks, setShowTracks] = useState(true);
   const state = useStore(runtime.explore);
   const planner = useStore(runtime.planner);
+  const cities = useStore(runtime.cities);
+  const consumedBoundsFocus = useRef<string | null>(null);
   useEffect(() => {
     if (!host.current) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -95,6 +97,16 @@ export function ExploreMap({ runtime, enabled, accountId, planning, selected, se
     restoredGeneration.current = runtime.imports.getAccountGeneration();
     map.jumpTo(accountId ? positions.current?.read(accountId) ?? DEFAULT_POSITION : DEFAULT_POSITION);
   }, [accountId, ready]);
+  useEffect(() => {
+    const map = mapRef.current; const focus = cities.mapFocus;
+    if (!ready || !map || !enabled || !accountId || !focus) return;
+    const key = `${accountId}:${runtime.imports.getAccountGeneration()}:${focus.revision}`;
+    if (consumedBoundsFocus.current === key) return;
+    consumedBoundsFocus.current = key;
+    map.stop();
+    const [west, south, east, north] = focus.bounds;
+    map.fitBounds([[west, south], [east, north]], { padding: 70, maxZoom: 15, duration: 700 });
+  }, [cities.mapFocus, ready, enabled, accountId, runtime]);
   useEffect(() => {
     const map = mapRef.current; if (!ready || !map) return;
     (map.getSource('current-location') as GeoJSONSource).setData(enabled && location?.accountId === accountId ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: location.coordinate } }] } : EMPTY);

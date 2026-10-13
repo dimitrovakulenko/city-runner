@@ -31,6 +31,8 @@ test('street discovery and Node Hunter use real scoped coverage, consume node cl
   await page.getByRole('button', { name: 'Nearly done', exact: true }).click();
   await expect(page.locator('.street-row')).toHaveCount(1);
   await expect(page.locator('.street-row')).toContainText('80% GPS');
+  // Region/city navigation centers the map before map-feature interaction.
+  await expect.poll(() => view ? Math.abs((view.bbox[0] + view.bbox[2]) / 2 - 3.725) : 1).toBeLessThan(.00001);
   // A map feature opens a street absent from the filtered list.
   await clickCoordinate(page, view!, 3.724, 51.050);
   await expect(page.getByRole('heading', { name: 'Orchard Street', exact: true })).toBeVisible();

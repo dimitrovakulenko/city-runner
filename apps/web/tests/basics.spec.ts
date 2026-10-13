@@ -103,18 +103,21 @@ test('location, account-scoped viewport and offline recovery use the real browse
   await expect(page.getByRole('button', { name: 'Remaining node 1', exact: true })).toBeDisabled();
   await context.setOffline(false);
   await expect(streetTarget).toBeEnabled();
+  // Explicit city navigation finishes before checking saved-view isolation.
+  await expect.poll(() => page.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? '{}').center?.[0] ?? -180, key)).toBeCloseTo(3.725, 6);
   // Cancelled and signed-out callbacks must never move the map or expose a marker.
   await page.evaluate(() => Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { getCurrentPosition: (success: unknown) => { (window as unknown as { locationSuccess: unknown }).locationSuccess = success; } } }));
   await location.click(); await page.getByRole('button', { name: 'Cancel location' }).click();
   await page.evaluate(() => (window as unknown as { locationSuccess: (position: unknown) => void }).locationSuccess({ coords: { longitude: 3.72, latitude: 51.04, accuracy: 4 } }));
   await expect(page.locator('.map-area')).toHaveAttribute('data-located', 'false');
+  const savedBeforeAccountChange = await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), key);
   await location.click(); await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await page.evaluate(() => (window as unknown as { locationSuccess: (position: unknown) => void }).locationSuccess({ coords: { longitude: 3.72, latitude: 51.04, accuracy: 4 } }));
   await expect(page.locator('.map-area')).toHaveAttribute('data-located', 'false');
   await page.evaluate(() => sessionStorage.setItem('city-runner.session', 'web-synthetic-view-other')); await page.reload();
   await expect(page.locator('.map-area')).toHaveAttribute('data-ready', 'true');
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('city-runner.viewport.web-test-view-other') ?? '{}').zoom)).toBe(14.8);
-  expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), key)).toEqual(saved);
+  expect(await page.evaluate((key) => JSON.parse(localStorage.getItem(key)!), key)).toEqual(savedBeforeAccountChange);
   await page.evaluate(() => Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { getCurrentPosition: (_success: unknown, fail: (error: unknown) => void) => fail({ code: 1 }) } }));
   await location.click(); await expect(page.locator('.map-location [role="alert"]')).toContainText('permission denied');
   await page.evaluate(() => Object.defineProperty(navigator, 'geolocation', { configurable: true, value: { getCurrentPosition: (_success: unknown, fail: (error: unknown) => void) => fail({ code: 3 }) } }));

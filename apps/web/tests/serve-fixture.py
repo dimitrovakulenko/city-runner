@@ -42,25 +42,25 @@ worker = None
 fixtures = Path(__file__).parent / '.fixtures'
 fixtures.mkdir(exist_ok=True)
 
-def geography():
+def geography(*, city_name='Demo City', relation_id=900, longitude_offset=0.):
     root = Element('osm', version='0.6', generator='city-runner-synthetic-web-test')
     boundaries = {1: (3.71, 51.04), 2: (3.74, 51.04), 3: (3.74, 51.065), 4: (3.71, 51.065)}
     for identifier, (lon, lat) in boundaries.items():
-        SubElement(root, 'node', id=str(identifier), lon=str(lon), lat=str(lat))
+        SubElement(root, 'node', id=str(identifier), lon=str(lon + longitude_offset), lat=str(lat))
     for index, name in enumerate(['Maple Lane', 'Canal Road', 'Garden Way', 'Orchard Street', 'Birch Avenue', 'River Walk', 'Park Lane', 'Willow Road']):
         way = SubElement(root, 'way', id=str(20 + index))
         for offset in range(5):
             identifier = 1000 + index * 10 + offset
-            SubElement(root, 'node', id=str(identifier), lon=str(3.716 + offset * .004), lat=str(51.044 + index * .002))
+            SubElement(root, 'node', id=str(identifier), lon=str(3.716 + longitude_offset + offset * .004), lat=str(51.044 + index * .002))
             SubElement(way, 'nd', ref=str(identifier))
         SubElement(way, 'tag', k='highway', v='residential')
         SubElement(way, 'tag', k='name', v=name)
     for identifier, refs in [(10, [1, 2]), (11, [2, 3]), (12, [3, 4]), (13, [4, 1])]:
         way = SubElement(root, 'way', id=str(identifier))
         for ref in refs: SubElement(way, 'nd', ref=str(ref))
-    relation = SubElement(root, 'relation', id='900')
+    relation = SubElement(root, 'relation', id=str(relation_id))
     for identifier in [10, 11, 12, 13]: SubElement(relation, 'member', type='way', ref=str(identifier), role='outer')
-    for key, value in {'type': 'boundary', 'boundary': 'administrative', 'admin_level': '8', 'name': 'Demo City'}.items(): SubElement(relation, 'tag', k=key, v=value)
+    for key, value in {'type': 'boundary', 'boundary': 'administrative', 'admin_level': '8', 'name': city_name}.items(): SubElement(relation, 'tag', k=key, v=value)
     return tostring(root)
 
 def gpx(name, rows):
@@ -73,6 +73,7 @@ try:
     os.environ['DATABASE_URL'] = url
     with tempfile.TemporaryDirectory(prefix='city-runner-web-test-') as temporary:
         os.environ['UPLOAD_STORAGE_DIR'] = temporary + '/sources'
+        os.environ['MAP_IMPORT_STORAGE_ROOT'] = temporary + '/map-imports'
         os.environ['ACCOUNT_DELETION_LEDGER'] = temporary + '/account-deletions.jsonl'
         initialize_ledger()
         config = Config(str(ROOT / 'backend/alembic.ini'))
@@ -80,7 +81,7 @@ try:
         command.upgrade(config, 'head')
         engine = create_engine(url, pool_pre_ping=True)
         with engine.begin() as db:
-            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race', 'sync', 'sync-failure', 'sync-race', 'stats', 'stats-backfill', 'recordings', 'recording-race', 'history-zip', 'history-folder', 'history-race', 'history-replacement']:
+            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race', 'sync', 'sync-failure', 'sync-race', 'stats', 'stats-backfill', 'recordings', 'recording-race', 'history-zip', 'history-folder', 'history-race', 'history-replacement', 'regions', 'region-race', 'region-replacement']:
                 db.execute(text('INSERT INTO accounts(id) VALUES (:id)'), {'id': 'web-test-' + account})
                 db.execute(text('INSERT INTO sessions(token_digest,account_id,expires_at) VALUES (:digest,:id,:expires)'), {
                     'digest': hashlib.sha256(('web-synthetic-' + account).encode()).hexdigest(), 'id': 'web-test-' + account,
@@ -96,6 +97,30 @@ try:
             return {'code': 'Ok', 'waypoints': [{'location': point, 'distance': 0} for point in points],
                 'routes': [{'geometry': {'type': 'LineString', 'coordinates': points}, 'distance': 1234.5, 'duration': 900}]}
         app = create_app(engine, routing_provider=synthetic_route if os.environ.get('WEB_TEST_ROUTING') == '1' else None)
+        @app.post('/__test__/regions/create', include_in_schema=False)
+        def fixture_add_region():
+            from backend.app.map_imports import submit_osm_import
+            extract = Path(temporary) / 'additional-region.osm'
+            extract.write_bytes(geography(city_name='Additional City', relation_id=901, longitude_offset=.4))
+            return submit_osm_import(engine, extract, region='Z Added Region', city_relation_ids=[901],
+                source_timestamp='2026-10-13T00:00:00Z', coverage_mode='complete',
+                coverage_evidence='Synthetic additional-region browser QA only')
+        @app.get('/__test__/regions/tasks/{task_id}', include_in_schema=False)
+        def fixture_region_task(task_id: int):
+            from backend.app.map_imports import get_map_task
+            return get_map_task(engine, task_id)
+        @app.post('/__test__/regions/catalog', include_in_schema=False)
+        def fixture_region_catalog():
+            extract = Path(temporary) / 'catalog-region.osm'
+            extract.write_bytes(geography(city_name='Catalog City', relation_id=902, longitude_offset=.1))
+            return [import_osm_xml(engine, extract, region=f'ZZ Catalog {index:02}', city_relation_ids=[902],
+                source_timestamp='2026-10-13T00:00:00Z', coverage_mode='complete',
+                coverage_evidence='Synthetic catalog pagination QA only') for index in range(21)]
+        @app.post('/__test__/regions/cleanup', include_in_schema=False)
+        def fixture_region_cleanup():
+            with engine.begin() as db:
+                db.execute(text("DELETE FROM map_datasets WHERE region='Z Added Region' OR region LIKE 'ZZ Catalog %'"))
+            return {'cleaned': True}
         @app.post('/__test__/statistics/legacy/{activity_id}', include_in_schema=False)
         def fixture_legacy_statistics(activity_id: int):
             with engine.begin() as db:
@@ -188,7 +213,9 @@ try:
         def work():
             while not stop.is_set():
                 cleaned = process_account_deletion_cleanup(engine)
-                if not cleaned and not run_once(engine, handlers): stop.wait(.15)
+                if not cleaned and not run_once(engine, handlers):
+                    from backend.app.map_imports import process_map_task_step
+                    if not process_map_task_step(engine): stop.wait(.15)
         worker = threading.Thread(target=work, daemon=True); worker.start()
         try:
             uvicorn.run(app, host='127.0.0.1', port=int(os.environ.get('WEB_TEST_API_PORT', '8003')), log_level='warning')

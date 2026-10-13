@@ -14,6 +14,7 @@ import { createRouteApi } from '../../mobile/src/api/routes';
 import { createActivityApi, createApiRequest } from '../../mobile/src/api/client';
 import { createExploreApi } from '../../mobile/src/api/explore';
 import { createCityExplorerApi } from '../../mobile/src/api/cities';
+import { createDatasetApi } from '../../mobile/src/api/datasets';
 import { createImportBatchApi } from '../../mobile/src/api/importBatches';
 import { createHistoryImportApi } from '../../mobile/src/api/importHistories';
 import { createCorrectionApi } from '../../mobile/src/api/corrections';
@@ -40,7 +41,7 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
   });
   const account = new AccountStore(createAccountApi(options), sessions);
   const explore = new ExploreStore(createExploreApi(options));
-  const cities = new CityExplorerStore(createCityExplorerApi(options));
+  const cities = new CityExplorerStore(createCityExplorerApi(options), createDatasetApi(options));
   const planner = new RoutePlannerStore(createRouteApi(options));
   const imports = new ImportStore(createBrowserImportApi(options, files, false), () => crypto.randomUUID(), () => {
     void sync.retryRefresh();
@@ -60,12 +61,12 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
     if (activity.listError || activity.detailError || activity.impactError || activity.filterOptionsError ||
       map.progressStatus === 'error' || map.progressStatus === 'offline' || map.mapStatus === 'error' || map.mapStatus === 'offline' ||
       activitySources.getState().activityId !== null && !activitySources.getState().activityMissing && activitySources.getState().error ||
-      city.progressError || city.selectedDatasetId && city.cityError || city.selectedCityId && city.streetError ||
+      city.progressError || city.datasetError || city.selectedDatasetId && city.cityError || city.selectedCityId && city.streetError ||
       city.selectedStreetId && (city.detailError || city.contributionError) || imports.getState().error) {
       throw new Error('Some views could not refresh. Retry refresh when connected.');
     }
     return activityReady && mapReady && (sourceReady || activitySources.getState().activityId === null) && activity.filterOptionsStatus === 'ready' &&
-      city.progressStatus === 'ready' && (!city.selectedDatasetId || !city.cityError) &&
+      city.progressStatus === 'ready' && !city.datasetError && (!city.selectedDatasetId || !city.cityError) &&
       (!city.selectedCityId || !city.streetError) && (!city.selectedStreetId || !city.detailError && !city.contributionError) &&
       !imports.getState().error && !imports.getState().historyError;
   });

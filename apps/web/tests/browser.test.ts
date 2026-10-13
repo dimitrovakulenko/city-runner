@@ -106,6 +106,7 @@ test('runtime acknowledges status only after views refresh and unchanged polls s
       if (failList) { failList = false; return Response.json({ detail: 'Temporary failure' }, { status: 503 }); }
       return Response.json({ items: [], page: 1, page_size: 20, total: 0 });
     }
+    if (url.pathname === '/api/datasets') return Response.json({ rule: 'normal', items: [], page: 1, page_size: 20, total: 0 });
     if (url.pathname === '/api/progress') return Response.json({ state: 'unsupported-geography', rule: 'normal', datasets: [], datasets_truncated: false, unmapped_points: 0, pending_imports: 0 });
     if (url.pathname === '/api/import-batches') return Response.json({ items: [], page: 1, page_size: 20, total: 0 });
     if (url.pathname === '/api/import-histories') return Response.json({ items: [], page: 1, page_size: 20, total: 0 });
