@@ -9,9 +9,9 @@ import re
 import stat
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
-from sqlalchemy import Engine, text
+from sqlalchemy import Connection, Engine, text
 
 from backend.app.owner_guard import owner_lock
 
@@ -136,7 +136,9 @@ def _options(region: str, city_relation_ids: list[int] | tuple[int, ...],
 def submit_osm_import(engine: Engine, source_path: str | os.PathLike[str], *, region: str,
                       city_relation_ids: list[int] | tuple[int, ...],
                       source_timestamp: str | None = None, coverage_mode: str = "sampled",
-                      coverage_evidence: str = "", storage_root: str | os.PathLike[str] | None = None) -> dict[str, Any]:
+                      coverage_evidence: str = "", storage_root: str | os.PathLike[str] | None = None,
+                      _transaction_hook: Callable[[Connection, int, str, str | None], None] | None = None
+                      ) -> dict[str, Any]:
     """Durably snapshot a public extract and submit one idempotent global task."""
     from backend.app.geography import ELIGIBILITY_RULE_VERSION, _iso_timestamp
 
@@ -165,6 +167,8 @@ def submit_osm_import(engine: Engine, source_path: str | os.PathLike[str], *, re
             if row is not None:
                 task_id = int(row[0])
                 retained = True
+                if _transaction_hook is not None:
+                    _transaction_hook(db, task_id, checksum, parsed_timestamp)
             else:
                 existing = db.execute(text("""SELECT id,region,object_key,status,phase,dataset_id,
                         source_cursor,attempts,last_error,source_checksum,created_at,updated_at
@@ -173,6 +177,8 @@ def submit_osm_import(engine: Engine, source_path: str | os.PathLike[str], *, re
                       AND selection_key=:selection AND eligibility_rule_version=:rule"""), identity).mappings().one()
                 task_id = int(existing["id"])
                 result = _public_task(existing)
+                if _transaction_hook is not None:
+                    _transaction_hook(db, task_id, checksum, parsed_timestamp)
         if not retained:
             _remove_object(root, object_key)
             return result
@@ -190,8 +196,7 @@ def submit_osm_import(engine: Engine, source_path: str | os.PathLike[str], *, re
                     AND region=:region AND source_checksum=:checksum AND coverage_mode=:coverage_mode
                     AND selection_key=:selection AND eligibility_rule_version=:rule
                     AND object_key=:object_key"""), {**identity, "object_key": object_key}).first()
-            if exists:
-                retained = True
+            retained = bool(exists)
         except Exception:
             retained = True
         if not retained:
@@ -383,7 +388,7 @@ def _advance_backfill_source(engine: Engine, task_id: int, lease_token: str) -> 
                 raise RuntimeError("map_task_lease_lost")
             return False
         cursor = task["source_cursor"]
-        candidate = db.execute(text("""SELECT id,account_id FROM activity_sources
+        candidate = db.execute(text("""SELECT id,account_id,activity_id FROM activity_sources
             WHERE (CAST(:cursor AS bigint) IS NULL OR id>CAST(:cursor AS bigint))
             ORDER BY id LIMIT 1"""), {
             "cursor": cursor,
@@ -412,11 +417,20 @@ def _advance_backfill_source(engine: Engine, task_id: int, lease_token: str) -> 
                 "account": account_id, "id": source_id,
             }).mappings().first()
             if source is not None and source["status"] == "succeeded" and source["activity_id"] is not None:
-                queue_source_coverage(
-                    db, account_id=account_id, source_id=source_id,
-                    source_revision=int(source["revision"]), activity_id=int(source["activity_id"]),
-                    dataset_ids=[int(task["dataset_id"])], priority=10,
-                )
+                from backend.app.coverage import track_may_touch_dataset_sql
+                candidate_sql = track_may_touch_dataset_sql("activity.track_geometry", ":dataset")
+                may_touch = db.execute(text(f"""SELECT EXISTS (
+                    SELECT 1 FROM activities activity WHERE activity.user_id=:account
+                      AND activity.id=:activity AND {candidate_sql})"""), {
+                    "account": account_id, "activity": source["activity_id"],
+                    "dataset": int(task["dataset_id"]),
+                }).scalar_one()
+                if may_touch:
+                    queue_source_coverage(
+                        db, account_id=account_id, source_id=source_id,
+                        source_revision=int(source["revision"]), activity_id=int(source["activity_id"]),
+                        dataset_ids=[int(task["dataset_id"])], priority=10,
+                    )
         advanced = db.execute(text("""UPDATE map_import_tasks SET source_cursor=:cursor,
             attempts=0,
             last_error=NULL,updated_at=clock_timestamp()

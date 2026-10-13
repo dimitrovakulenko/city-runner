@@ -33,6 +33,13 @@ NODE_ZOOM = 16
 STATEMENT_TIMEOUT_MS = 1500
 
 
+def _public_region(dataset_alias: str) -> str:
+    return f"""CASE WHEN {dataset_alias}.region LIKE 'auto:%' THEN COALESCE(
+        (SELECT city.name||', '||substring({dataset_alias}.region FROM 6 FOR 2)
+         FROM cities city WHERE city.dataset_id={dataset_alias}.id ORDER BY city.id LIMIT 1),
+        {dataset_alias}.region) ELSE {dataset_alias}.region END"""
+
+
 class LayerLimit(BaseModel):
     returned: int
     limit: int
@@ -197,10 +204,14 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
         with _query_connection(engine) as db:
             with db.begin():
                 db.execute(text(f"SET LOCAL statement_timeout = '{STATEMENT_TIMEOUT_MS}ms'"))
-                where = "status='active' AND coverage_mode='complete' AND (:q='' OR strpos(lower(region),lower(:q))>0)"
                 params = {"q": q or "", "limit": page_size, "offset": (page - 1) * page_size}
-                total = int(db.execute(text(f"SELECT count(*) FROM map_datasets WHERE {where}"), params).scalar_one())
-                rows = db.execute(text(f"""SELECT id,region FROM map_datasets WHERE {where}
+                region_sql = _public_region("dataset")
+                matching = f"""WITH datasets AS (SELECT dataset.id,{region_sql} AS region
+                    FROM map_datasets dataset WHERE dataset.status='active'
+                      AND dataset.coverage_mode='complete')"""
+                where = "(:q='' OR strpos(lower(region),lower(:q))>0)"
+                total = int(db.execute(text(f"{matching} SELECT count(*) FROM datasets WHERE {where}"), params).scalar_one())
+                rows = db.execute(text(f"""{matching} SELECT id,region FROM datasets WHERE {where}
                     ORDER BY lower(region),id LIMIT :limit OFFSET :offset"""), params).mappings().all()
                 items = [_dataset_catalog_item(db, account_id, row, rule) for row in rows]
         return DatasetPage(rule=rule, items=items, page=page, page_size=page_size, total=total)
@@ -212,8 +223,9 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
         with _query_connection(engine) as db:
             with db.begin():
                 db.execute(text(f"SET LOCAL statement_timeout = '{STATEMENT_TIMEOUT_MS}ms'"))
-                row = db.execute(text("""SELECT id,region FROM map_datasets
-                    WHERE id=:id AND status='active' AND coverage_mode='complete'"""),
+                row = db.execute(text(f"""SELECT dataset.id,{_public_region('dataset')} AS region
+                    FROM map_datasets dataset WHERE dataset.id=:id
+                      AND dataset.status='active' AND dataset.coverage_mode='complete'"""),
                     {"id": dataset_id}).mappings().first()
                 if row is None:
                     raise HTTPException(status_code=404, detail="Dataset not found.")
@@ -375,11 +387,12 @@ def create_map_router(engine: Engine, current_user: Callable[..., str]) -> APIRo
         with _query_connection(engine) as db:
             with db.begin():
                 db.execute(text(f"SET LOCAL statement_timeout = '{STATEMENT_TIMEOUT_MS}ms'"))
-                rows = db.execute(text("""
-                    SELECT id,region FROM map_datasets
-                    WHERE status='active' AND coverage_mode='complete'
-                    ORDER BY region,id LIMIT :limit
-                """), {"limit": MAX_DATASETS + 1}).mappings().all()
+                rows = db.execute(text(f"""SELECT dataset.id,{_public_region('dataset')} AS region
+                    FROM map_datasets dataset WHERE dataset.status='active'
+                      AND dataset.coverage_mode='complete'
+                    ORDER BY region,dataset.id LIMIT :limit"""), {
+                    "limit": MAX_DATASETS + 1,
+                }).mappings().all()
                 datasets_truncated = len(rows) > MAX_DATASETS
                 rows = rows[:MAX_DATASETS]
                 result = []
@@ -531,6 +544,10 @@ def _filtered_dataset_counts(db, account_id: str, dataset_id: int, filters: Acti
           JOIN coverage_source_runs r ON r.account_id=src.account_id AND r.source_id=src.id
             AND r.source_revision=src.revision AND r.dataset_id=:dataset_id AND r.status='succeeded'
           JOIN jobs j ON j.account_id=r.account_id AND j.id=r.job_id AND j.status='succeeded'
+          AND NOT EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+            WHERE applicability.account_id=src.account_id AND applicability.source_id=src.id
+              AND applicability.source_revision=src.revision AND applicability.dataset_id=r.dataset_id
+              AND applicability.applicable=FALSE)
           {join}
           WHERE src.account_id=:account_id AND src.status='succeeded' {source_filter}
         )
@@ -621,7 +638,7 @@ def _query_connection(engine):
 
 _CITY_QUERY = """
     WITH box AS (SELECT ST_MakeEnvelope(:west,:south,:east,:north,4326) AS geom)
-    SELECT d.id AS dataset_id,d.region,c.id AS city_id,substring(c.name,1,200) AS name,
+    SELECT d.id AS dataset_id,""" + _public_region("d") + """ AS region,c.id AS city_id,substring(c.name,1,200) AS name,
            ST_XMin(Box2D(c.boundary)) AS west,ST_YMin(Box2D(c.boundary)) AS south,
            ST_XMax(Box2D(c.boundary)) AS east,ST_YMax(Box2D(c.boundary)) AS north
     FROM map_datasets d JOIN cities c ON c.dataset_id=d.id CROSS JOIN box
@@ -718,6 +735,10 @@ _MISSING_NODE_QUERY = """
           JOIN jobs j ON j.account_id=r.account_id AND j.id=r.job_id AND j.status='succeeded'
           /* FILTERED_ACTIVITY_JOIN */
           WHERE c.account_id=:account_id AND c.dataset_id=sn.dataset_id AND c.node_id=sn.osm_node_id
+            AND NOT EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+              WHERE applicability.account_id=c.account_id AND applicability.source_id=c.source_id
+                AND applicability.source_revision=c.source_revision AND applicability.dataset_id=c.dataset_id
+                AND applicability.applicable=FALSE)
             /* FILTERED_SOURCE */
         )
       GROUP BY sn.dataset_id,sn.osm_node_id,n.point
@@ -749,6 +770,10 @@ def _progress_counts(db, account_id: str, dataset_id: int, rule: str,
           JOIN coverage_source_runs r ON r.account_id=c.account_id AND r.source_id=c.source_id
             AND r.source_revision=c.source_revision AND r.dataset_id=c.dataset_id AND r.status='succeeded'
           JOIN jobs j ON j.account_id=r.account_id AND j.id=r.job_id AND j.status='succeeded'
+          AND NOT EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+            WHERE applicability.account_id=c.account_id AND applicability.source_id=c.source_id
+              AND applicability.source_revision=c.source_revision AND applicability.dataset_id=c.dataset_id
+              AND applicability.applicable=FALSE)
           {join}
           WHERE sn.dataset_id=:dataset {source_filter} GROUP BY sn.dataset_id,sn.street_id
         )
@@ -784,6 +809,10 @@ _STREET_VISIT_QUERY = """
     JOIN coverage_source_runs r ON r.account_id=c.account_id AND r.source_id=c.source_id
       AND r.source_revision=c.source_revision AND r.dataset_id=c.dataset_id AND r.status='succeeded'
     JOIN jobs j ON j.account_id=r.account_id AND j.id=r.job_id AND j.status='succeeded'
+    AND NOT EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+      WHERE applicability.account_id=c.account_id AND applicability.source_id=c.source_id
+        AND applicability.source_revision=c.source_revision AND applicability.dataset_id=c.dataset_id
+        AND applicability.applicable=FALSE)
     /* FILTERED_ACTIVITY_JOIN */
     WHERE sn.dataset_id=ANY(:dataset_ids) AND sn.street_id=ANY(:street_ids)
       /* FILTERED_SOURCE */

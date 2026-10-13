@@ -375,7 +375,8 @@ class CorrectionsPostgisTests(unittest.TestCase):
         with self.engine.begin() as db:
             activity_id = db.execute(text("""INSERT INTO activities
                 (user_id,name,date,activity_type,processed,unmapped_points,tracks,timestamps)
-                VALUES (:account,'requeue race','2026-10-06','run',false,0,'[]'::json,'[]'::json)
+                VALUES (:account,'requeue race','2026-10-06','run',false,0,
+                    '[[[0.2,0.4]]]'::json,'[[null]]'::json)
                 RETURNING id"""), {"account": self.account}).scalar_one()
             source_id = db.execute(text("""INSERT INTO activity_sources
                 (account_id,activity_id,source_kind,private_object_key,status)

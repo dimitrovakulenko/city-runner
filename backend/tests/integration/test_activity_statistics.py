@@ -218,6 +218,10 @@ class ActivityStatisticsPostgisTests(unittest.TestCase):
                 "checksum": hashlib.sha256(uuid.uuid4().bytes).hexdigest(),
             }).scalar_one()
             self.dataset_ids.append(int(dataset_id))
+            db.execute(text("""INSERT INTO cities
+                (dataset_id,osm_relation_id,name,admin_level,boundary)
+                VALUES (:dataset,990001,'Synthetic coverage city','8',
+                    ST_Multi(ST_MakeEnvelope(-1,-1,1,1,4326)))"""), {"dataset": dataset_id})
             source_id = db.execute(text("""INSERT INTO activity_sources
                 (account_id,activity_id,source_kind,revision,status)
                 VALUES (:account,:activity,'gpx',1,'succeeded') RETURNING id"""), {

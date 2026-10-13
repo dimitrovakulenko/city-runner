@@ -61,6 +61,8 @@ SCHEMAS = (
     "SyncFailurePage",
     "ActivitySourceResponse",
     "ActivitySourcePage",
+    "CoveragePreparationCity",
+    "CoveragePreparationResponse",
 )
 
 

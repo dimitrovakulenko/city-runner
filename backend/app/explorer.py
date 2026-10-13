@@ -361,16 +361,24 @@ def _coverage(db, account_id: str, dataset_id: int, dataset: dict[str, Any]) -> 
 
 
 def _version_coverage(db, account_id: str, dataset_id: int, coverage_mode: str) -> dict[str, Any]:
+    from backend.app.coverage import track_may_touch_dataset_sql
+    candidate_sql = track_may_touch_dataset_sql("activity.track_geometry", ":dataset")
     rows = db.execute(text("""WITH current_sources AS (
             SELECT source.id,source.activity_id,run.status AS run_status,job.status AS job_status,
                    run.unsupported_sample_count
             FROM activity_sources source
+            JOIN activities activity ON activity.user_id=source.account_id AND activity.id=source.activity_id
             LEFT JOIN coverage_source_runs run ON run.account_id=source.account_id
               AND run.source_id=source.id AND run.source_revision=source.revision
               AND run.dataset_id=:dataset
             LEFT JOIN jobs job ON job.account_id=run.account_id AND job.id=run.job_id
+            LEFT JOIN source_dataset_applicability applicability
+              ON applicability.account_id=source.account_id AND applicability.source_id=source.id
+              AND applicability.source_revision=source.revision AND applicability.dataset_id=:dataset
             WHERE source.account_id=:account AND source.status='succeeded'
               AND source.activity_id IS NOT NULL
+              AND (applicability.applicable IS TRUE OR
+                   (applicability.applicable IS NULL AND {candidate_sql}))
         )
         SELECT count(*) FILTER (WHERE run_status='failed' OR job_status IN ('failed','cancelled')) AS failed,
           count(*) FILTER (WHERE run_status IS NULL OR run_status<>'succeeded'
@@ -380,7 +388,8 @@ def _version_coverage(db, account_id: str, dataset_id: int, coverage_mode: str) 
                FROM current_sources WHERE run_status='succeeded' AND job_status='succeeded'
                GROUP BY activity_id
           ) grouped),0) AS unsupported
-        FROM current_sources"""), {"dataset": dataset_id, "account": account_id}).mappings().one()
+        FROM current_sources""".format(candidate_sql=candidate_sql)),
+        {"dataset": dataset_id, "account": account_id}).mappings().one()
     visited = db.execute(text("""SELECT count(DISTINCT contribution.node_id)
         FROM source_node_contributions contribution
         JOIN activity_sources source ON source.account_id=contribution.account_id
@@ -390,6 +399,11 @@ def _version_coverage(db, account_id: str, dataset_id: int, coverage_mode: str) 
           AND run.source_id=contribution.source_id AND run.source_revision=contribution.source_revision
           AND run.dataset_id=contribution.dataset_id AND run.status='succeeded'
         JOIN jobs job ON job.account_id=run.account_id AND job.id=run.job_id AND job.status='succeeded'
+          AND NOT EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+            WHERE applicability.account_id=contribution.account_id
+              AND applicability.source_id=contribution.source_id
+              AND applicability.source_revision=contribution.source_revision
+              AND applicability.dataset_id=contribution.dataset_id AND applicability.applicable=FALSE)
         WHERE contribution.account_id=:account AND contribution.dataset_id=:dataset"""), {
         "account": account_id, "dataset": dataset_id,
     }).scalar_one()
@@ -562,6 +576,11 @@ _MATCHED_NODES_SQL = """
       AND run.source_id=contribution.source_id AND run.source_revision=contribution.source_revision
       AND run.dataset_id=contribution.dataset_id AND run.status='succeeded'
     JOIN jobs job ON job.account_id=run.account_id AND job.id=run.job_id AND job.status='succeeded'
+    AND NOT EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+      WHERE applicability.account_id=contribution.account_id
+        AND applicability.source_id=contribution.source_id
+        AND applicability.source_revision=contribution.source_revision
+        AND applicability.dataset_id=contribution.dataset_id AND applicability.applicable=FALSE)
     WHERE contribution.account_id=:account_id AND contribution.dataset_id=:dataset_id
 """
 
@@ -649,6 +668,11 @@ _STREET_MATCHES_SQL = f"""
       AND run.source_id=contribution.source_id AND run.source_revision=contribution.source_revision
       AND run.dataset_id=contribution.dataset_id AND run.status='succeeded'
     JOIN jobs job ON job.account_id=run.account_id AND job.id=run.job_id AND job.status='succeeded'
+    AND NOT EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+      WHERE applicability.account_id=contribution.account_id
+        AND applicability.source_id=contribution.source_id
+        AND applicability.source_revision=contribution.source_revision
+        AND applicability.dataset_id=contribution.dataset_id AND applicability.applicable=FALSE)
     WHERE street.dataset_id=:dataset_id AND street.street_id=:street_id
 """
 

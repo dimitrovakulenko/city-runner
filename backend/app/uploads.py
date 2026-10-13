@@ -394,6 +394,10 @@ def process_upload(engine: Engine, job: dict[str, Any], store: LocalObjectStore 
         })
         if result.rowcount != 1:
             raise RuntimeError("source revision changed")
+        from backend.app.city_provisioning import enqueue_preparation_request
+
+        enqueue_preparation_request(db, account_id=str(current_source["account_id"]),
+                                    source_id=source_id, source_revision=revision)
         queue_source_coverage(db, account_id=current_source["account_id"], source_id=source_id,
                               source_revision=revision, activity_id=activity_id)
         if not complete(db, job_id=job_id, lease_token=lease_token):

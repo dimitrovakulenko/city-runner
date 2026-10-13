@@ -122,6 +122,9 @@ class AccountDataIntegrationTests(unittest.TestCase):
             original = f"originals/source-{result['id']}.gpx"
             self.assertEqual(archive.read(original), SAMPLE_GPX)
             self.assertIn(original, manifest["entries"])
+            for owner_table in ("activity_preparation_requests", "activity_preparation_countries",
+                                "activity_preparation_cities", "source_dataset_applicability"):
+                self.assertIn(f"data/{owner_table}.json", archive.namelist())
             self.assertEqual(sources[0]["id"], result["id"])
             self.assertEqual(activities[0]["id"], self._activity_id(result["id"]))
             self.assertEqual(activities[0]["tracks"], [[[4.2, 50.1], [4.3, 50.2]]])

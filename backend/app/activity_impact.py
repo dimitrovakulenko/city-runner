@@ -191,7 +191,11 @@ _QUALIFIED_SOURCES = """
       AND run.source_id=source.id AND run.source_revision=source.revision
       AND run.dataset_id=:dataset_id AND run.status='succeeded'
     JOIN jobs job ON job.account_id=run.account_id AND job.id=run.job_id AND job.status='succeeded'
+    LEFT JOIN source_dataset_applicability applicability ON applicability.account_id=source.account_id
+      AND applicability.source_id=source.id AND applicability.source_revision=source.revision
+      AND applicability.dataset_id=:dataset_id
     WHERE source.account_id=:account_id AND source.status='succeeded' AND source.activity_id IS NOT NULL
+      AND applicability.applicable IS DISTINCT FROM FALSE
 """
 
 _TARGET_PROVENANCE_QUERY = f"""

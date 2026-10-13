@@ -78,6 +78,62 @@ def _count_dataset_supported_samples(db: Connection, dataset_id: int,
         )"""), {"points": _points_json(points), "dataset_id": dataset_id}).scalar_one()
 
 
+def _dataset_applicability(db: Connection, *, account_id: str, source_id: int,
+                           source_revision: int, dataset_id: int,
+                           points: list[list[float]]) -> tuple[bool, bool]:
+    row = db.execute(text("""WITH samples AS (
+            SELECT ST_SetSRID(ST_MakePoint((point->>0)::double precision,
+                (point->>1)::double precision),4326) AS geom
+            FROM jsonb_array_elements(CAST(:points AS jsonb)) AS item(point)
+        )
+        SELECT COALESCE(bool_or(ST_DWithin(city.boundary::geography,sample.geom::geography,25.0)),FALSE) AS applicable,
+               COALESCE(bool_or(ST_Covers(city.boundary,sample.geom)),FALSE) AS touched
+        FROM cities city CROSS JOIN samples sample
+        WHERE city.dataset_id=:dataset_id
+          AND (abs(ST_X(sample.geom))>179.0 OR abs(ST_Y(sample.geom))>85.0
+               OR city.boundary && ST_Expand(sample.geom,
+              LEAST(180.0,0.00023/GREATEST(abs(cos(radians(ST_Y(sample.geom)))),0.000001)),
+              0.00023))"""), {
+        "points": _points_json(points), "dataset_id": dataset_id,
+    }).mappings().one()
+    applicable, touched = bool(row["applicable"]), bool(row["touched"])
+    db.execute(text("""INSERT INTO source_dataset_applicability
+            (account_id,source_id,source_revision,dataset_id,applicable,touched)
+        VALUES (:account,:source,:revision,:dataset,:applicable,:touched)
+        ON CONFLICT (account_id,source_id,source_revision,dataset_id) DO UPDATE SET
+          applicable=EXCLUDED.applicable,touched=EXCLUDED.touched,checked_at=clock_timestamp()"""), {
+        "account": account_id, "source": source_id, "revision": source_revision,
+        "dataset": dataset_id, "applicable": applicable, "touched": touched,
+    })
+    return applicable, touched
+
+
+def track_may_touch_dataset_sql(track_sql: str, dataset_sql: str) -> str:
+    """Conservative indexed envelope test; exact sample checks still decide applicability."""
+    return f"""({track_sql} IS NULL OR EXISTS (
+        SELECT 1 FROM cities candidate_city
+        WHERE candidate_city.dataset_id={dataset_sql}
+          AND (abs(ST_XMin(Box2D({track_sql}))) > 179.0
+               OR abs(ST_XMax(Box2D({track_sql}))) > 179.0
+               OR abs(ST_YMin(Box2D({track_sql}))) > 85.0
+               OR abs(ST_YMax(Box2D({track_sql}))) > 85.0
+               OR abs(ST_XMin(Box2D(candidate_city.boundary))) > 179.0
+               OR abs(ST_XMax(Box2D(candidate_city.boundary))) > 179.0
+               OR GREATEST(abs(ST_YMin(Box2D({track_sql}))),
+                           abs(ST_YMax(Box2D({track_sql}))),
+                           abs(ST_YMin(Box2D(candidate_city.boundary))),
+                           abs(ST_YMax(Box2D(candidate_city.boundary)))) > 85.0
+               OR candidate_city.boundary && ST_Expand({track_sql},
+                    LEAST(180.0,0.00023/GREATEST(
+                        abs(cos(radians(GREATEST(
+                            abs(ST_YMin(Box2D({track_sql}))),
+                            abs(ST_YMax(Box2D({track_sql}))),
+                            abs(ST_YMin(Box2D(candidate_city.boundary))),
+                            abs(ST_YMax(Box2D(candidate_city.boundary))))))),
+                        0.000001)),0.00023))
+    ))"""
+
+
 def _insert_batch(db: Connection, *, account_id: str, source_id: int, source_revision: int,
                   dataset_id: int, points: list[list[float]]) -> None:
     if not points:
@@ -125,14 +181,20 @@ def queue_source_coverage(db: Connection, *, account_id: str, source_id: int,
     }).first()
     if source is None or source[0] != source_revision:
         raise ValueError("source_revision_mismatch")
-    tracks = db.execute(text("SELECT tracks FROM activities WHERE id=:id AND user_id=:account_id"), {
+    activity = db.execute(text("SELECT tracks,track_geometry FROM activities WHERE id=:id AND user_id=:account_id"), {
         "id": activity_id, "account_id": account_id,
-    }).scalar_one()
-    points = _samples_from_tracks(tracks)
+    }).mappings().one()
+    points = _samples_from_tracks(activity["tracks"])
     if dataset_ids is None:
         lock_active_datasets_for_enqueue(db)
-        datasets = db.execute(text("""SELECT id FROM map_datasets
-            WHERE status='active' AND coverage_mode='complete' ORDER BY id""")).scalars().all()
+        candidate_sql = track_may_touch_dataset_sql("activity.track_geometry", "dataset.id")
+        datasets = db.execute(text(f"""SELECT dataset.id FROM map_datasets dataset
+            JOIN activities activity ON activity.user_id=:account_id AND activity.id=:activity_id
+            WHERE dataset.status='active' AND dataset.coverage_mode='complete'
+              AND {candidate_sql}
+            ORDER BY dataset.id"""), {
+                "account_id": account_id, "activity_id": activity_id,
+            }).scalars().all()
     else:
         datasets = sorted(set(int(value) for value in dataset_ids))
         if datasets:
@@ -144,6 +206,15 @@ def queue_source_coverage(db: Connection, *, account_id: str, source_id: int,
                 raise ValueError("coverage_dataset_unavailable")
 
     unmapped_points = _count_unsupported_samples(db, points)
+    applicable_datasets = []
+    for dataset_id in datasets:
+        applicable, _ = _dataset_applicability(
+            db, account_id=account_id, source_id=source_id,
+            source_revision=source_revision, dataset_id=dataset_id, points=points,
+        )
+        if applicable:
+            applicable_datasets.append(dataset_id)
+    datasets = applicable_datasets
     queued: list[dict[str, Any]] = []
     pending_datasets: list[int] = []
     for dataset_id in datasets:
@@ -197,6 +268,7 @@ def queue_source_coverage(db: Connection, *, account_id: str, source_id: int,
 
 
 def _live_summary(db: Connection, account_id: str, dataset_id: int) -> dict[str, Any]:
+    candidate_sql = track_may_touch_dataset_sql("activity.track_geometry", ":dataset_id")
     dataset = db.execute(text("SELECT status,coverage_mode FROM map_datasets WHERE id=:id"), {
         "id": dataset_id,
     }).mappings().first()
@@ -209,12 +281,19 @@ def _live_summary(db: Connection, account_id: str, dataset_id: int) -> dict[str,
                    run.status AS run_status, job.status AS job_status,
                    run.unsupported_sample_count
             FROM activity_sources source
+            JOIN activities activity ON activity.user_id=source.account_id
+                AND activity.id=source.activity_id
             LEFT JOIN coverage_source_runs run ON run.account_id=source.account_id
                 AND run.source_id=source.id AND run.source_revision=source.revision
                 AND run.dataset_id=:dataset_id
             LEFT JOIN jobs job ON job.account_id=run.account_id AND job.id=run.job_id
+            LEFT JOIN source_dataset_applicability applicability
+                ON applicability.account_id=source.account_id AND applicability.source_id=source.id
+                AND applicability.source_revision=source.revision AND applicability.dataset_id=:dataset_id
             WHERE source.account_id=:account_id AND source.status='succeeded'
               AND source.activity_id IS NOT NULL
+              AND (applicability.applicable IS TRUE OR
+                   (applicability.applicable IS NULL AND {candidate_sql}))
         )
         SELECT count(*) FILTER (WHERE run_status='failed' OR job_status IN ('failed','cancelled')) AS failed,
                count(*) FILTER (WHERE run_status IS NULL OR run_status<>'succeeded'
@@ -224,13 +303,29 @@ def _live_summary(db: Connection, account_id: str, dataset_id: int) -> dict[str,
                     FROM current_sources WHERE run_status='succeeded' AND job_status='succeeded'
                     GROUP BY activity_id
                ) grouped),0) AS unsupported
-        FROM current_sources"""), {"account_id": account_id, "dataset_id": dataset_id}).mappings().one()
+        FROM current_sources""".format(candidate_sql=candidate_sql)), {
+            "account_id": account_id, "dataset_id": dataset_id}).mappings().one()
     visited = db.execute(text("""SELECT count(DISTINCT contribution.node_id)
         FROM source_node_contributions contribution
         JOIN activity_sources source ON source.account_id=contribution.account_id
             AND source.id=contribution.source_id AND source.revision=contribution.source_revision
         WHERE contribution.account_id=:account_id AND contribution.dataset_id=:dataset_id
-          AND source.status='succeeded' AND source.activity_id IS NOT NULL"""), {
+          AND source.status='succeeded' AND source.activity_id IS NOT NULL
+          AND EXISTS (SELECT 1 FROM activities activity
+              WHERE activity.user_id=source.account_id AND activity.id=source.activity_id
+                AND (EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+                    WHERE applicability.account_id=contribution.account_id
+                      AND applicability.source_id=contribution.source_id
+                      AND applicability.source_revision=contribution.source_revision
+                      AND applicability.dataset_id=contribution.dataset_id
+                      AND applicability.applicable IS TRUE)
+                  OR (NOT EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+                    WHERE applicability.account_id=contribution.account_id
+                      AND applicability.source_id=contribution.source_id
+                      AND applicability.source_revision=contribution.source_revision
+                      AND applicability.dataset_id=contribution.dataset_id)
+                    AND {candidate_sql})))""".format(candidate_sql=track_may_touch_dataset_sql(
+                        "activity.track_geometry", "contribution.dataset_id"))), {
         "account_id": account_id, "dataset_id": dataset_id,
     }).scalar_one()
     failed = int(counts["failed"])
@@ -292,6 +387,12 @@ def _rebuild_account_coverage(db: Connection, account_id: str, dataset_id: int) 
             WHERE contribution.account_id=:account_id AND contribution.dataset_id=street.dataset_id
               AND contribution.node_id=street.osm_node_id
               AND source.status='succeeded' AND source.activity_id IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+                  WHERE applicability.account_id=contribution.account_id
+                    AND applicability.source_id=contribution.source_id
+                    AND applicability.source_revision=contribution.source_revision
+                    AND applicability.dataset_id=contribution.dataset_id
+                    AND applicability.applicable=FALSE)
         )
         GROUP BY street.dataset_id, street.street_id"""), {
         "account_id": account_id, "dataset_id": dataset_id,
@@ -332,6 +433,12 @@ def get_street_coverage(db: Connection, account_id: str, dataset_id: int,
               WHERE contribution.account_id=:account_id AND contribution.dataset_id=street.dataset_id
                 AND contribution.node_id=street.osm_node_id
                 AND source.status='succeeded' AND source.activity_id IS NOT NULL
+                AND NOT EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+                    WHERE applicability.account_id=contribution.account_id
+                      AND applicability.source_id=contribution.source_id
+                      AND applicability.source_revision=contribution.source_revision
+                      AND applicability.dataset_id=contribution.dataset_id
+                      AND applicability.applicable=FALSE)
           )"""), {"dataset_id": dataset_id, "street_id": street_id,
                    "account_id": account_id}).scalar_one())
     threshold = total if rule == "strict" or total < 10 else (9 * total + 9) // 10
@@ -396,24 +503,64 @@ def _refresh_activity_processing(db: Connection, *, account_id: str, source_id: 
     lock_active_datasets_for_enqueue(db)
     active_count = _active_dataset_count(db)
     unmapped = _count_unsupported_samples(db, points)
+    candidate_sql = track_may_touch_dataset_sql("activities.track_geometry", "dataset.id")
     pending = db.execute(text("""SELECT count(*) FROM map_datasets dataset
         WHERE dataset.status='active' AND dataset.coverage_mode='complete'
           AND EXISTS (
               SELECT 1 FROM activity_sources group_source
+              JOIN activities activities ON activities.user_id=group_source.account_id
+                  AND activities.id=group_source.activity_id
               WHERE group_source.account_id=:account_id AND group_source.activity_id=:activity_id
-                AND (group_source.status<>'succeeded' OR NOT EXISTS (
+                AND (group_source.status<>'succeeded' OR (
+                    (EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+                        WHERE applicability.account_id=group_source.account_id
+                          AND applicability.source_id=group_source.id
+                          AND applicability.source_revision=group_source.revision
+                          AND applicability.dataset_id=dataset.id
+                          AND applicability.applicable=TRUE)
+                     OR (NOT EXISTS (SELECT 1 FROM source_dataset_applicability applicability
+                        WHERE applicability.account_id=group_source.account_id
+                          AND applicability.source_id=group_source.id
+                          AND applicability.source_revision=group_source.revision
+                          AND applicability.dataset_id=dataset.id)
+                        AND {candidate_sql}))
+                    AND NOT EXISTS (
                     SELECT 1 FROM coverage_source_runs run JOIN jobs job
                       ON job.account_id=run.account_id AND job.id=run.job_id
                     WHERE run.account_id=group_source.account_id
                       AND run.source_id=group_source.id AND run.source_revision=group_source.revision
                       AND run.dataset_id=dataset.id
                       AND run.status='succeeded' AND job.status='succeeded'
-                ))
-          )"""), {"account_id": account_id, "source_id": source_id,
+                )))
+          )""".format(candidate_sql=candidate_sql)), {"account_id": account_id, "source_id": source_id,
                    "source_revision": source_revision, "activity_id": activity_id}).scalar_one()
+    db.execute(text("""UPDATE activity_preparation_requests request SET
+            unsupported_sample_count=:unmapped,
+            state=CASE WHEN :unmapped=0 THEN 'ready' ELSE 'unsupported' END,
+            updated_at=clock_timestamp()
+        FROM activity_sources source
+        WHERE source.account_id=request.account_id AND source.id=request.source_id
+          AND source.revision=request.source_revision AND source.account_id=:account
+          AND source.activity_id=:activity AND source.status='succeeded'
+          AND request.phase='done' AND request.state IN ('ready','unsupported')
+          AND (request.unsupported_sample_count IS DISTINCT FROM :unmapped OR
+               request.state IS DISTINCT FROM CASE WHEN :unmapped=0 THEN 'ready' ELSE 'unsupported' END)"""), {
+        "unmapped": unmapped, "account": account_id, "activity": activity_id,
+    })
+    discovery_waiting = 0
+    if os.getenv("CITY_GEOGRAPHY_PROVIDER", "").strip().lower() == "overpass":
+        discovery_waiting = int(db.execute(text("""SELECT count(*) FROM activity_sources source
+            WHERE source.account_id=:account AND source.activity_id=:activity
+              AND (source.status<>'succeeded' OR NOT EXISTS (
+                SELECT 1 FROM activity_preparation_requests request
+                WHERE request.account_id=source.account_id AND request.source_id=source.id
+                  AND request.source_revision=source.revision
+                  AND request.state IN ('ready','unsupported')))"""), {
+            "account": account_id, "activity": activity_id,
+        }).scalar_one())
     db.execute(text("""UPDATE activities SET processed=:processed, unmapped_points=:unmapped
         WHERE id=:activity_id AND user_id=:account_id"""), {
-        "processed": active_count > 0 and int(pending) == 0,
+        "processed": active_count > 0 and int(pending) == 0 and discovery_waiting == 0,
         "unmapped": unmapped if active_count else len(points),
         "activity_id": activity_id, "account_id": account_id,
     })

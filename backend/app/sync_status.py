@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import DBAPIError
 
-from backend.app.coverage import _pending_summary
+from backend.app.coverage import _pending_summary, track_may_touch_dataset_sql
 from backend.app.owner_guard import owner_lock
 
 
@@ -179,23 +179,32 @@ def _status_snapshot(db, account_id: str, deadline: float, token: str) -> dict:
             import_times.append(row["last_import_at"])
 
     _set_budget(db, deadline)
+    candidate_sql = track_may_touch_dataset_sql("activity.track_geometry", "active.id")
     coverage = db.execute(text("""WITH active AS (
             SELECT id FROM map_datasets WHERE status='active' AND coverage_mode='complete'
         ), imported AS (
-            SELECT source.id, source.revision FROM activity_sources source
+            SELECT source.id, source.revision,source.activity_id FROM activity_sources source
             JOIN jobs ingestion ON ingestion.account_id=source.account_id AND ingestion.kind='process_upload'
               AND ingestion.dedupe_key=concat('upload:',source.id::text,chr(58),'r',source.revision::text)
             WHERE source.account_id=:account AND source.source_kind IN ('gpx','fit')
               AND source.activity_id IS NOT NULL AND ingestion.status='succeeded'
         ), readiness AS (
             SELECT source.id,
-              count(active.id) AS active_count,
-              count(*) FILTER (WHERE match_job.status IN ('failed','cancelled')
-                  OR (match_job.id IS NOT NULL AND run.status='failed')) AS failed_count,
-              count(*) FILTER (WHERE active.id IS NOT NULL AND
+              count(active.id) FILTER (WHERE applicability.applicable IS TRUE OR
+                (applicability.applicable IS NULL AND {candidate_sql})) AS active_count,
+              count(*) FILTER (WHERE (applicability.applicable IS TRUE OR
+                (applicability.applicable IS NULL AND {candidate_sql})) AND
+                  (match_job.status IN ('failed','cancelled')
+                  OR (match_job.id IS NOT NULL AND run.status='failed'))) AS failed_count,
+              count(*) FILTER (WHERE active.id IS NOT NULL AND (applicability.applicable IS TRUE OR
+                (applicability.applicable IS NULL AND {candidate_sql})) AND
                   (run.status IS DISTINCT FROM 'succeeded' OR match_job.status IS DISTINCT FROM 'succeeded')) AS pending_count
             FROM imported source CROSS JOIN (SELECT count(*) FROM active) active_total
+            JOIN activities activity ON activity.user_id=:account AND activity.id=source.activity_id
             LEFT JOIN active ON TRUE
+            LEFT JOIN source_dataset_applicability applicability ON applicability.account_id=:account
+              AND applicability.source_id=source.id AND applicability.source_revision=source.revision
+              AND applicability.dataset_id=active.id
             LEFT JOIN coverage_source_runs run ON run.account_id=:account AND run.source_id=source.id
               AND run.source_revision=source.revision AND run.dataset_id=active.id
             LEFT JOIN jobs match_job ON match_job.account_id=run.account_id AND match_job.id=run.job_id
@@ -209,7 +218,7 @@ def _status_snapshot(db, account_id: str, deadline: float, token: str) -> dict:
           count(*) FILTER (WHERE active_count>0 AND failed_count>0) AS failed,
           count(*) FILTER (WHERE active_count>0 AND failed_count=0 AND pending_count>0) AS pending,
           count(*) FILTER (WHERE active_count>0 AND failed_count=0 AND pending_count=0) AS ready
-        FROM readiness"""), {"account": account_id}).mappings().one()
+        FROM readiness""".format(candidate_sql=candidate_sql)), {"account": account_id}).mappings().one()
 
     _set_budget(db, deadline)
     batches = db.execute(text("""SELECT
@@ -237,6 +246,26 @@ def _status_snapshot(db, account_id: str, deadline: float, token: str) -> dict:
             {"provider": "strava", "available": False, "reason": "The Strava adapter is not implemented."},
         ],
     }
+
+
+def _active_applicable_datasets(db, *, account_id: str, activity_id: int,
+                                source_id: int, source_revision: int,
+                                limit: int, lock: bool = False) -> list[int]:
+    candidate_sql = track_may_touch_dataset_sql("activity.track_geometry", "dataset.id")
+    lock_sql = " FOR SHARE OF dataset" if lock else ""
+    rows = db.execute(text(f"""SELECT dataset.id FROM map_datasets dataset
+        JOIN activities activity ON activity.user_id=:account AND activity.id=:activity
+        LEFT JOIN source_dataset_applicability applicability ON applicability.account_id=:account
+          AND applicability.source_id=:source AND applicability.source_revision=:revision
+          AND applicability.dataset_id=dataset.id
+        WHERE dataset.status='active' AND dataset.coverage_mode='complete'
+          AND (applicability.applicable IS TRUE OR
+               (applicability.applicable IS NULL AND {candidate_sql}))
+        ORDER BY dataset.id LIMIT :limit{lock_sql}"""), {
+        "account": account_id, "activity": activity_id, "source": source_id,
+        "revision": source_revision, "limit": limit,
+    }).scalars().all()
+    return [int(value) for value in rows]
 
 
 def create_sync_status_router(engine: Engine, current_user: Callable[..., str]) -> APIRouter:
@@ -267,6 +296,7 @@ def create_sync_status_router(engine: Engine, current_user: Callable[..., str]) 
             _set_budget(db, deadline)
             owner_lock(db, account_id)
             token = _read_version(db, account_id, deadline)
+            candidate_sql = track_may_touch_dataset_sql("activity.track_geometry", "run.dataset_id")
             filters = """WITH failures AS (
                     SELECT source.id AS source_id,source.source_kind,source.activity_id,
                         'import'::text AS stage,job.last_error AS error
@@ -287,12 +317,20 @@ def create_sync_status_router(engine: Engine, current_user: Callable[..., str]) 
                       AND job.payload->>'source_revision'=source.revision::text
                       AND job.payload->>'dataset_id'=run.dataset_id::text
                     JOIN map_datasets dataset ON dataset.id=run.dataset_id
+                    JOIN activities activity ON activity.user_id=source.account_id
+                      AND activity.id=source.activity_id
+                    LEFT JOIN source_dataset_applicability applicability
+                      ON applicability.account_id=source.account_id AND applicability.source_id=source.id
+                      AND applicability.source_revision=source.revision
+                      AND applicability.dataset_id=run.dataset_id
                     WHERE source.account_id=:account AND source.source_kind IN ('gpx','fit')
                       AND source.activity_id IS NOT NULL
                       AND dataset.status='active' AND dataset.coverage_mode='complete'
+                      AND (applicability.applicable IS TRUE OR
+                           (applicability.applicable IS NULL AND {candidate_sql}))
                       AND job.status IN ('failed','cancelled')
                     GROUP BY source.id,source.source_kind,source.activity_id
-            ) """
+            ) """.format(candidate_sql=candidate_sql)
             _set_budget(db, deadline)
             total = db.execute(text(filters + "SELECT count(*) FROM failures"), {
                 "account": account_id,
@@ -317,7 +355,7 @@ def create_sync_status_router(engine: Engine, current_user: Callable[..., str]) 
         with _transaction(engine, "READ COMMITTED") as db:
             _set_budget(db, deadline)
             owner_lock(db, account_id)
-            source_hint = db.execute(text("""SELECT source.revision,ingestion.status AS ingestion_status,
+            source_hint = db.execute(text("""SELECT source.revision,source.activity_id,ingestion.status AS ingestion_status,
                     ingestion.id AS ingestion_job_id
                 FROM activity_sources source LEFT JOIN jobs ingestion
                   ON ingestion.account_id=source.account_id AND ingestion.kind='process_upload'
@@ -329,10 +367,10 @@ def create_sync_status_router(engine: Engine, current_user: Callable[..., str]) 
                 raise HTTPException(status_code=404, detail="Upload not found.")
             if source_hint["ingestion_status"] != "succeeded":
                 raise HTTPException(status_code=409, detail="Upload has not finished importing.")
-            datasets = db.execute(text("""SELECT id FROM map_datasets
-                WHERE status='active' AND coverage_mode='complete' ORDER BY id LIMIT :limit"""), {
-                "limit": MAX_ACTIVE_DATASETS_PER_RETRY + 1,
-            }).scalars().all()
+            datasets = _active_applicable_datasets(db, account_id=account_id,
+                activity_id=int(source_hint["activity_id"]), source_id=source_id,
+                source_revision=int(source_hint["revision"]),
+                limit=MAX_ACTIVE_DATASETS_PER_RETRY + 1)
             if len(datasets) > MAX_ACTIVE_DATASETS_PER_RETRY:
                 raise HTTPException(status_code=409, detail="Too many active datasets to retry in one request.")
             _set_budget(db, deadline)
@@ -345,10 +383,12 @@ def create_sync_status_router(engine: Engine, current_user: Callable[..., str]) 
                 WHERE job.account_id=:account AND (
                     (job.kind='process_upload' AND job.dedupe_key=:upload_key) OR
                     (job.kind='match_coverage' AND run.account_id=:account
+                      AND run.dataset_id=ANY(:datasets)
                       AND dataset.status='active' AND dataset.coverage_mode='complete'))
                 ORDER BY job.id FOR UPDATE OF job"""), {
                 "account": account_id, "source": source_id, "revision": source_hint["revision"],
                 "upload_key": f"upload:{source_id}:r{source_hint['revision']}",
+                "datasets": datasets,
             }).mappings().all()
             source = db.execute(text("""SELECT id,revision,status,activity_id FROM activity_sources
                 WHERE id=:source AND account_id=:account FOR UPDATE"""), {
@@ -376,12 +416,11 @@ def create_sync_status_router(engine: Engine, current_user: Callable[..., str]) 
                 "account": account_id, "source": source_id, "revision": source["revision"],
                 "datasets": datasets,
             }).mappings().all() if datasets else []
-            fresh_datasets = db.execute(text("""SELECT id FROM map_datasets
-                WHERE status='active' AND coverage_mode='complete' ORDER BY id
-                LIMIT :limit FOR SHARE"""), {
-                "limit": MAX_ACTIVE_DATASETS_PER_RETRY + 1,
-            }).scalars().all()
-            if list(map(int, fresh_datasets)) != list(map(int, datasets)):
+            fresh_datasets = _active_applicable_datasets(db, account_id=account_id,
+                activity_id=int(source["activity_id"]), source_id=source_id,
+                source_revision=int(source["revision"]),
+                limit=MAX_ACTIVE_DATASETS_PER_RETRY + 1, lock=True)
+            if fresh_datasets != datasets:
                 raise HTTPException(status_code=409, detail="Active datasets changed; retry again.")
             run_by_id = {int(row["job_id"]): row for row in run_rows}
             reset_datasets = []

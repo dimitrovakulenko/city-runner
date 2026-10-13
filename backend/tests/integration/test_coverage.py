@@ -304,7 +304,7 @@ class CoveragePostgisTests(unittest.TestCase):
 
     def test_bounded_requeue_and_unsupported_samples_are_explicit(self):
         alice = self.accounts[0]
-        sources = [self.add_source(0, [[[0.5, 0.5]]])[0] for _ in range(2)]
+        sources = [self.add_source(0, [[[0.0101, 0.0]]])[0] for _ in range(2)]
         # Remove the jobs created by normal ingestion to model legacy succeeded sources.
         with self.engine.begin() as db:
             db.execute(text("""DELETE FROM coverage_source_runs WHERE account_id=:account

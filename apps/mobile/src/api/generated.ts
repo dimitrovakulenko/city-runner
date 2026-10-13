@@ -399,6 +399,23 @@ export type ActivitySourcePage = {
   total: number;
 };
 
+export type CoveragePreparationCity = {
+  osm_relation_id: string;
+  name: string;
+  state: "queued" | "fetching" | "importing" | "ready" | "failed";
+  error: string | null;
+};
+
+export type CoveragePreparationResponse = {
+  enabled: boolean;
+  state: "ready" | "pending" | "failed" | "unsupported";
+  pending_sources: number;
+  failed_sources: number;
+  unsupported_sources: number;
+  cities: Array<CoveragePreparationCity>;
+  cities_truncated: boolean;
+};
+
 export type CityItem = {
   id: string;
   name: string;

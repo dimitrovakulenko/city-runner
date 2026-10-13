@@ -21,6 +21,7 @@ from backend.app.uploads import process_upload
 from backend.app.account_data import process_account_deletion_cleanup, replay_account_deletions
 from backend.app.owner_guard import owner_lock
 from backend.app.map_imports import process_map_task_step
+from backend.app.city_provisioning import process_city_provisioning_step
 
 logger = logging.getLogger(__name__)
 Handler = Callable[[dict[str, Any]], None]
@@ -35,6 +36,8 @@ def run_once(engine: Engine, handlers: dict[str, Handler], *, lease_seconds: int
         return False
     job = claim(engine, lease_seconds=lease_seconds, kind=tuple(handlers))
     if job is None:
+        if process_city_provisioning_step(engine):
+            return True
         return process_map_task_step(engine)
     handler = handlers[job["kind"]]
     try:

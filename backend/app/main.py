@@ -32,6 +32,7 @@ from backend.app.activity_filters import (
 from backend.app.sync_status import create_sync_status_router
 from backend.app.account_data import create_account_data_router
 from backend.app.recording_groups import create_recording_groups_router
+from backend.app.city_provisioning import create_city_provisioning_router, enabled as city_discovery_enabled
 
 
 class ChallengeRequest(BaseModel):
@@ -147,6 +148,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
     app.include_router(create_activity_filters_router(engine, current_user))
     app.include_router(create_sync_status_router(engine, current_user))
     app.include_router(create_recording_groups_router(engine, current_user))
+    app.include_router(create_city_provisioning_router(engine, current_user))
     app.include_router(create_map_router(engine, current_user))
     app.include_router(create_explorer_router(engine, current_user))
     app.include_router(create_corrections_router(engine, current_user))
@@ -163,6 +165,17 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
         user_id: str = Depends(current_user),
     ):
         selection = canonical_filters(date_from, date_to, activity_type, source)
+        processed_sql = "processed"
+        if engine.dialect.name == "postgresql" and city_discovery_enabled():
+            processed_sql = """CASE WHEN EXISTS (
+                SELECT 1 FROM activity_sources source
+                LEFT JOIN activity_preparation_requests request
+                  ON request.account_id=source.account_id AND request.source_id=source.id
+                  AND request.source_revision=source.revision
+                WHERE source.account_id=activities.user_id AND source.activity_id=activities.id
+                  AND (source.status<>'succeeded' OR request.state IS NULL
+                    OR request.state NOT IN ('ready','unsupported'))
+            ) THEN FALSE ELSE processed END"""
         params: dict[str, Any] = {
             "user_id": user_id,
             "limit": page_size,
@@ -176,7 +189,8 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
             params["q"] = f"%{q}%"
         with engine.connect() as db:
             total = db.execute(text(f"SELECT count(*) FROM activities WHERE {filters}"), params).scalar_one()
-            rows = db.execute(text(f"""SELECT id, name, date, activity_type, processed, unmapped_points,
+            rows = db.execute(text(f"""SELECT id, name, date, activity_type,
+                {processed_sql} AS processed, unmapped_points,
                 distance_m, duration_s, pace_s_per_km FROM activities
                 WHERE {filters} ORDER BY CASE WHEN date IS NULL OR date='' OR date='unknown' THEN 1 ELSE 0 END,
                 date DESC, id DESC LIMIT :limit OFFSET :offset"""), params).mappings().all()
@@ -194,9 +208,21 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
 
     @app.get("/api/activities/{activity_id}", response_model=ActivityDetail)
     def activity(activity_id: int, user_id: str = Depends(current_user)):
+        processed_sql = "processed"
+        if engine.dialect.name == "postgresql" and city_discovery_enabled():
+            processed_sql = """CASE WHEN EXISTS (
+                SELECT 1 FROM activity_sources source
+                LEFT JOIN activity_preparation_requests request
+                  ON request.account_id=source.account_id AND request.source_id=source.id
+                  AND request.source_revision=source.revision
+                WHERE source.account_id=activities.user_id AND source.activity_id=activities.id
+                  AND (source.status<>'succeeded' OR request.state IS NULL
+                    OR request.state NOT IN ('ready','unsupported'))
+            ) THEN FALSE ELSE processed END"""
         with engine.connect() as db:
-            row = db.execute(text("""SELECT id, name, date, activity_type, tracks, timestamps,
-                processed, unmapped_points, distance_m, duration_s, pace_s_per_km
+            row = db.execute(text(f"""SELECT id, name, date, activity_type, tracks, timestamps,
+                {processed_sql} AS processed,
+                unmapped_points, distance_m, duration_s, pace_s_per_km
                 FROM activities WHERE id=:id AND user_id=:user_id"""),
                 {"id": activity_id, "user_id": user_id}).mappings().first()
         if row is None:

@@ -199,6 +199,10 @@ def build_account_export(engine: Engine, account_id: str, store: LocalObjectStor
                     "account_street_coverage": "SELECT dataset_id,street_id,visited_node_count,updated_at FROM account_street_coverage WHERE account_id=:account ORDER BY dataset_id,street_id",
                     "manual_street_completions": "SELECT dataset_id,street_id,reason,created_at,updated_at FROM manual_street_completions WHERE account_id=:account ORDER BY dataset_id,street_id",
                     "saved_routes": "SELECT id,name,revision,waypoints,ST_AsGeoJSON(geometry,17) AS geometry,distance_m,duration_s,provider,attribution,routed_at,created_at,updated_at FROM saved_routes WHERE account_id=:account ORDER BY id",
+                    "activity_preparation_requests": "SELECT source_id,source_revision,state,phase,country_codes,country_cursor,candidate_cursor,unsupported_sample_count,safe_error,created_at,updated_at FROM activity_preparation_requests WHERE account_id=:account ORDER BY source_id,source_revision",
+                    "activity_preparation_countries": "SELECT source_id,source_revision,country_code,task_key,state,candidate_cursor FROM activity_preparation_countries WHERE account_id=:account ORDER BY source_id,source_revision,country_code",
+                    "activity_preparation_cities": "SELECT source_id,source_revision,relation_id,name,task_key,dataset_id,state,touched FROM activity_preparation_cities WHERE account_id=:account ORDER BY source_id,source_revision,relation_id",
+                    "source_dataset_applicability": "SELECT source_id,source_revision,dataset_id,applicable,touched,checked_at FROM source_dataset_applicability WHERE account_id=:account ORDER BY source_id,source_revision,dataset_id",
                 }
                 for name, query in queries.items():
                     manifest["counts"][name] = json_entry(f"data/{name}.json", query, {"account": account_id},
@@ -518,7 +522,11 @@ def verify_account_deletions(engine: Engine, store: LocalObjectStore | None = No
                 EXISTS(SELECT 1 FROM manual_street_completions WHERE account_id=:account) OR
                 EXISTS(SELECT 1 FROM saved_routes WHERE account_id=:account) OR
                 EXISTS(SELECT 1 FROM account_dataset_coverage WHERE account_id=:account) OR
-                EXISTS(SELECT 1 FROM account_street_coverage WHERE account_id=:account)"""), {
+                EXISTS(SELECT 1 FROM account_street_coverage WHERE account_id=:account) OR
+                EXISTS(SELECT 1 FROM activity_preparation_requests WHERE account_id=:account) OR
+                EXISTS(SELECT 1 FROM activity_preparation_countries WHERE account_id=:account) OR
+                EXISTS(SELECT 1 FROM activity_preparation_cities WHERE account_id=:account) OR
+                EXISTS(SELECT 1 FROM source_dataset_applicability WHERE account_id=:account)"""), {
                 "account": account_id,
             }).scalar_one()
             pending = db.execute(text("""SELECT EXISTS(SELECT 1 FROM account_deletion_outbox
