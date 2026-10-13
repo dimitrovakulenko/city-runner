@@ -119,8 +119,10 @@ def _validate_root(*, create: bool) -> None:
     if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
             or stat.S_IMODE(info.st_mode) & 0o077):
         raise PreviewError("Preview root must be a private, user-owned directory.")
-    for path in (PGDATA, PGSOCKETS, SOURCES, MAP_IMPORTS, JOURNAL_DIR, LOGS):
+    for path in (PGDATA, PGSOCKETS, SOURCES, JOURNAL_DIR, LOGS):
         _private_directory(path, create=create)
+    if create or MAP_IMPORTS.exists():
+        _private_directory(MAP_IMPORTS, create=create)
 
 
 def _fresh_install_preflight() -> None:
@@ -335,6 +337,10 @@ def _validate_initialized_state(pg_bin: Path) -> tuple[str, bool]:
         read_records_durable()
     except JournalError as error:
         raise PreviewError("Preview deletion journal is corrupt; refusing to start.") from error
+    if not MAP_IMPORTS.exists():
+        MAP_IMPORTS.mkdir(mode=0o700)
+        _fsync_directory(PREVIEW_ROOT)
+    _private_directory(MAP_IMPORTS, create=False)
     tools = _tools(pg_bin)
     was_running = _pg_running(tools["pg_ctl"])
     return owner_id, not was_running

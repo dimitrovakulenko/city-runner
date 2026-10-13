@@ -29,6 +29,8 @@ MAX_IMPORT_CITIES = 50
 MAX_OSM_NODES = 250_000
 MAX_OSM_WAYS = 100_000
 MAX_OSM_REFERENCES = 1_000_000
+MAX_OSM_XML_DEPTH = 4
+MAX_OSM_XML_ELEMENTS = 2_000_000
 
 
 @dataclass(frozen=True)
@@ -62,64 +64,87 @@ def parse_osm_xml(path: str | Path, city_relation_ids: set[int]) -> OSMDocument:
 def _parse_osm_stream(source, city_relation_ids: set[int]) -> OSMDocument:
     if len(city_relation_ids) > MAX_IMPORT_CITIES:
         raise ValueError("invalid_osm_import_selection")
-    root = ElementTree.parse(source).getroot()
-    if root.tag != "osm":
-        raise ValueError("Expected an OSM XML document with an <osm> root.")
-
     nodes: dict[int, tuple[float, float]] = {}
     ways: dict[int, Way] = {}
     relations: dict[int, Relation] = {}
     reference_count = 0
-    for element in root:
-        if element.tag == "node":
-            if len(nodes) >= MAX_OSM_NODES:
-                raise ValueError("osm_node_limit_exceeded")
-            osm_id = _positive_id(element.get("id"), "node")
-            lon = _coordinate(element.get("lon"), -180, 180, "longitude")
-            lat = _coordinate(element.get("lat"), -90, 90, "latitude")
-            if osm_id in nodes and nodes[osm_id] != (lon, lat):
-                raise ValueError(f"Conflicting duplicate OSM node {osm_id}.")
-            nodes[osm_id] = (lon, lat)
-        elif element.tag == "way":
-            if len(ways) >= MAX_OSM_WAYS:
-                raise ValueError("osm_way_limit_exceeded")
-            reference_count += len(element.findall("nd"))
-            if reference_count > MAX_OSM_REFERENCES:
-                raise ValueError("osm_reference_limit_exceeded")
-            osm_id = _positive_id(element.get("id"), "way")
-            refs = tuple(_positive_id(node.get("ref"), "way node") for node in element.findall("nd"))
-            tags = _tags(element)
-            way = Way(osm_id, refs, tags)
-            previous = ways.get(osm_id)
-            if previous is not None:
-                if previous.nodes != way.nodes or any(
-                    key in previous.tags and previous.tags[key] != value
-                    for key, value in way.tags.items()
-                ):
-                    raise ValueError(f"Conflicting duplicate OSM way {osm_id}.")
-                way = Way(osm_id, refs, {**previous.tags, **tags})
-            ways[osm_id] = way
-        elif element.tag == "relation":
-            reference_count += len(element.findall("member"))
-            if reference_count > MAX_OSM_REFERENCES:
-                raise ValueError("osm_reference_limit_exceeded")
-            osm_id = _positive_id(element.get("id"), "relation")
-            if osm_id not in city_relation_ids:
-                continue
-            tags = _tags(element)
-            members = tuple(
-                (member.get("type", ""), _positive_id(member.get("ref"), "relation member"),
-                 member.get("role", ""))
-                for member in element.findall("member")
-            )
-            relations[osm_id] = Relation(osm_id, tags, members)
+    node_count = 0
+    way_count = 0
+    element_count = 0
+    root = None
+    root_attributes: dict[str, str] = {}
+    metadata_timestamp = None
+    depth = 0
+    for event, element in ElementTree.iterparse(source, events=("start", "end")):
+        if event == "start":
+            depth += 1
+            element_count += 1
+            if depth > MAX_OSM_XML_DEPTH:
+                raise ValueError("osm_xml_depth_exceeded")
+            if element_count > MAX_OSM_XML_ELEMENTS:
+                raise ValueError("osm_xml_element_limit_exceeded")
+            if element.tag in {"nd", "member"}:
+                reference_count += 1
+                if reference_count > MAX_OSM_REFERENCES:
+                    raise ValueError("osm_reference_limit_exceeded")
+            if depth == 1:
+                root = element
+                if root.tag != "osm":
+                    raise ValueError("Expected an OSM XML document with an <osm> root.")
+                root_attributes = dict(root.attrib)
+            continue
+        if depth == 2:
+            if element.tag == "node":
+                node_count += 1
+                if node_count > MAX_OSM_NODES:
+                    raise ValueError("osm_node_limit_exceeded")
+                osm_id = _positive_id(element.get("id"), "node")
+                lon = _coordinate(element.get("lon"), -180, 180, "longitude")
+                lat = _coordinate(element.get("lat"), -90, 90, "latitude")
+                if osm_id in nodes and nodes[osm_id] != (lon, lat):
+                    raise ValueError(f"Conflicting duplicate OSM node {osm_id}.")
+                nodes[osm_id] = (lon, lat)
+            elif element.tag == "way":
+                way_count += 1
+                if way_count > MAX_OSM_WAYS:
+                    raise ValueError("osm_way_limit_exceeded")
+                osm_id = _positive_id(element.get("id"), "way")
+                refs = tuple(_positive_id(node.get("ref"), "way node") for node in element.findall("nd"))
+                tags = _tags(element)
+                way = Way(osm_id, refs, tags)
+                previous = ways.get(osm_id)
+                if previous is not None:
+                    if previous.nodes != way.nodes or any(
+                        key in previous.tags and previous.tags[key] != value
+                        for key, value in way.tags.items()
+                    ):
+                        raise ValueError(f"Conflicting duplicate OSM way {osm_id}.")
+                    way = Way(osm_id, refs, {**previous.tags, **tags})
+                ways[osm_id] = way
+            elif element.tag == "relation":
+                osm_id = _positive_id(element.get("id"), "relation")
+                if osm_id in city_relation_ids:
+                    tags = _tags(element)
+                    members = tuple(
+                        (member.get("type", ""), _positive_id(member.get("ref"), "relation member"),
+                         member.get("role", ""))
+                        for member in element.findall("member")
+                    )
+                    relations[osm_id] = Relation(osm_id, tags, members)
+            elif element.tag == "meta":
+                metadata_timestamp = element.get("osm_base")
+            if root is not None:
+                root.remove(element)
+        depth -= 1
+
+    if root is None:
+        raise ValueError("Expected an OSM XML document with an <osm> root.")
 
     missing = city_relation_ids - relations.keys()
     if missing:
         raise ValueError(f"Selected city relation(s) missing from extract: {sorted(missing)}")
-    meta = root.find("meta")
-    timestamp = (root.get("timestamp") or root.get("osmosis_replication_timestamp")
-                 or (meta.get("osm_base") if meta is not None else None))
+    timestamp = (root_attributes.get("timestamp") or root_attributes.get("osmosis_replication_timestamp")
+                 or metadata_timestamp)
     return OSMDocument(nodes, ways, relations, timestamp)
 
 
@@ -271,7 +296,8 @@ def _iso_timestamp(value: str | None) -> datetime:
     return result.astimezone(timezone.utc)
 
 
-def _read_osm_snapshot(path: Path, relation_ids: set[int]) -> tuple[OSMDocument, str]:
+def _read_osm_snapshot(path: Path, relation_ids: set[int], *,
+                       expected_checksum: str | None = None) -> tuple[OSMDocument, str]:
     """Hash and parse the same temporary snapshot so import identity cannot drift."""
     digest = hashlib.sha256()
     with path.open("rb") as source, tempfile.TemporaryFile(mode="w+b") as snapshot:
@@ -287,9 +313,12 @@ def _read_osm_snapshot(path: Path, relation_ids: set[int]) -> tuple[OSMDocument,
         signature = lambda info: (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
         if signature(before) != signature(after):
             raise ValueError("OSM source changed while it was being snapshotted; retry the import.")
+        checksum = digest.hexdigest()
+        if expected_checksum is not None and checksum != expected_checksum:
+            raise ValueError("osm_snapshot_checksum_mismatch")
         snapshot.seek(0)
         document = _parse_osm_stream(snapshot, relation_ids)
-    return document, digest.hexdigest()
+    return document, checksum
 
 
 def import_osm_xml(
@@ -318,9 +347,8 @@ def import_osm_xml(
     evidence = (coverage_evidence or "Sampled input; completeness not established.").strip()
     if len(evidence) > 2048:
         raise ValueError("coverage_evidence must be at most 2048 characters.")
-    document, digest = _read_osm_snapshot(file_path, set(relation_ids))
-    if _expected_checksum is not None and digest != _expected_checksum:
-        raise ValueError("osm_snapshot_checksum_mismatch")
+    document, digest = _read_osm_snapshot(file_path, set(relation_ids),
+                                          expected_checksum=_expected_checksum)
     snapshot = _iso_timestamp(source_timestamp or document.source_timestamp)
     selection_config = f"{coverage_mode}:{','.join(map(str, relation_ids))}"
     selection_key = hashlib.sha256(selection_config.encode("ascii")).hexdigest()

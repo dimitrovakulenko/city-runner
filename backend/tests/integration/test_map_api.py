@@ -116,14 +116,14 @@ class MapApiPostgisTests(unittest.TestCase):
         item = payload["items"][0]
         self.assertEqual(item["dataset_id"], str(self.dataset))
         self.assertEqual(item["bounds"], [0.0, 0.0, 2.0, 2.0])
-        self.assertEqual(item["state"], "pending")
-        self.assertIsNone(item["eligible_nodes"])
+        self.assertEqual(item["state"], "ready")
+        self.assertGreater(item["eligible_nodes"], 0)
 
         detail = self.client.get(f"/api/datasets/{self.dataset}?rule=strict",
                                  headers=self.headers(self.account))
         self.assertEqual(detail.status_code, 200)
         self.assertEqual(detail.json()["bounds"], [0.0, 0.0, 2.0, 2.0])
-        self.assertEqual(detail.json()["state"], "pending")
+        self.assertEqual(detail.json()["state"], "ready")
         self.assertEqual(self.client.get("/api/datasets/999999999", headers=self.headers(self.account)).status_code,
                          404)
 
@@ -133,8 +133,8 @@ class MapApiPostgisTests(unittest.TestCase):
         self.assertEqual(cities.json()["items"][0]["bounds"], [0.0, 0.0, 2.0, 2.0])
 
         other = self.client.get("/api/datasets", headers=self.headers(self.other)).json()["items"][0]
-        self.assertEqual(other["state"], "pending")
-        self.assertIsNone(other["visited_node_count"])
+        self.assertEqual(other["state"], "ready")
+        self.assertEqual(other["visited_node_count"], 0)
 
     def add_activity(self, account, *, tracks, activity_id=None, source_status="succeeded"):
         activity_id = activity_id or (9007199254740993 if account == self.account else 9007199254740995)

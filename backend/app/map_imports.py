@@ -384,7 +384,8 @@ def _advance_backfill_source(engine: Engine, task_id: int, lease_token: str) -> 
             return False
         cursor = task["source_cursor"]
         candidate = db.execute(text("""SELECT id,account_id FROM activity_sources
-            WHERE (:cursor IS NULL OR id>:cursor) ORDER BY id LIMIT 1"""), {
+            WHERE (CAST(:cursor AS bigint) IS NULL OR id>CAST(:cursor AS bigint))
+            ORDER BY id LIMIT 1"""), {
             "cursor": cursor,
         }).mappings().first()
         if candidate is None:

@@ -1,8 +1,13 @@
+import io
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from backend.app.geography import Relation, Way, _stitch_rings, eligible_way, parse_osm_xml
+from backend.app.geography import (
+    Relation, Way, _parse_osm_stream, _read_osm_snapshot, _stitch_rings,
+    eligible_way, parse_osm_xml,
+)
 
 
 class OsmParserTests(unittest.TestCase):
@@ -73,6 +78,51 @@ class OsmParserTests(unittest.TestCase):
             path.write_text('<osm/>')
             with self.assertRaisesRegex(ValueError, "missing from extract"):
                 parse_osm_xml(path, {123})
+
+    def test_physical_duplicate_records_count_towards_streaming_parser_bounds(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "duplicates.osm"
+            path.write_text('<osm><node id="1" lon="0" lat="0"/><node id="1" lon="0" lat="0"/></osm>')
+            with patch("backend.app.geography.MAX_OSM_NODES", 1):
+                with self.assertRaisesRegex(ValueError, "osm_node_limit_exceeded"):
+                    parse_osm_xml(path, set())
+            path.write_text('<osm><way id="1"/><way id="1"/></osm>')
+            with patch("backend.app.geography.MAX_OSM_WAYS", 1):
+                with self.assertRaisesRegex(ValueError, "osm_way_limit_exceeded"):
+                    parse_osm_xml(path, set())
+            path.write_text('<osm><way id="1"><nd ref="1"/><nd ref="2"/></way></osm>')
+            with patch("backend.app.geography.MAX_OSM_REFERENCES", 1):
+                with self.assertRaisesRegex(ValueError, "osm_reference_limit_exceeded"):
+                    parse_osm_xml(path, set())
+
+    def test_reference_limit_aborts_inside_a_single_way_before_reading_tail(self):
+        document = (b'<osm><way id="1"><nd ref="1"/><nd ref="2"/>'
+                    b"</way></osm>" + b" " * 1_000_000)
+        source = io.BytesIO(document)
+        with patch("backend.app.geography.MAX_OSM_REFERENCES", 1):
+            with self.assertRaisesRegex(ValueError, "osm_reference_limit_exceeded"):
+                _parse_osm_stream(source, set())
+        self.assertLess(source.tell(), len(document) // 2)
+
+    def test_xml_depth_and_total_element_count_are_bounded(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "nested.osm"
+            path.write_text("<osm><node id='1' lon='0' lat='0'><tag><x><y/></x></tag></node></osm>")
+            with self.assertRaisesRegex(ValueError, "osm_xml_depth_exceeded"):
+                parse_osm_xml(path, set())
+            path.write_text("<osm><node id='1' lon='0' lat='0'/><node id='2' lon='0' lat='0'/></osm>")
+            with patch("backend.app.geography.MAX_OSM_XML_ELEMENTS", 2):
+                with self.assertRaisesRegex(ValueError, "osm_xml_element_limit_exceeded"):
+                    parse_osm_xml(path, set())
+
+    def test_snapshot_checksum_is_checked_before_xml_parse(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "corrupt.osm"
+            path.write_bytes(b"not xml")
+            with patch("backend.app.geography._parse_osm_stream") as parse:
+                with self.assertRaisesRegex(ValueError, "osm_snapshot_checksum_mismatch"):
+                    _read_osm_snapshot(path, set(), expected_checksum="0" * 64)
+                parse.assert_not_called()
 
     def test_merges_duplicate_skeleton_way_but_rejects_conflicting_tags(self):
         with tempfile.TemporaryDirectory() as directory:

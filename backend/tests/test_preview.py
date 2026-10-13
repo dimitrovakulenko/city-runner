@@ -113,6 +113,36 @@ class PreviewTests(unittest.TestCase):
                 for context in reversed(contexts):
                     context.__exit__(None, None, None)
 
+    def test_legacy_layout_upgrades_map_import_directory_only_after_old_state_validates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / ".local-preview"
+            paths = self.preview_paths(root)
+            for name in ("PREVIEW_ROOT", "PGDATA", "PGSOCKETS", "SOURCES", "JOURNAL_DIR", "LOGS"):
+                paths[name].mkdir(mode=0o700, parents=True, exist_ok=True)
+            (paths["PGDATA"] / "PG_VERSION").write_text("16\n", encoding="ascii")
+            owner = str(uuid.uuid4())
+            paths["OWNER_FILE"].write_text(json.dumps({"version": 1, "account_id": owner}), encoding="utf-8")
+            paths["OWNER_FILE"].chmod(0o600)
+            contexts = [patch.object(preview, name, path) for name, path in paths.items()]
+            try:
+                for context in contexts:
+                    context.__enter__()
+                with patch.dict(os.environ, {"ACCOUNT_DELETION_LEDGER": str(paths["JOURNAL"])}):
+                    with self.assertRaisesRegex(preview.PreviewError, "journal is missing"):
+                        preview._validate_initialized_state(Path("unused"))
+                    self.assertFalse(paths["MAP_IMPORTS"].exists())
+                    initialize_ledger()
+                    with patch.object(preview, "_tools", return_value={"pg_ctl": Path("pg_ctl")}), \
+                         patch.object(preview, "_pg_running", return_value=False), \
+                         patch.object(preview, "_fsync_directory") as fsync:
+                        self.assertEqual(preview._validate_initialized_state(Path("unused")), (owner, True))
+                    self.assertTrue(paths["MAP_IMPORTS"].is_dir())
+                    self.assertEqual(paths["MAP_IMPORTS"].stat().st_mode & 0o777, 0o700)
+                    fsync.assert_called_once_with(root)
+            finally:
+                for context in reversed(contexts):
+                    context.__exit__(None, None, None)
+
     def test_database_head_marker_does_not_hide_missing_required_tables(self):
         engine = create_engine("sqlite://")
         try:

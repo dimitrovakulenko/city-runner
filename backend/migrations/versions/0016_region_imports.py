@@ -23,7 +23,7 @@ def upgrade():
         selection_key CHAR(64),
         coverage_mode VARCHAR(16),
         coverage_evidence TEXT,
-        dataset_id BIGINT,
+        dataset_id BIGINT REFERENCES map_datasets(id) ON DELETE CASCADE,
         source_cursor BIGINT,
         status VARCHAR(16) NOT NULL DEFAULT 'queued'
             CHECK (status IN ('queued','running','backfilling','succeeded','failed')),
