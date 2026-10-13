@@ -75,7 +75,7 @@ flowchart LR
     A --> R[Pedestrian routing service]
 ```
 
-One Lightsail production VM, Terraform, Caddy for HTTPS, systemd services for API/worker/PostgreSQL, and private S3 files/backups. No Lambda, Kubernetes or Docker requirement. A worker is a separate process using the same codebase, not a separate distributed service. Use PostgreSQL durable jobs with leases/retries; do not add Redis initially. Choose instance size after measuring regional geography plus backfill memory/CPU, not from the single-run demo.
+Initial Hetzner development VM, a separate Terraform root, Caddy for HTTPS and systemd services for API/worker/PostgreSQL. Private originals and immutable map snapshots use the implemented filesystem store; a protected retained volume holds the current deletion journal independently of VM snapshots. Hosted consistent/off-host backups and restore remain required. Existing AWS/S3 templates remain an alternative. No Lambda, Kubernetes or Docker requirement. A worker is a separate process using the same codebase, not a separate distributed service. Use PostgreSQL durable jobs with leases/retries; do not add Redis initially. Choose instance size after measuring regional geography plus backfill memory/CPU, not from the single-run demo.
 
 Do not expose production while it still uses one Basic-auth identity. Add verified Google/Apple identities, per-user sessions and ownership checks before any shared remote beta. Maintain one account across login identities and workout providers. Provider secrets stay server-side; platform sessions use secure credential storage.
 
