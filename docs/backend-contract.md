@@ -1,5 +1,7 @@
 # Backend contract: first production slice
 
+The [full-history ZIP/folder import contract](history-imports.md) extends D18/D37 with durable collections of existing 20-file batches; migration 0015 is additive.
+
 D04, updated 6 October 2026. This contract describes planned tables/endpoints unless explicitly marked implemented. Activity list/detail have Pydantic response models in `backend/app/schemas.py`, exposed by OpenAPI. D05 identity/sessions, D09 jobs/worker, D10 private GPX uploads, D11 shared OSM import, D12 coverage matching, D13 map/progress, D15 city/street endpoints, D17 deletion/manual completion and D18 FIT/durable bulk imports are implemented. Mobile and browser clients share generated activity/auth/map/progress/upload/city/street/correction/import types from OpenAPI; D07 implements native Google orchestration and secure session storage, with real native/provider acceptance pending. Migrations form one chain through `0009_import_batches`. Review schema changes before dispatching dependent work.
 
 ## Compatibility
