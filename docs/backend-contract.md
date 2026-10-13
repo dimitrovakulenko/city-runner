@@ -141,3 +141,5 @@ The [statistics contract](activity-statistics.md) defines persisted nullable GPS
 ## Equivalent file recordings: D24
 
 Equivalent GPX/FIT recordings follow the [D24 grouping contract](recording-groups.md): conservative sample/time identity, independently retained sources, bounded provenance, source-level removal and terminal manifests. Provider reconciliation remains gated on approved adapters.
+
+Additional public regions follow the [T04 region-import contract](region-imports.md): operator-only durable XML imports, automatic existing-source matching and authenticated paged dataset discovery.
