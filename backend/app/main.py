@@ -20,6 +20,7 @@ from backend.app.explorer import create_explorer_router
 from backend.app.map_api import create_map_router
 from backend.app.uploads import create_upload_router
 from backend.app.import_batches import create_import_batch_router
+from backend.app.import_histories import create_import_histories_router
 from backend.app.routes import create_routes_router
 from backend.app.activity_impact import create_activity_impact_router
 from backend.app.activity_filters import (
@@ -73,6 +74,8 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
     async def safe_route_validation_error(request: Request, exc: RequestValidationError):
         if request.url.path.startswith("/api/routes"):
             return JSONResponse(status_code=422, content={"detail": "Invalid route request."})
+        if request.url.path == "/api/import-histories":
+            return JSONResponse(status_code=422, content={"detail": "Invalid history manifest."})
         return await request_validation_exception_handler(request, exc)
 
     def bearer_token(
@@ -137,6 +140,7 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
 
     app.include_router(create_upload_router(engine, current_user))
     app.include_router(create_import_batch_router(engine, current_user))
+    app.include_router(create_import_histories_router(engine, current_user))
     app.include_router(create_routes_router(engine, current_user, routing_provider))
     app.include_router(create_activity_impact_router(engine, current_user))
     app.include_router(create_account_data_router(engine, current_user))

@@ -50,7 +50,7 @@ REQUIRED_TABLES = frozenset({
     "jobs", "map_datasets", "cities", "osm_nodes", "osm_ways", "streets",
     "street_ways", "street_nodes", "activity_sources", "source_node_contributions",
     "coverage_source_runs", "account_dataset_coverage", "account_street_coverage",
-    "manual_street_completions", "import_batches", "import_batch_items", "saved_routes",
+    "manual_street_completions", "import_histories", "import_batches", "import_batch_items", "saved_routes",
     "routing_provider_quota", "account_deletions", "account_deletion_outbox",
     "sync_account_revisions", "sync_geography_revision", "sync_revision_events",
 })

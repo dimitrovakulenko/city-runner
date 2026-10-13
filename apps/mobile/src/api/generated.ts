@@ -179,10 +179,42 @@ export type ImportBatchResponse = {
   created_at: string;
   items: Array<ImportBatchItemResponse>;
   counts: ImportBatchCounts;
+  history_id?: string | null;
 };
 
 export type ImportBatchPage = {
   items: Array<ImportBatchResponse>;
+  page: number;
+  page_size: number;
+  total: number;
+};
+
+export type ImportHistoryFile = {
+  name: string;
+  format: "gpx" | "fit";
+  size: number;
+  sha256: string;
+};
+
+export type ImportHistoryCreate = {
+  request_id: string;
+  label: string;
+  files: Array<ImportHistoryFile>;
+};
+
+export type ImportHistoryState = {
+  id: string;
+  label: string;
+  state: "open" | "stopped";
+  created_at: string;
+  file_count: number;
+  batch_ids: Array<string>;
+  counts: ImportBatchCounts;
+  duplicate_count: number;
+};
+
+export type ImportHistoryPage = {
+  items: Array<ImportHistoryState>;
   page: number;
   page_size: number;
   total: number;
@@ -413,6 +445,8 @@ export type ImportBatchItemResponse = {
   activity_id: string | null;
   duplicate: boolean;
   error: string | null;
+  expected_sha256?: string | null;
+  expected_size?: number | null;
 };
 
 export type LayerLimit = {

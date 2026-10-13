@@ -57,6 +57,8 @@ class ImportBatchItemResponse(BaseModel):
     activity_id: str | None
     duplicate: bool
     error: str | None
+    expected_sha256: str | None = None
+    expected_size: int | None = None
 
 
 class ImportBatchCounts(BaseModel):
@@ -74,6 +76,7 @@ class ImportBatchResponse(BaseModel):
     created_at: datetime
     items: list[ImportBatchItemResponse]
     counts: ImportBatchCounts
+    history_id: str | None = None
 
 
 class ImportBatchPage(BaseModel):
@@ -92,11 +95,12 @@ def _manifest_name(value: str) -> str:
 
 
 def _detail(db, account_id: str, batch_id: int) -> dict:
-    batch = db.execute(text("""SELECT id,state,created_at FROM import_batches
+    batch = db.execute(text("""SELECT id,state,created_at,history_id FROM import_batches
         WHERE id=:id AND account_id=:account"""), {"id": batch_id, "account": account_id}).mappings().first()
     if batch is None:
         raise HTTPException(status_code=404, detail="Import batch not found.")
     rows = db.execute(text("""SELECT item.id,item.name,item.format,item.status AS item_status,
+            item.expected_sha256,item.expected_size,
             item.source_id,item.duplicate,item.error_code,source.activity_id,source.status AS source_status,
             source.last_error,job.status AS job_status,job.last_error AS job_error
         FROM import_batch_items item
@@ -124,12 +128,14 @@ def _detail(db, account_id: str, batch_id: int) -> dict:
             "activity_id": str(row["activity_id"]) if row["activity_id"] is not None else None,
             "duplicate": row["duplicate"],
             "error": _safe_error(row["job_error"] or row["last_error"] or row["error_code"]),
+            "expected_sha256": row["expected_sha256"], "expected_size": row["expected_size"],
         })
     counts = {key: 0 for key in ("awaiting_upload","queued","processing","succeeded","failed","deleted")}
     for item in items:
         counts[item["status"]] += 1
     return {"id": str(batch["id"]), "state": batch["state"], "created_at": batch["created_at"],
-            "items": items, "counts": counts}
+            "items": items, "counts": counts,
+            "history_id": str(batch["history_id"]) if batch["history_id"] is not None else None}
 
 
 class _SourceChanged(Exception):
@@ -160,13 +166,28 @@ def _lock_source(db, account_id, candidate):
 
 def _attach_once(db, store, account_id, batch_id, item_id, content, content_hash, file_format, created_keys):
     owner_lock(db, account_id)
-    batch = db.execute(text("""SELECT state FROM import_batches
+    hint = db.execute(text("""SELECT history_id FROM import_batches
+            WHERE id=:batch AND account_id=:account"""), {
+            "batch": batch_id, "account": account_id,
+        }).mappings().first()
+    if hint is None:
+        raise HTTPException(status_code=404, detail="Import batch not found.")
+    history_state = None
+    if hint["history_id"] is not None:
+        history = db.execute(text("""SELECT state FROM import_histories
+            WHERE id=:id AND account_id=:account FOR UPDATE"""), {
+            "id": hint["history_id"], "account": account_id,
+        }).mappings().first()
+        if history is None:
+            raise HTTPException(status_code=404, detail="Import history not found.")
+        history_state = history["state"]
+    batch = db.execute(text("""SELECT state,history_id FROM import_batches
             WHERE id=:batch AND account_id=:account FOR UPDATE"""), {
             "batch": batch_id, "account": account_id,
         }).mappings().first()
-    if batch is None:
-        raise HTTPException(status_code=404, detail="Import batch not found.")
-    item = db.execute(text("""SELECT id,format,status,content_hash,source_id
+    if batch is None or batch["history_id"] != hint["history_id"]:
+        raise HTTPException(status_code=409, detail="Import batch changed; retry the upload.")
+    item = db.execute(text("""SELECT id,format,status,content_hash,source_id,expected_sha256,expected_size
             FROM import_batch_items WHERE id=:item AND batch_id=:batch AND account_id=:account
             FOR UPDATE"""), {"item": item_id, "batch": batch_id, "account": account_id}).mappings().first()
     if item is None:
@@ -175,6 +196,9 @@ def _attach_once(db, store, account_id, batch_id, item_id, content, content_hash
         raise HTTPException(status_code=409, detail="Deleted batch items cannot be uploaded again.")
     if item["format"] != file_format:
         raise HTTPException(status_code=422, detail="File does not match the batch item's format.")
+    if (item["expected_size"] is not None and item["expected_size"] != len(content)) or (
+            item["expected_sha256"] is not None and item["expected_sha256"] != content_hash):
+        raise HTTPException(status_code=409, detail="File bytes do not match the declared history item.")
     if item["content_hash"] is not None:
         if item["content_hash"] != content_hash:
             raise HTTPException(status_code=409, detail="Batch item is already pinned to different bytes.")
@@ -186,7 +210,7 @@ def _attach_once(db, store, account_id, batch_id, item_id, content, content_hash
             raise HTTPException(status_code=409, detail="Deleted batch items cannot be uploaded again.")
         _lock_source(db, account_id, candidate)
         return False
-    if batch["state"] != "open":
+    if batch["state"] != "open" or history_state == "stopped":
         raise HTTPException(status_code=409, detail="Batch is stopped.")
     object_key = store.write(content, extension=file_format, owner_id=account_id)
     created_keys.append(object_key)
@@ -327,9 +351,9 @@ def create_import_batch_router(engine: Engine, current_user: Callable[..., str],
     def list_batches(page: int = Query(1, ge=1, le=MAX_BIGINT // 20), page_size: int = Query(20, ge=1, le=20),
                      account_id: str = Depends(current_user)):
         with engine.connect() as db:
-            total = db.execute(text("SELECT count(*) FROM import_batches WHERE account_id=:account"),
+            total = db.execute(text("SELECT count(*) FROM import_batches WHERE account_id=:account AND history_id IS NULL"),
                                {"account": account_id}).scalar_one()
-            rows = db.execute(text("""SELECT id FROM import_batches WHERE account_id=:account
+            rows = db.execute(text("""SELECT id FROM import_batches WHERE account_id=:account AND history_id IS NULL
                 ORDER BY created_at DESC,id DESC LIMIT :limit OFFSET :offset"""), {
                 "account": account_id, "limit": page_size, "offset": (page - 1) * page_size,
             }).scalars().all()
@@ -369,12 +393,28 @@ def create_import_batch_router(engine: Engine, current_user: Callable[..., str],
     def set_state(batch_id: int, account_id: str, state: str):
         with engine.begin() as db:
             owner_lock(db, account_id)
+            hint = db.execute(text("SELECT history_id FROM import_batches WHERE id=:id AND account_id=:account"), {
+                "id": batch_id, "account": account_id,
+            }).mappings().first()
+            if hint is None:
+                raise HTTPException(status_code=404, detail="Import batch not found.")
+            parent_state = None
+            if hint["history_id"] is not None:
+                history = db.execute(text("""SELECT state FROM import_histories
+                    WHERE id=:id AND account_id=:account FOR UPDATE"""), {
+                    "id": hint["history_id"], "account": account_id,
+                }).mappings().first()
+                if history is None:
+                    raise HTTPException(status_code=404, detail="Import history not found.")
+                parent_state = history["state"]
+            if state == "open" and parent_state == "stopped":
+                raise HTTPException(status_code=409, detail="Resume the import history to reopen its child batches.")
             result = db.execute(text("""UPDATE import_batches SET state=:state,updated_at=clock_timestamp()
-                WHERE id=:id AND account_id=:account"""), {
-                "state": state, "id": batch_id, "account": account_id,
+                WHERE id=:id AND account_id=:account AND history_id IS NOT DISTINCT FROM :history_id"""), {
+                "state": state, "id": batch_id, "account": account_id, "history_id": hint["history_id"],
             })
             if result.rowcount != 1:
-                raise HTTPException(status_code=404, detail="Import batch not found.")
+                raise HTTPException(status_code=409, detail="Import batch changed; retry the request.")
 
     @router.post("/api/import-batches/{batch_id}/stop", status_code=204)
     def stop_batch(batch_id: int = Path(ge=1, le=MAX_BIGINT), account_id: str = Depends(current_user)):
