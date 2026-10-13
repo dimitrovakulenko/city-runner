@@ -80,7 +80,7 @@ try:
         command.upgrade(config, 'head')
         engine = create_engine(url, pool_pre_ping=True)
         with engine.begin() as db:
-            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race', 'sync', 'sync-failure', 'sync-race', 'stats', 'stats-backfill', 'recordings', 'recording-race']:
+            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race', 'sync', 'sync-failure', 'sync-race', 'stats', 'stats-backfill', 'recordings', 'recording-race', 'history-zip', 'history-folder', 'history-race', 'history-replacement']:
                 db.execute(text('INSERT INTO accounts(id) VALUES (:id)'), {'id': 'web-test-' + account})
                 db.execute(text('INSERT INTO sessions(token_digest,account_id,expires_at) VALUES (:digest,:id,:expires)'), {
                     'digest': hashlib.sha256(('web-synthetic-' + account).encode()).hexdigest(), 'id': 'web-test-' + account,

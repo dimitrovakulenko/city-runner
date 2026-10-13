@@ -108,6 +108,7 @@ test('runtime acknowledges status only after views refresh and unchanged polls s
     }
     if (url.pathname === '/api/progress') return Response.json({ state: 'unsupported-geography', rule: 'normal', datasets: [], datasets_truncated: false, unmapped_points: 0, pending_imports: 0 });
     if (url.pathname === '/api/import-batches') return Response.json({ items: [], page: 1, page_size: 20, total: 0 });
+    if (url.pathname === '/api/import-histories') return Response.json({ items: [], page: 1, page_size: 20, total: 0 });
     throw new Error(`Unexpected request: ${url.pathname}`);
   });
   runtime.planner.setName('Keep my draft'); runtime.sync.setEligible(true);

@@ -92,11 +92,17 @@ test('typed account deletion revokes the old token and forgets only that account
   await expect(page.getByRole('alert')).toContainText('Synthetic deletion unavailable');
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   await page.unroute('**/api/account');
+  let capturedReceipt!: { id: string; status: 'complete' | 'cleanup-pending' };
+  await page.route('**/api/account', async (route) => {
+    const response = await route.fetch();
+    if (route.request().method() === 'DELETE' && response.status() === 202) capturedReceipt = await response.json();
+    await route.fulfill({ response });
+  });
   const accepted = page.waitForResponse((response) => response.url().endsWith('/api/account') && response.request().method() === 'DELETE');
   await page.getByRole('button', { name: 'Permanently delete account' }).click();
   const response = await accepted;
   expect(response.status()).toBe(202);
-  const receipt = await response.json() as { id: string; status: 'complete' | 'cleanup-pending' };
+  const receipt = capturedReceipt;
   expect(receipt.status).toMatch(/^(complete|cleanup-pending)$/);
   await expect(page.getByRole('status').filter({ hasText: 'account has been removed' })).toContainText('queued for removal');
   await expect(page.getByRole('button', { name: 'Start exploring' })).toBeVisible();

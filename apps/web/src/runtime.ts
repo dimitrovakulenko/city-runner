@@ -15,6 +15,7 @@ import { createActivityApi, createApiRequest } from '../../mobile/src/api/client
 import { createExploreApi } from '../../mobile/src/api/explore';
 import { createCityExplorerApi } from '../../mobile/src/api/cities';
 import { createImportBatchApi } from '../../mobile/src/api/importBatches';
+import { createHistoryImportApi } from '../../mobile/src/api/importHistories';
 import { createCorrectionApi } from '../../mobile/src/api/corrections';
 import type { ActivityFilters, ImportBatchItemResponse } from '../../mobile/src/api/generated';
 import { BrowserFiles } from './files';
@@ -41,9 +42,9 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
   const explore = new ExploreStore(createExploreApi(options));
   const cities = new CityExplorerStore(createCityExplorerApi(options));
   const planner = new RoutePlannerStore(createRouteApi(options));
-  const imports = new ImportStore(createBrowserImportApi(options, files), () => crypto.randomUUID(), () => {
+  const imports = new ImportStore(createBrowserImportApi(options, files, false), () => crypto.randomUUID(), () => {
     void sync.retryRefresh();
-  });
+  }, createHistoryImportApi(options), (uri) => files.release(uri));
   const corrections = new CorrectionStore(createCorrectionApi(options), (operation, id) => {
     if (operation === 'activity-delete') activities.activityDeleted(id);
     void sync.retryRefresh();
@@ -66,7 +67,7 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
     return activityReady && mapReady && (sourceReady || activitySources.getState().activityId === null) && activity.filterOptionsStatus === 'ready' &&
       city.progressStatus === 'ready' && (!city.selectedDatasetId || !city.cityError) &&
       (!city.selectedCityId || !city.streetError) && (!city.selectedStreetId || !city.detailError && !city.contributionError) &&
-      !imports.getState().error;
+      !imports.getState().error && !imports.getState().historyError;
   });
   const reset = () => { sync.reset(); files.clear(); account.reset(); activitySources.reset(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); planner.reset(); };
   sessions.subscribe(reset);
@@ -76,14 +77,14 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
 
 export type Runtime = ReturnType<typeof createRuntime>;
 
-export function createBrowserImportApi(options: Parameters<typeof createImportBatchApi>[0], files: BrowserFiles) {
+export function createBrowserImportApi(options: Parameters<typeof createImportBatchApi>[0], files: BrowserFiles, releaseOnUpload = true) {
   const upload = createApiRequest({ ...options, timeoutMs: 120_000 });
   return {
     ...createImportBatchApi(options),
     async uploadItem(batchId: string, itemId: string, selection: Parameters<BrowserFiles['form']>[0], signal?: AbortSignal) {
       const result = await upload<ImportBatchItemResponse>(`/api/import-batches/${encodeURIComponent(batchId)}/items/${encodeURIComponent(itemId)}/upload`,
         { method: 'POST', body: files.form(selection), signal });
-      files.release(selection.uri); return result;
+      if (releaseOnUpload) files.release(selection.uri); return result;
     },
   };
 }
