@@ -184,7 +184,7 @@ export class CityExplorerStore {
 
   selectDataset(datasetId: string | null): void {
     if (datasetId === this.state.selectedDatasetId) return;
-    if (datasetId !== null && !this.state.datasets.some((dataset) => dataset.dataset_id === datasetId)) return;
+    if (datasetId !== null && ((this.datasetApi && !validBigintId(datasetId)) || !this.state.datasets.some((dataset) => dataset.dataset_id === datasetId))) return;
     this.mapStreetContext = false;
     this.invalidateSelectionRequests();
     this.selectedDatasetRequest++;
@@ -231,7 +231,7 @@ export class CityExplorerStore {
         const response = await this.datasetApi.listDatasets({ rule, query, page, pageSize: DATASET_PAGE_SIZE }, this.accountController.signal);
         if (revision !== this.accountGeneration || request !== this.datasetRequest) return false;
         if (response.rule !== rule || response.page !== page || response.page_size !== DATASET_PAGE_SIZE || !Number.isInteger(response.total) || response.total < 0 ||
-            response.items.some((item) => !validBounds(item.bounds))) throw new Error('The region list response was invalid. Refresh and retry.');
+            response.items.some((item) => !validBigintId(item.dataset_id) || !validBounds(item.bounds))) throw new Error('The region list response was invalid. Refresh and retry.');
         pages.push(response.items); total = response.total;
         if (page * DATASET_PAGE_SIZE >= total) break;
       }
@@ -241,13 +241,33 @@ export class CityExplorerStore {
       let selectedDataset = selectedId ? datasets.find((item) => item.dataset_id === selectedId) ?? this.state.selectedDataset : null;
       if (selectedId) {
         const detailRequest = ++this.selectedDatasetRequest;
-        const detail = await this.datasetApi.getDataset(selectedId, rule, this.accountController.signal);
-        if (revision !== this.accountGeneration || request !== this.datasetRequest) return false;
-        if (selectedId === this.state.selectedDatasetId && detailRequest === this.selectedDatasetRequest) {
-          if (detail.dataset_id !== selectedId || !validBounds(detail.bounds)) throw new Error('The selected region response was invalid. Refresh and retry.');
-          selectedDataset = detail;
-          const index = datasets.findIndex((item) => item.dataset_id === selectedId);
-          if (index >= 0) datasets[index] = detail;
+        try {
+          const detail = await this.datasetApi.getDataset(selectedId, rule, this.accountController.signal);
+          if (revision !== this.accountGeneration || request !== this.datasetRequest) return false;
+          if (selectedId === this.state.selectedDatasetId && detailRequest === this.selectedDatasetRequest) {
+            if (detail.dataset_id !== selectedId || !validBounds(detail.bounds)) throw new Error('The selected region response was invalid. Refresh and retry.');
+            selectedDataset = detail;
+            const index = datasets.findIndex((item) => item.dataset_id === selectedId);
+            if (index >= 0) datasets[index] = detail;
+          }
+        } catch (error) {
+          if (revision !== this.accountGeneration || request !== this.datasetRequest) return false;
+          if (errorKind(error) === 'sign-in-required') throw error;
+          if (selectedId === this.state.selectedDatasetId && detailRequest === this.selectedDatasetRequest) {
+            if (error instanceof ApiError && error.status === 404) {
+              selectedDataset = null;
+              const index = datasets.findIndex((item) => item.dataset_id === selectedId);
+              if (index >= 0) datasets.splice(index, 1);
+              total = Math.max(0, total - 1);
+              this.update({ selectedDatasetId: null, selectedDataset: null, mapFocus: null,
+                cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null, cityStatus: 'idle', cityError: null,
+                selectedCityId: null, selectedCityName: null, streets: [], streetPage: 0, streetTotal: 0,
+                streetCoverage: null, streetStatus: 'idle', streetError: null, selectedStreetId: null,
+                detail: null, remainingNodes: null, detailStatus: 'idle', detailError: null,
+                contributions: [], contributionPage: 0, contributionTotal: null, contributionCoverage: null,
+                contributionStatus: 'idle', contributionError: null });
+            } else throw error;
+          }
         }
       }
       if (revision !== this.accountGeneration || request !== this.datasetRequest) return false;
@@ -273,7 +293,7 @@ export class CityExplorerStore {
       const response = await this.datasetApi.listDatasets({ rule, query, page, pageSize: DATASET_PAGE_SIZE }, this.accountController.signal);
       if (generation !== this.accountGeneration || request !== this.datasetRequest || query !== this.state.datasetQuery || rule !== this.state.rule) return false;
       if (response.rule !== rule || response.page !== page || response.page_size !== DATASET_PAGE_SIZE || !Number.isInteger(response.total) || response.total < 0 ||
-          response.items.some((item) => !validBounds(item.bounds))) throw new Error('The region list response was invalid. Refresh and retry.');
+          response.items.some((item) => !validBigintId(item.dataset_id) || !validBounds(item.bounds))) throw new Error('The region list response was invalid. Refresh and retry.');
       const byId = new Map((append ? this.state.datasets : []).map((item) => [item.dataset_id, item]));
       for (const item of response.items) byId.set(item.dataset_id, item);
       const datasets = append ? [...byId.values()] : response.items;
@@ -312,6 +332,7 @@ export class CityExplorerStore {
       const response = await this.api.getCities(datasetId, { rule, q: query, page, pageSize: PAGE_SIZE }, this.accountController.signal);
       if (!this.current('cities', request, generation) || datasetId !== this.state.selectedDatasetId || query !== this.state.cityQuery || rule !== this.state.rule) return;
       if (response.dataset_id !== datasetId || response.dataset_state !== 'active') return this.datasetBecameInactive();
+      if (response.items.some((city) => !validBounds(city.bounds))) throw new Error('The city list response was invalid. Refresh and retry.');
       if (append && this.state.cityCoverage && (this.state.cityCoverage.progress_revision !== response.coverage.progress_revision || this.state.cityCoverage.status !== response.coverage.status)) {
         await this.loadCities(1, false);
         return;
@@ -328,7 +349,7 @@ export class CityExplorerStore {
   }
 
   selectCity(cityId: string): void {
-    if (!this.state.cities.some((city) => city.id === cityId)) return;
+    if (!this.state.cities.some((city) => city.id === cityId && validBounds(city.bounds))) return;
     this.invalidateSelectionRequests();
     this.mapStreetContext = false;
     const city = this.state.cities.find((item) => item.id === cityId)!;

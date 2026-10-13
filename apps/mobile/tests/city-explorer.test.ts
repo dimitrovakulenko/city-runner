@@ -11,8 +11,9 @@ import type { CityPage, ContributionPage, DatasetItem, DatasetPage, ProgressData
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((yes) => { resolve = yes; });
-  return { promise, resolve };
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
 }
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 const coverage = (status: 'ready' | 'pending' | 'failed' = 'ready', revision = '5') => ({ status, progress_revision: revision,
@@ -49,7 +50,7 @@ function sessions(initial: string | null): SessionStore {
     async clearIfCurrent(value) { if (token !== value) return false; token = null; return true; } };
 }
 function catalogApi(overrides: Partial<DatasetApi> = {}): DatasetApi {
-  return { async listDatasets(input) { return datasetPage([catalogDataset('d1')], input.page, input.rule); },
+  return { async listDatasets(input) { return datasetPage([catalogDataset('1')], input.page, input.rule); },
     async getDataset(id) { return catalogDataset(id); }, ...overrides };
 }
 async function selectCity(store: CityExplorerStore) {
@@ -97,7 +98,7 @@ test('dataset catalog pages beyond the progress cap, searches and preserves page
   const catalog = catalogApi({ async listDatasets(input) {
     calls.push({ query: input.query, page: input.page });
     const start = (input.page - 1) * 20;
-    const items = Array.from({ length: Math.min(20, 25 - start) }, (_item, index) => catalogDataset(`region-${start + index + 1}`));
+    const items = Array.from({ length: Math.min(20, 25 - start) }, (_item, index) => catalogDataset(String(start + index + 1)));
     return datasetPage(items, input.page, input.rule, 25);
   } });
   const store = new CityExplorerStore(api(), catalog);
@@ -116,16 +117,16 @@ test('dataset search and account reset fence late catalog responses', async () =
   const stale = deferred<DatasetPage>(); let first = true;
   const store = new CityExplorerStore(api(), catalogApi({ listDatasets(input) {
     if (first) { first = false; return stale.promise; }
-    return Promise.resolve(datasetPage([catalogDataset('new-query')], input.page, input.rule));
+    return Promise.resolve(datasetPage([catalogDataset('11')], input.page, input.rule));
   } }));
   const oldSearch = store.loadDatasets();
   store.setDatasetQuery('new'); await tick();
-  stale.resolve(datasetPage([catalogDataset('old-query')])); await oldSearch; await tick();
-  assert.deepEqual(store.getState().datasets.map((item) => item.dataset_id), ['new-query']);
+  stale.resolve(datasetPage([catalogDataset('12')])); await oldSearch; await tick();
+  assert.deepEqual(store.getState().datasets.map((item) => item.dataset_id), ['11']);
   const accountRead = deferred<DatasetPage>();
   const accountStore = new CityExplorerStore(api(), catalogApi({ listDatasets() { return accountRead.promise; } }));
   const pending = accountStore.loadDatasets(); accountStore.reset();
-  accountRead.resolve(datasetPage([catalogDataset('private-old')])); await pending;
+  accountRead.resolve(datasetPage([catalogDataset('13')])); await pending;
   assert.deepEqual(accountStore.getState().datasets, []);
   assert.equal(accountStore.getState().mapFocus, null);
 });
@@ -134,45 +135,89 @@ test('rule changes fence older catalog pages and reload the requested rule', asy
   const oldPage = deferred<DatasetPage>(); const rules: string[] = [];
   const store = new CityExplorerStore(api({ async getProgress(rule) { return { ...progress(), rule }; } }), catalogApi({ listDatasets(input) {
     rules.push(input.rule);
-    return input.rule === 'normal' ? oldPage.promise : Promise.resolve(datasetPage([catalogDataset('strict-region')], input.page, input.rule));
+    return input.rule === 'normal' ? oldPage.promise : Promise.resolve(datasetPage([catalogDataset('15')], input.page, input.rule));
   } }));
   const normalRequest = store.loadDatasets();
   store.setRule('strict'); await tick(); await tick();
-  oldPage.resolve(datasetPage([catalogDataset('old-normal')])); await normalRequest; await tick();
+  oldPage.resolve(datasetPage([catalogDataset('16')])); await normalRequest; await tick();
   assert.equal(store.getState().rule, 'strict');
-  assert.deepEqual(store.getState().datasets.map((item) => item.dataset_id), ['strict-region']);
+  assert.deepEqual(store.getState().datasets.map((item) => item.dataset_id), ['15']);
   assert.ok(rules.includes('strict'));
+});
+
+test('catalog rejects invalid region IDs and out-of-range bounds', async () => {
+  for (const invalid of [catalogDataset('not-an-id'), catalogDataset('21', [3, 95, 4, 96])]) {
+    const store = new CityExplorerStore(api(), catalogApi({ async listDatasets(input) { return datasetPage([invalid], input.page, input.rule); } }));
+    assert.equal(await store.loadDatasets(), false);
+    assert.equal(store.getState().datasets.length, 0);
+    assert.equal(store.getState().datasetStatus, 'error');
+  }
 });
 
 test('selected region refresh stays exact outside the search page and never replays focus', async () => {
   let exactReads = 0;
-  const catalog = catalogApi({ async listDatasets(input) { return datasetPage([catalogDataset(input.query ? 'other-result' : 'query-result')], input.page, input.rule, 101); },
+  const catalog = catalogApi({ async listDatasets(input) { return datasetPage([catalogDataset(input.query ? '18' : '17')], input.page, input.rule, 101); },
     async getDataset(id) { exactReads++; return { ...catalogDataset(id, [4, 49, 5, 50]), progress_revision: '6' }; } });
   const store = new CityExplorerStore(api(), catalog);
   await store.loadDatasets();
-  store.selectDataset('query-result'); await tick();
+  store.selectDataset('17'); await tick();
   const focusRevision = store.getState().mapFocus?.revision;
   store.setDatasetQuery('elsewhere'); await tick();
   assert.equal(await store.refreshDatasets(), true);
-  assert.equal(store.getState().datasets.some((item) => item.dataset_id === 'query-result'), false);
+  assert.equal(store.getState().datasets.some((item) => item.dataset_id === '17'), false);
   assert.equal(store.getState().datasetTotal, 101);
-  assert.equal(store.getState().selectedDataset?.dataset_id, 'query-result');
+  assert.equal(store.getState().selectedDataset?.dataset_id, '17');
   assert.deepEqual(store.getState().selectedDataset?.bounds, [4, 49, 5, 50]);
   assert.equal(store.getState().selectedDataset?.progress_revision, '6');
   assert.equal(store.getState().mapFocus?.revision, focusRevision);
   assert.ok(exactReads >= 1);
 });
 
+test('late selected-region errors cannot replace a newer selection', async () => {
+  const staleDetail = deferred<DatasetItem>();
+  const store = new CityExplorerStore(api(), catalogApi({
+    async listDatasets(input) { return datasetPage([catalogDataset('31'), catalogDataset('32')], input.page, input.rule); },
+    getDataset(id) { return id === '31' ? staleDetail.promise : Promise.resolve(catalogDataset(id)); },
+  }));
+  await store.loadDatasets();
+  store.selectDataset('31'); await tick();
+  const refresh = store.refreshDatasets(); await tick();
+  store.selectDataset('32');
+  staleDetail.reject(new Error('old region request failed'));
+  await refresh;
+  assert.equal(store.getState().selectedDatasetId, '32');
+  assert.equal(store.getState().selectedDataset?.dataset_id, '32');
+  assert.equal(store.getState().datasetError, null);
+  assert.deepEqual(store.getState().datasets.map((item) => item.dataset_id), ['31', '32']);
+});
+
+test('selected region 404 clears only that selection and retains valid catalog results', async () => {
+  const store = new CityExplorerStore(api(), catalogApi({
+    async listDatasets(input) { return datasetPage([catalogDataset('41'), catalogDataset('42')], input.page, input.rule); },
+    async getDataset(id) { if (id === '41') throw new ApiError('http', 'Region is no longer active.', 404); return catalogDataset(id); },
+  }));
+  await store.loadDatasets();
+  store.selectDataset('41'); await tick();
+  assert.equal(await store.refreshDatasets(), true);
+  assert.equal(store.getState().selectedDatasetId, null);
+  assert.equal(store.getState().selectedDataset, null);
+  assert.equal(store.getState().cityTotal, 0);
+  assert.equal(store.getState().mapFocus, null);
+  assert.deepEqual(store.getState().datasets.map((item) => item.dataset_id), ['42']);
+  assert.equal(store.getState().datasetTotal, 1);
+  assert.equal(store.getState().datasetStatus, 'ready');
+});
+
 test('Retry reloads a failed selected-region catalog refresh', async () => {
   let exactReads = 0;
-  const catalog = catalogApi({ async listDatasets(input) { return datasetPage([catalogDataset('d1')], input.page, input.rule); },
+  const catalog = catalogApi({ async listDatasets(input) { return datasetPage([catalogDataset('1')], input.page, input.rule); },
     async getDataset(id) {
       if (++exactReads === 1) throw new Error('temporary region refresh failure');
       return catalogDataset(id, [4, 49, 5, 50]);
     } });
   const store = new CityExplorerStore(api(), catalog);
   await store.loadDatasets();
-  store.selectDataset('d1'); await tick();
+  store.selectDataset('1'); await tick();
   assert.equal(await store.refreshDatasets(), false);
   assert.equal(store.getState().datasetStatus, 'error');
   assert.equal(store.getState().datasetError, 'temporary region refresh failure');
@@ -186,22 +231,36 @@ test('Retry reloads a failed selected-region catalog refresh', async () => {
 });
 
 test('region and city clicks issue repeatable map-focus bounds; pending progress stays null', async () => {
-  const pending = { ...catalogDataset('d1', [-1, 49, 1, 51]), state: 'pending' as const,
+  const pending = { ...catalogDataset('1', [-1, 49, 1, 51]), state: 'pending' as const,
     visited_node_count: null, eligible_streets: null, completed_streets: null, effective_completed_streets: null, eligible_nodes: null };
   const store = new CityExplorerStore(api(), catalogApi({ async listDatasets(input) { return datasetPage([pending], input.page, input.rule); },
     async getDataset() { return pending; } }));
   await store.loadDatasets();
-  store.selectDataset('d1'); await tick();
+  store.selectDataset('1'); await tick();
   assert.deepEqual(store.getState().mapFocus?.bounds, [-1, 49, 1, 51]);
   assert.equal(store.getState().selectedDataset?.eligible_streets, null);
   await tick();
   store.selectCity('c1');
   assert.deepEqual(store.getState().mapFocus?.bounds, [3.5, 50.9, 3.9, 51.2]);
   assert.equal(store.getState().mapFocus?.revision, 2);
-  store.selectDataset(null); store.selectDataset('d1'); await tick();
+  store.selectDataset(null); store.selectDataset('1'); await tick();
   assert.equal(store.getState().mapFocus?.revision, 3);
   store.reset();
   assert.equal(store.getState().mapFocus, null);
+});
+
+test('invalid city bounds never publish or reach map focus', async () => {
+  const store = new CityExplorerStore(api({ async getCities(id) {
+    return { ...cities(id), items: [{ ...cities(id).items[0]!, bounds: [4, 52, 3, 53] }] };
+  } }), catalogApi());
+  await store.loadDatasets();
+  store.selectDataset('1'); await tick();
+  const focusRevision = store.getState().mapFocus?.revision;
+  assert.equal(store.getState().cities.length, 0);
+  assert.equal(store.getState().cityStatus, 'error');
+  store.selectCity('c1');
+  assert.equal(store.getState().selectedCityId, null);
+  assert.equal(store.getState().mapFocus?.revision, focusRevision);
 });
 
 test('dataset choice is explicit and old dataset results cannot replace a new selection', async () => {
