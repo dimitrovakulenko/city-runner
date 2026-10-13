@@ -56,6 +56,12 @@ From `apps/web`, run `rtk npm ci` and `rtk npm run dev`; open `http://127.0.0.1:
 
 Apply migration `0012_sync_status` before using **Sources & sync** or automatic foreground refresh. It records transactional owner/geography revisions, including writes from existing workers; no additional service or polling worker is needed. The owner-only status/failure APIs and explicit matching retry are documented in [source status](sync-status.md). Provider connection credentials and adapters remain future work.
 
+## Additional public regions
+
+Apply migration `0016_region_imports` and restart the API and worker. Operator and worker share `MAP_IMPORT_STORAGE_ROOT`, a durable private directory for public XML snapshots. Persistent preview startup sets this to `.local-preview/map-imports` and applies the migration without replacing its database, owner or uploaded originals. Submit public extracts with the [operator commands](osm-import.md#durable-additional-regions); use status/retry to inspect durable phase and cursor. The existing ordinary worker runs this work when account jobs are idle. No new service or automatic external fetch is required.
+
+The browser discovers active complete datasets through `/api/datasets`, independently of the overview's 20-region cap. Region search/load-more preserves the selected region; region/city selection centers the map. Matching pending/failed states retain null counts.
+
 ## ZIP and folder histories
 
 Apply migration `0015_import_histories` and restart the API and ingestion workers before using browser ZIP/folder imports. The persistent preview runner applies this migration on normal restart; do not initialize a replacement preview. Histories add durable owner-scoped parents to existing 20-file manifests, without a new worker or automatic backfill. See [history contract](history-imports.md) and [browser controls](../apps/web/README.md#history-imports).

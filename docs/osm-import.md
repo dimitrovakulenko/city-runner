@@ -24,9 +24,21 @@ python -m backend.app.geography --file region.osm --region gent --city-relation 
   --coverage-mode complete --coverage-evidence 'Source, query/scope, and snapshot establishing the selected extract coverage'
 ```
 
-“Complete” records the operator’s claim; code verifies the boundary and that each selected city has eligible streets, but cannot prove an external extract’s coverage. A later version remains staged as `importing`; this slice does not switch active datasets. Identity includes region, file SHA-256, eligibility-rule version, coverage mode, and sorted selected relation IDs. Repeating the same identity is idempotent and does not reactivate a retired/staged version. Import runs transactionally; failures leave no partial dataset.
+“Complete” records the operator’s claim; code verifies the boundary and that each selected city has eligible streets, but cannot prove an external extract’s coverage. A later version remains staged as `importing`; this slice does not switch active datasets. Identity includes region, file SHA-256, eligibility-rule version, coverage mode, and sorted selected relation IDs. Repeating the same identity is idempotent and does not reactivate a retired/staged version. Import runs transactionally; failures leave no partial dataset. First activation also initializes durable matching of existing successful sources; staged/sampled versions never replace the live region.
 
 `find_cities` and `find_nearby_nodes` provide validated, capped WGS84 lookups using local GiST indexes. They are not suitable for unbounded export or private activity matching.
+
+## Durable additional regions
+
+Use the [region import contract](region-imports.md) for additional public cities. Apply migration `0016_region_imports`, configure the same private `MAP_IMPORT_STORAGE_ROOT` for operator and worker, then submit an immutable bounded XML snapshot:
+
+```sh
+rtk .venv/bin/python scripts/dev/import-osm-region.py submit --file region.osm --region be/city --city-relation RELATION_ID --coverage-mode complete --coverage-evidence 'Public source, selected boundary and full named-highway query scope'
+rtk .venv/bin/python scripts/dev/import-osm-region.py status --task-id TASK_ID
+rtk .venv/bin/python scripts/dev/import-osm-region.py retry --task-id TASK_ID
+```
+
+The ordinary worker handles queued geography when account jobs are idle, then checkpoints existing-source matching in pages of at most 20. Retry resumes its durable phase/cursor; interrupted geography rolls back and restarts from stored original bytes. Task success means matching jobs were queued; each account's progress stays pending until its jobs complete. The browser's region catalog provides search/paging and city/region map focus. Existing direct imports also initialize automatic backfill. No external URL, automatic download, browser geography mutation or replacement activation is added.
 
 ## Public validation snapshot
 
@@ -39,3 +51,15 @@ On 2026-10-05, this public Overpass query retrieved Gent relation 897671, its re
 The response OSM snapshot was `2026-10-05T20:39:51Z` (area snapshot `2026-10-04T19:59:06Z`). It contained 45 repeated way representations with identical node references and compatible tags; the importer merged those directly from the raw response. Raw response SHA-256: `747e0b7675ee5e81b082c126ee3f8654f78e11f066840da1fac92d406085b951`. The disposable PostGIS import validated 1 city, 9,748 eligible ways, 3,108 exact-name street groups, 56,678 street-node memberships, and 51,134 distinct original nodes. This tests one-city extract handling only; it is not regional or Belgian coverage, and mapped completeness still depends on OSM. The extract is not checked into the repository.
 
 Attribute map/data views with “© OpenStreetMap contributors” and link the [OpenStreetMap copyright and licence page](https://www.openstreetmap.org/copyright), which identifies the ODbL. Preserve the source timestamp/checksum and query scope with the imported dataset.
+
+## Brugge validation snapshot
+
+On 13 October 2026, the operator workflow loaded public Brugge municipality [relation 562654](https://www.openstreetmap.org/relation/562654) alongside the existing Gent preview. The [FOSSGIS Overpass endpoint](https://overpass-api.de/api/interpreter) returned this bounded query:
+
+```text
+[out:xml][timeout:120];rel(562654)->.city;rel(562654);map_to_area->.area;(.city;way(r.city);way(area.area)["highway"]["name"];);out body;>;out skel qt;
+```
+
+OSM snapshot: `2026-10-13T08:39:39Z`; area snapshot: `2026-10-12T15:16:01Z`. Exact response: 5,563,688 bytes, SHA-256 `c98bf6311a10d64a777b238b91478ef6b9e53589932323065dc23841a67b5082`. Validated eligible output: one city, 1,592 street groups, 6,181 ways and 30,823 distinct original nodes. Completeness evidence records the selected city/full named-highway query; this is two supported municipalities, not country/world coverage. The extract stays outside Git.
+
+Actual HTTP imported a synthetic public-node activity before Brugge existed. A queued immutable region task survived API/worker/PostgreSQL restart, activated Brugge and automatically matched that retained recording without another upload. A second complete restart preserved dataset identity, public snapshot bytes, original GPX bytes/samples/timestamps, coverage and session. Gent retained its checksum, 3,109 streets and 51,154 nodes. The synthetic account/originals were removed through the account API; the default preview account remains empty.
