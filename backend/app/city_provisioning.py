@@ -97,6 +97,7 @@ def preparation_policy_changed_sql() -> str:
         OR (request.state IN ('ready','unsupported','failed') AND EXISTS (
             SELECT 1 FROM jsonb_array_elements_text(request.country_codes) country(code)
             WHERE CAST(:city_policy_tasks AS jsonb) ? country.code
+              AND (request.state<>'failed' OR country.code<=request.country_cursor::text)
               AND NOT EXISTS (SELECT 1 FROM activity_preparation_countries scope
                 WHERE scope.account_id=request.account_id AND scope.source_id=request.source_id
                   AND scope.source_revision=request.source_revision AND scope.country_code=country.code))))"""

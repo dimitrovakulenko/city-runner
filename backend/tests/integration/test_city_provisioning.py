@@ -203,6 +203,37 @@ class CityProvisioningPostgisTests(unittest.TestCase):
         self._set_policy_request('BE', state='pending')
         self.assertFalse(_enroll_existing_sources(self.engine))
 
+    def test_failed_first_country_page_is_not_masked_by_unvisited_supported_countries(self):
+        from backend.app.city_geography_provider import country_admin_levels
+        profile = 'country-policy-failed-' + uuid.uuid4().hex
+        countries = sorted(country_admin_levels())[:21]
+        client = TestClient(create_app(self.engine, identity_resolver=lambda: self.account))
+        try:
+            with patch('backend.app.city_geography_provider.PROFILE_VERSION', profile):
+                with self.engine.begin() as db:
+                    cursor = _enqueue_country_page(db, self.account, self.source_id, 1, countries, None)
+                    db.execute(text("""UPDATE activity_preparation_requests SET state='failed',phase='done',
+                        country_codes=CAST(:countries AS jsonb),country_cursor=:cursor,safe_error='city_provider_unavailable'
+                        WHERE account_id=:account"""), {
+                        'countries': json.dumps(countries), 'cursor': cursor, 'account': self.account,
+                    })
+                    db.execute(text("""UPDATE city_public_tasks SET status='failed',safe_error='city_provider_unavailable'
+                        WHERE task_key=(SELECT task_key FROM activity_preparation_countries
+                            WHERE account_id=:account AND country_code=:country)"""), {
+                        'account': self.account, 'country': countries[0],
+                    })
+                self.assertEqual(client.get('/api/coverage-preparation').json()['state'], 'failed')
+                self.assertFalse(_enroll_existing_sources(self.engine))
+                self.assertFalse(_enroll_existing_sources(self.engine))
+                with patch.dict(os.environ, {'CITY_ADMIN_LEVELS': json.dumps({countries[0]: [9]})}, clear=False):
+                    self.assertEqual(client.get('/api/coverage-preparation').json()['state'], 'pending')
+                    self.assertTrue(_enroll_existing_sources(self.engine))
+                    self.assertFalse(_enroll_existing_sources(self.engine))
+        finally:
+            with self.engine.begin() as db:
+                db.execute(text('DELETE FROM activity_preparation_countries WHERE account_id=:account'), {'account': self.account})
+                db.execute(text('DELETE FROM city_public_tasks WHERE task_key LIKE :pattern'), {'pattern': '%:' + profile + '%'})
+
     def test_unchanged_terminal_policy_and_unknown_country_do_not_reenroll(self):
         self._set_policy_request('BE', old_levels=[8])
         self.assertFalse(_enroll_existing_sources(self.engine))
