@@ -16,10 +16,12 @@ const INITIAL: CoveragePreparationState = { data: null, status: 'idle', error: n
 
 function kind(error: unknown): ApiErrorKind | 'http' { return error instanceof ApiError ? error.kind : 'http'; }
 function message(error: unknown): string { return error instanceof Error ? error.message : 'Could not refresh city preparation. Retry when connected.'; }
+const MAX_RELATION_ID = 9223372036854775807n;
 function isCity(value: unknown): value is CoveragePreparationCity {
   if (!value || typeof value !== 'object') return false;
   const city = value as CoveragePreparationCity;
-  return typeof city.osm_relation_id === 'string' && !!city.osm_relation_id && typeof city.name === 'string' &&
+  const validRelationId = typeof city.osm_relation_id === 'string' && /^[1-9]\d{0,18}$/.test(city.osm_relation_id) && BigInt(city.osm_relation_id) <= MAX_RELATION_ID;
+  return validRelationId && typeof city.name === 'string' && !!city.name && Array.from(city.name).length <= 200 &&
     (city.state === 'queued' || city.state === 'fetching' || city.state === 'importing' || city.state === 'ready' || city.state === 'failed') &&
     (city.error === null || typeof city.error === 'string');
 }
@@ -104,8 +106,8 @@ export class CoveragePreparationStore {
     try {
       await this.api.retry(controller.signal);
       if (!current()) return false;
-      await this.refresh();
-      return current();
+      const refreshed = await this.refresh();
+      return refreshed && current();
     } catch (error) {
       if (!current()) return false;
       if (kind(error) === 'sign-in-required') this.expireSession(message(error));

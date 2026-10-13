@@ -97,6 +97,25 @@ test('retry is serialized, does not run when disabled, and refreshes accepted wo
   assert.equal(await disabled.retry(), false);
 });
 
+test('accepted retry reports failure when its required status refresh fails', async () => {
+  let reads = 0;
+  let posts = 0;
+  const store = new CoveragePreparationStore(api({
+    async getStatus() {
+      if (++reads > 1) throw new ApiError('offline', 'Connection lost.');
+      return snapshot({ state: 'failed', failed_sources: 1 });
+    },
+    async retry() { posts++; },
+  }));
+  await store.refresh();
+  assert.equal(await store.retry(), false);
+  assert.equal(posts, 1);
+  assert.equal(store.getState().status, 'offline');
+  assert.equal(store.getState().error, 'Connection lost.');
+  assert.equal(store.getState().data?.failed_sources, 1);
+  assert.equal(store.getState().retrying, false);
+});
+
 test('401 clears cached preparation data and malformed pages fail closed', async () => {
   const store = new CoveragePreparationStore(api());
   await store.refresh();
@@ -111,6 +130,17 @@ test('401 clears cached preparation data and malformed pages fail closed', async
   assert.equal(await malformed.refresh(), false);
   assert.equal(malformed.getState().data, null);
   assert.equal(malformed.getState().status, 'error');
+
+  const invalidCity = new CoveragePreparationStore(api({ async getStatus() { return snapshot({ cities: [
+    { osm_relation_id: '0', name: 'City', state: 'ready', error: null },
+  ] }); } }));
+  assert.equal(await invalidCity.refresh(), false);
+  assert.equal(invalidCity.getState().data, null);
+  const longName = new CoveragePreparationStore(api({ async getStatus() { return snapshot({ cities: [
+    { osm_relation_id: '123456', name: 'x'.repeat(201), state: 'ready', error: null },
+  ] }); } }));
+  assert.equal(await longName.refresh(), false);
+  assert.equal(longName.getState().data, null);
 });
 
 test('newer refresh wins when an older status response arrives late', async () => {
