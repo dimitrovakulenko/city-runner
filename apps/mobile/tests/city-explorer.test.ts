@@ -206,6 +206,27 @@ test('selected region 404 clears only that selection and retains valid catalog r
   assert.deepEqual(store.getState().datasets.map((item) => item.dataset_id), ['42']);
   assert.equal(store.getState().datasetTotal, 1);
   assert.equal(store.getState().datasetStatus, 'ready');
+  store.selectDataset('42');
+  assert.equal(store.getState().mapFocus?.revision, 2);
+});
+
+test('selected region 404 outside current query results does not reduce catalog total', async () => {
+  const store = new CityExplorerStore(api(), catalogApi({
+    async listDatasets(input) {
+      return input.query
+        ? datasetPage([catalogDataset('52')], input.page, input.rule, 21)
+        : datasetPage([catalogDataset('51'), catalogDataset('52')], input.page, input.rule, 21);
+    },
+    async getDataset(id) { if (id === '51') throw new ApiError('http', 'Region is no longer active.', 404); return catalogDataset(id); },
+  }));
+  await store.loadDatasets();
+  store.selectDataset('51'); await tick();
+  store.setDatasetQuery('other'); await tick();
+  assert.equal(store.getState().datasetTotal, 21);
+  assert.equal(await store.refreshDatasets(), true);
+  assert.equal(store.getState().selectedDatasetId, null);
+  assert.equal(store.getState().datasetTotal, 21);
+  assert.deepEqual(store.getState().datasets.map((item) => item.dataset_id), ['52']);
 });
 
 test('Retry reloads a failed selected-region catalog refresh', async () => {

@@ -89,6 +89,7 @@ export class CityExplorerStore {
   private requests = { progress: 0, cities: 0, streets: 0, detail: 0, contributions: 0 };
   private datasetRequest = 0;
   private selectedDatasetRequest = 0;
+  private mapFocusRevision = 0;
   private mapStreetContext = false;
   private listeners = new Set<(state: CityExplorerState) => void>();
 
@@ -119,6 +120,7 @@ export class CityExplorerStore {
   }
   reset(): void {
     this.accountGeneration++;
+    this.mapFocusRevision = 0;
     this.mapStreetContext = false;
     this.accountController.abort();
     this.accountController = new AbortController();
@@ -257,8 +259,10 @@ export class CityExplorerStore {
             if (error instanceof ApiError && error.status === 404) {
               selectedDataset = null;
               const index = datasets.findIndex((item) => item.dataset_id === selectedId);
-              if (index >= 0) datasets.splice(index, 1);
-              total = Math.max(0, total - 1);
+              if (index >= 0) {
+                datasets.splice(index, 1);
+                total = Math.max(0, total - 1);
+              }
               this.update({ selectedDatasetId: null, selectedDataset: null, mapFocus: null,
                 cities: [], cityPage: 0, cityTotal: 0, cityCoverage: null, cityStatus: 'idle', cityError: null,
                 selectedCityId: null, selectedCityName: null, streets: [], streetPage: 0, streetTotal: 0,
@@ -308,7 +312,7 @@ export class CityExplorerStore {
   }
 
   private focusMap(bounds: [number, number, number, number]): void {
-    const revision = (this.state.mapFocus?.revision ?? 0) + 1;
+    const revision = ++this.mapFocusRevision;
     this.update({ mapFocus: { revision, bounds } });
   }
 
