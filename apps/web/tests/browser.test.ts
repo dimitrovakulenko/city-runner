@@ -107,6 +107,7 @@ test('runtime acknowledges status only after views refresh and unchanged polls s
       return Response.json({ items: [], page: 1, page_size: 20, total: 0 });
     }
     if (url.pathname === '/api/datasets') return Response.json({ rule: 'normal', items: [], page: 1, page_size: 20, total: 0 });
+    if (url.pathname === '/api/coverage-preparation') return Response.json({ enabled: false, state: 'ready', pending_sources: 0, failed_sources: 0, unsupported_sources: 0, cities: [], cities_truncated: false });
     if (url.pathname === '/api/progress') return Response.json({ state: 'unsupported-geography', rule: 'normal', datasets: [], datasets_truncated: false, unmapped_points: 0, pending_imports: 0 });
     if (url.pathname === '/api/import-batches') return Response.json({ items: [], page: 1, page_size: 20, total: 0 });
     if (url.pathname === '/api/import-histories') return Response.json({ items: [], page: 1, page_size: 20, total: 0 });
@@ -138,4 +139,18 @@ test('runtime session replacement fences a delayed private imported-file page', 
   assert.deepEqual(runtime.activitySources.getState().items, []);
   assert.equal(runtime.activitySources.getState().activityId, null);
   assert.equal(runtime.activitySources.getState().removingSourceId, null);
+});
+
+test('runtime session replacement discards a late private city preparation snapshot', async () => {
+  const sessions = new BrowserSessions(storage()); await sessions.setToken('alice');
+  let finish!: (response: Response) => void;
+  const runtime = createRuntime(sessions, '', () => new Promise<Response>((resolve) => { finish = resolve; }));
+  const pending = runtime.preparation.refresh();
+  await Promise.resolve(); await Promise.resolve();
+  await sessions.setToken('bob');
+  finish(Response.json({ enabled: true, state: 'pending', pending_sources: 1, failed_sources: 0, unsupported_sources: 0,
+    cities: [{ osm_relation_id: '42', name: 'Alice city', state: 'fetching', error: null }], cities_truncated: false }));
+  assert.equal(await pending, false);
+  assert.equal(runtime.preparation.getState().data, null);
+  assert.equal(runtime.preparation.getState().retrying, false);
 });

@@ -55,6 +55,8 @@ REQUIRED_TABLES = frozenset({
     "routing_provider_quota", "account_deletions", "account_deletion_outbox",
     "sync_account_revisions", "sync_geography_revision", "sync_revision_events",
     "map_import_tasks",
+    "city_provider_admission", "city_public_tasks", "activity_preparation_requests",
+    "activity_preparation_countries", "activity_preparation_cities", "source_dataset_applicability",
 })
 ALLOWED_ORIGINS = {
     "http://127.0.0.1:5173",

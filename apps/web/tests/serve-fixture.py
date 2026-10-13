@@ -81,7 +81,7 @@ try:
         command.upgrade(config, 'head')
         engine = create_engine(url, pool_pre_ping=True)
         with engine.begin() as db:
-            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race', 'sync', 'sync-failure', 'sync-race', 'stats', 'stats-backfill', 'recordings', 'recording-race', 'history-zip', 'history-folder', 'history-race', 'history-replacement', 'regions', 'region-race', 'region-replacement']:
+            for account in ['alice', 'bob', 'carol', 'discovery', 'impact', 'filters', 'usability', 'view-other', 'account-export', 'account-delete', 'account-replacement', 'account-race', 'sync', 'sync-failure', 'sync-race', 'stats', 'stats-backfill', 'recordings', 'recording-race', 'history-zip', 'history-folder', 'history-race', 'history-replacement', 'regions', 'region-race', 'region-replacement', 'provisioning', 'provisioning-other', 'provisioning-retry']:
                 db.execute(text('INSERT INTO accounts(id) VALUES (:id)'), {'id': 'web-test-' + account})
                 db.execute(text('INSERT INTO sessions(token_digest,account_id,expires_at) VALUES (:digest,:id,:expires)'), {
                     'digest': hashlib.sha256(('web-synthetic-' + account).encode()).hexdigest(), 'id': 'web-test-' + account,
@@ -97,6 +97,48 @@ try:
             return {'code': 'Ok', 'waypoints': [{'location': point, 'distance': 0} for point in points],
                 'routes': [{'geometry': {'type': 'LineString', 'coordinates': points}, 'distance': 1234.5, 'duration': 900}]}
         app = create_app(engine, routing_provider=synthetic_route if os.environ.get('WEB_TEST_ROUTING') == '1' else None)
+        provisioning = {'hold': True, 'fail_retry': True, 'requests': []}
+        class SyntheticCityProvider:
+            def fetch_world_catalog(self):
+                provisioning['requests'].append(['world'])
+                return {'regions': [{'country_code': 'BE', 'geometry': {'type': 'Polygon',
+                    'coordinates': [[[2.,49.],[6.,49.],[6.,53.],[2.,53.],[2.,49.]]]}}]}
+            def fetch_country_catalog(self, country, levels):
+                provisioning['requests'].append(['country', country, levels])
+                return {'source_timestamp': '2026-10-13T00:00:00Z', 'cities': [
+                    {'relation_id': 900, 'name': 'Demo City', 'bounds': [3.71,51.04,3.74,51.065]},
+                    {'relation_id': 903, 'name': 'Antwerp', 'bounds': [4.51,51.04,4.54,51.065]},
+                    {'relation_id': 904, 'name': 'Retry City', 'bounds': [4.91,51.04,4.94,51.065]}]}
+            def fetch_city_extract(self, relation_id):
+                from backend.app.city_geography_provider import CityGeographyError
+                provisioning['requests'].append(['city', relation_id])
+                if relation_id == 903 and provisioning['hold']:
+                    raise CityGeographyError('city_provider_unavailable')
+                if relation_id == 904 and provisioning['fail_retry']:
+                    # Rehearse the final failed attempt without a minute of backoff.
+                    with engine.begin() as db:
+                        db.execute(text("UPDATE city_public_tasks SET attempts=5 WHERE relation_id=904 AND status='running'"))
+                    raise CityGeographyError('city_provider_unavailable')
+                return {'source_timestamp': '2026-10-13T00:00:00Z', 'xml': geography(
+                    city_name='Antwerp' if relation_id == 903 else 'Retry City',
+                    relation_id=relation_id, longitude_offset=.8 if relation_id == 903 else 1.2)}
+        @app.post('/__test__/provisioning/enable', include_in_schema=False)
+        def fixture_enable_provisioning():
+            import backend.app.city_geography_provider as provider_module
+            provider_module.get_city_geography_provider = lambda: SyntheticCityProvider()
+            os.environ['CITY_GEOGRAPHY_PROVIDER'] = 'overpass'
+            return {'enabled': True}
+        @app.post('/__test__/provisioning/release', include_in_schema=False)
+        def fixture_release_provisioning():
+            provisioning['hold'] = False
+            return {'released': True}
+        @app.post('/__test__/provisioning/allow-retry', include_in_schema=False)
+        def fixture_allow_provisioning_retry():
+            provisioning['fail_retry'] = False
+            return {'released': True}
+        @app.get('/__test__/provisioning/requests', include_in_schema=False)
+        def fixture_provisioning_requests():
+            return {'requests': provisioning['requests']}
         @app.post('/__test__/regions/create', include_in_schema=False)
         def fixture_add_region():
             from backend.app.map_imports import submit_osm_import
@@ -215,7 +257,8 @@ try:
                 cleaned = process_account_deletion_cleanup(engine)
                 if not cleaned and not run_once(engine, handlers):
                     from backend.app.map_imports import process_map_task_step
-                    if not process_map_task_step(engine): stop.wait(.15)
+                    from backend.app.city_provisioning import process_city_provisioning_step
+                    if not process_map_task_step(engine) and not process_city_provisioning_step(engine): stop.wait(.15)
         worker = threading.Thread(target=work, daemon=True); worker.start()
         try:
             uvicorn.run(app, host='127.0.0.1', port=int(os.environ.get('WEB_TEST_API_PORT', '8003')), log_level='warning')

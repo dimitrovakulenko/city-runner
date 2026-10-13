@@ -62,6 +62,14 @@ Apply migration `0016_region_imports` and restart the API and worker. Operator a
 
 The browser discovers active complete datasets through `/api/datasets`, independently of the overview's 20-region cap. Region search/load-more preserves the selected region; region/city selection centers the map. Matching pending/failed states retain null counts.
 
+## Activity-triggered city preparation
+
+Apply migration `0017_city_provisioning` and enable `CITY_GEOGRAPHY_PROVIDER=overpass` on the API and worker to use the bounded development adapter. The existing private map-import root stores accepted city snapshots; public catalog/country/city task state and private preparation requests are durable in PostgreSQL. Existing successful sources are enrolled in bounded steps after enablement. Disabling the optional adapter preserves known-region matching and leaves private requests available for a later re-enable.
+
+The first activity in a missing city discovers its public relation locally, then queues a shared complete-city import and matching. Neither original GPS nor derived track boxes are sent externally. The browser shows discovery/preparation, retry and unsupported places through `/api/coverage-preparation`; routine foreground refresh retains filters and drafts. Source matching and historical backfill use conservative indexed original-track envelopes before exact original-sample qualification.
+
+Default municipal policies: BE/DE/FR/NL level 8, DK level 7 and NZ level 6. These are explicit initial policies, not verified coverage of every municipality or country. `CITY_ADMIN_LEVELS='{"BE":[8],"NZ":[6]}'` adds/overrides trusted policies; there is no universal level-eight fallback. Boundary absence, provider failure and bounded-extract overflow remain explicit. Worldwide country policy/large-city/provider acceptance remains required. See the [contract](city-provisioning.md) and [remote worker template](../infra/README.md).
+
 ## ZIP and folder histories
 
 Apply migration `0015_import_histories` and restart the API and ingestion workers before using browser ZIP/folder imports. The persistent preview runner applies this migration on normal restart; do not initialize a replacement preview. Histories add durable owner-scoped parents to existing 20-file manifests, without a new worker or automatic backfill. See [history contract](history-imports.md) and [browser controls](../apps/web/README.md#history-imports).

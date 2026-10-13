@@ -3,6 +3,7 @@ import type { Runtime } from './runtime';
 import { useStore } from './hooks';
 import { FILE_ERRORS } from './Imports';
 import { Icon } from './icons';
+import { CoveragePreparation } from './CoveragePreparation';
 
 const recordedDate = (value: string | null) => value ? new Date(`${value}T12:00:00`).toLocaleDateString() : 'Unknown';
 const importedAt = (value: string | null) => value ? new Date(value).toLocaleString() : 'No successful file imports yet';
@@ -16,6 +17,7 @@ export function Sources({ runtime, online, onImports, onActivity }: {
   const refresh = () => { void store.retryRefresh(); };
   return <>
     <div className="panel-heading"><span className="eyebrow">YOUR ACTIVITY SOURCES</span><h1>Sources & sync</h1><p>See how your history is importing and when coverage is ready.</p></div>
+    <CoveragePreparation runtime={runtime} online={online} />
     <section aria-label="File import status">
       <div className="section-title"><h2>File imports</h2><button className="icon-button" aria-label="Refresh source status" disabled={!online || state.refreshing} onClick={refresh}><Icon name="refresh" size={17} /></button></div>
       <p className="note" role="status">{!online ? 'Offline · showing last loaded source status.' : !state.eligible ? 'Automatic refresh pauses while this tab is hidden.' : state.pollingStopped ? 'Automatic refresh paused. Retry refresh to continue.' : state.refreshing ? 'Checking your sources…' : state.error ? 'Refresh delayed. Retry when connected.' : 'Automatic refresh is active while this tab is visible.'}</p>
@@ -26,7 +28,7 @@ export function Sources({ runtime, online, onImports, onActivity }: {
           const files = data.files[kind];
           return <article className="source-card" key={kind}><h3>{kind.toUpperCase()} files</h3><dl className="source-counts"><dt>Imported</dt><dd>{files.imported}</dd><dt>Waiting to process</dt><dd>{files.queued}</dd><dt>Processing</dt><dd>{files.processing}</dd><dt>Needs attention</dt><dd>{files.failed}</dd>{files.unavailable > 0 && <><dt>Status unavailable</dt><dd>{files.unavailable}</dd></>}</dl></article>;
         })}
-        <article className="source-card"><h3>Coverage processing</h3><dl className="source-counts"><dt>Ready</dt><dd>{data.coverage.ready}</dd><dt>Pending</dt><dd>{data.coverage.pending}</dd><dt>Needs attention</dt><dd>{data.coverage.failed}</dd><dt>Geography unavailable</dt><dd>{data.coverage.unavailable}</dd></dl><p className="note">These are imported file counts. Coverage is ready after all supported regions finish matching.</p></article>
+        <article className="source-card"><h3>Coverage processing</h3><dl className="source-counts"><dt>Ready</dt><dd>{data.coverage.ready}</dd><dt>Pending</dt><dd>{data.coverage.pending}</dd><dt>Needs attention</dt><dd>{data.coverage.failed}</dd><dt>Geography unavailable</dt><dd>{data.coverage.unavailable}</dd></dl><p className="note">These are imported file counts. Coverage is ready after the cities touched by each activity finish matching.</p></article>
         {(data.batches.waiting > 0 || data.batches.stopped > 0) && <p className="pause-note">{data.batches.waiting} files still need uploading · {data.batches.stopped} stopped batches. Accepted jobs continue processing. Unsubmitted files require selection in Imports.</p>}
         {(data.batches.duplicates > 0 || data.batches.deleted > 0) && <p className="note">{data.batches.duplicates} duplicate entries · {data.batches.deleted} deleted entries. Deleted items stay deleted.</p>}
       </> : <p className="note">{state.status === 'loading' ? 'Loading source status…' : 'Source status is unavailable. Retry when connected.'}</p>}
