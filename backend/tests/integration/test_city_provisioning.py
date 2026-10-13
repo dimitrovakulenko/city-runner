@@ -4,6 +4,8 @@ import os
 import tempfile
 import unittest
 import uuid
+import time
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
@@ -225,11 +227,11 @@ class CityProvisioningPostgisTests(unittest.TestCase):
     def test_deleted_source_between_policy_selection_and_owner_lock_is_not_revived(self):
         self._set_policy_request('ZZ')
         from backend.app.owner_guard import owner_lock
-        def delete_before_lock(db, account):
+        def delete_before_lock(db, account, **kwargs):
             with self.engine.begin() as deletion:
                 deletion.execute(text("DELETE FROM activity_sources WHERE account_id=:account AND id=:source"),
                                  {"account": account, "source": self.source_id})
-            owner_lock(db, account)
+            owner_lock(db, account, **kwargs)
         with patch.dict(os.environ, {'CITY_ADMIN_LEVELS': '{"ZZ":[7]}'}, clear=False), patch(
                 'backend.app.city_provisioning.owner_lock', side_effect=delete_before_lock):
             _enroll_existing_sources(self.engine)
@@ -240,11 +242,11 @@ class CityProvisioningPostgisTests(unittest.TestCase):
     def test_source_revision_change_between_policy_selection_and_owner_lock_is_fenced(self):
         self._set_policy_request('ZZ')
         from backend.app.owner_guard import owner_lock
-        def revise_before_lock(db, account):
+        def revise_before_lock(db, account, **kwargs):
             with self.engine.begin() as revision:
                 revision.execute(text("UPDATE activity_sources SET revision=2 WHERE id=:source"),
                                  {"source": self.source_id})
-            owner_lock(db, account)
+            owner_lock(db, account, **kwargs)
         with patch.dict(os.environ, {'CITY_ADMIN_LEVELS': '{"ZZ":[7]}'}, clear=False), patch(
                 'backend.app.city_provisioning.owner_lock', side_effect=revise_before_lock):
             _enroll_existing_sources(self.engine)
@@ -259,6 +261,42 @@ class CityProvisioningPostgisTests(unittest.TestCase):
                 WHERE account_id=:account AND source_revision=2"""), {
                 "account": self.account,
             }).scalar_one(), 'pending')
+
+    def test_policy_recovery_waits_for_matcher_before_resetting_request(self):
+        self._set_policy_request('ZZ')
+        from backend.app.owner_guard import owner_lock
+        attempted = threading.Event()
+        recovery_pid = []
+        def observe_lock(db, account, **kwargs):
+            recovery_pid.append(db.execute(text('SELECT pg_backend_pid()')).scalar_one())
+            attempted.set()
+            owner_lock(db, account, **kwargs)
+        with self.engine.begin() as db:
+            db.execute(text('UPDATE activity_preparation_requests SET unsupported_sample_count=1 WHERE account_id=:account'),
+                       {'account': self.account})
+        with patch.dict(os.environ, {'CITY_ADMIN_LEVELS': '{"ZZ":[7]}'}, clear=False), patch(
+                'backend.app.city_provisioning.owner_lock', side_effect=observe_lock), ThreadPoolExecutor(max_workers=1) as pool:
+            with self.engine.begin() as matching:
+                owner_lock(matching, self.account)
+                matching.execute(text("SELECT id FROM activities WHERE id=:id FOR UPDATE"), {'id': self.activity_id})
+                recovery = pool.submit(_enroll_existing_sources, self.engine)
+                self.assertTrue(attempted.wait(5))
+                deadline = time.monotonic() + 5
+                waiting = False
+                while time.monotonic() < deadline and not recovery.done():
+                    with self.engine.connect() as observer:
+                        waiting = observer.execute(text("SELECT wait_event='advisory' FROM pg_stat_activity WHERE pid=:pid"),
+                                                   {'pid': recovery_pid[0]}).scalar_one_or_none()
+                    if waiting:
+                        break
+                    time.sleep(.01)
+                self.assertTrue(waiting, 'Recovery must wait before taking request/activity row locks')
+                _refresh_activity_processing(matching, account_id=self.account, source_id=self.source_id,
+                                             source_revision=1, activity_id=self.activity_id)
+            self.assertTrue(recovery.result(timeout=5))
+        with self.engine.connect() as db:
+            self.assertEqual(db.execute(text('SELECT state FROM activity_preparation_requests WHERE account_id=:account'),
+                                       {'account': self.account}).scalar_one(), 'pending')
 
     def test_multicountry_discovery_uses_local_original_samples_and_distinct_municipal_levels(self):
         profile = 'country-policy-' + uuid.uuid4().hex

@@ -620,7 +620,9 @@ def _enroll_existing_sources(engine: Engine) -> bool:
         account = str(row["account_id"])
         with engine.begin() as db:
             try:
-                owner_lock(db, account)
+                # Matching locks activity before diagnostics; recovery resets the
+                # request first. Serialize these owner writes before either row.
+                owner_lock(db, account, exclusive=True)
             except HTTPException as error:
                 if error.status_code in {401, 410}:
                     continue
