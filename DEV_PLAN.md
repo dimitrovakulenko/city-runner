@@ -8,6 +8,8 @@ Owner direction on 14 October 2026: complete the remaining planned features firs
 
 Continue dependency-ready feature tasks from the D backlog below. Web functionality remains this team's focus; native execution belongs to the separate device team. Provider approvals/access and deployment retain their existing gates. Historical execution records below describe what was verified at the time, not the current geographic priority.
 
+Owner-selected next feature: Superset personal analytics, D43–D47/T23/CR-23, following [the implementation plan](docs/superset-analytics.md). Start with D43's local synthetic two-account full-authoring/isolation pilot and reviewed contract; no installation or deployment is performed by this planning update. Provider registration and private issue reporting are postponed. Remind the owner about Strava/Garmin registration after three further completed implementation tasks (0/3; documentation-only work does not count).
+
 ## Execution record
 
 | Task | State | Evidence / remaining gate |
@@ -220,6 +222,11 @@ Tasks below define scope and dependencies; current states are in the execution r
 | D40 / T14 | Premium entitlements, 14-day trial and payments | Premium/trial/store decisions,D05 | Server authority, sandbox purchase/replay/cancel/refund; trial expiry retains free planner/maps/coverage |
 | D41 / T21 | Isolated previews and reporter revision verification | D35,D01; preview budget/runtime decision | Synthetic DB, exact commit/build, no production access, expiry; native defects get native builds; new commit invalidates verdict |
 | D42 / T22 | Bounded fix agent and trusted merge/release controller | D41; protected repository checks | Seeded eligible defect: reproduce/test/preview/user verify/review/merge; failed checks/stale verdict/sensitive change block landing |
+| D43 / T23 | Superset feasibility and analytics/security contract | D05,D12,D32,D37 | Exact released-version local two-account full authoring, immutable database ownership, private metadata/results, auth/logout and bounded query proof; [plan](docs/superset-analytics.md) |
+| D44 / T23 | Read-only activity/progress/history analytics datasets | D43 | Statistics/coverage/impact parity, honest period/new/lifetime metrics, provenance/readiness/version bounds and PostGIS deletion/revision races |
+| D45 / T23 | Superset identity, private objects and lifecycle | D43,D44 | Account-bound authoring/SQL, private caches/results, durable provisioning/export/deletion/restore, query bounds and restart recovery |
+| D46 / T23 | Web Insights, editable starter boards and full authoring | D45 | Generated backend types precede client wiring; SQL/visual charts and custom boards, saved default, private template copies, owner-safe explorer links and two-account Chrome flows |
+| D47 / T23 | Analytics capacity, upgrade and local recovery | D46 | Concurrent imports/maps/queries remain bounded; cancellation, stale-cache/deletion, restart/restore and pinned-version upgrade verified; no cloud deployment |
 
 M1 uses D01,D02,D04–D07,D09–D14 and the deletion portion of D17. M2 adds D08,D15–D18,D26–D29. M3 requires provider/health/status work D19–D25,D30–D36 and actual provider access. Contract dependencies do not mean unrelated work waits for the entire milestone.
 
