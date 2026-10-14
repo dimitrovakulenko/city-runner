@@ -200,15 +200,18 @@ class CityProvisioningPostgisTests(unittest.TestCase):
                 db.execute(text('DELETE FROM city_public_tasks WHERE task_key=:key'), {'key': old_key})
 
     def test_captured_country_selector_and_levels_survive_restart_and_policy_upgrade(self):
-        key = 'country:CA:captured-' + uuid.uuid4().hex
+        self._assert_captured_country_selector('CA', [6, 8], 'ca-municipal-v1', [8])
+        self._assert_captured_country_selector('AZ', [8], 'az-municipal-v1', [8])
+
+    def _assert_captured_country_selector(self, country, levels, profile, current_levels):
+        key = f'country:{country}:captured-' + uuid.uuid4().hex
         token = uuid.uuid4().hex
-        task = {'task_key': key, 'task_kind': 'country', 'country_code': 'CA',
-                'selector_profile': 'ca-municipal-v1', 'admin_levels': [6, 8], 'lease_token': token}
         with self.engine.begin() as db:
             db.execute(text("""INSERT INTO city_public_tasks
                 (task_key,task_kind,country_code,admin_levels,selector_profile,status,attempts,lease_token,leased_until)
-                VALUES (:key,'country','CA','[6,8]'::jsonb,'ca-municipal-v1','running',1,:token,
-                    clock_timestamp()+interval '5 minutes')"""), {'key': key, 'token': token})
+                VALUES (:key,'country',:country,CAST(:levels AS jsonb),:profile,'running',1,:token,
+                    clock_timestamp()+interval '5 minutes')"""), {
+                'key': key, 'token': token, 'country': country, 'levels': json.dumps(levels), 'profile': profile})
         calls = []
         class CapturedProvider:
             def fetch_country_catalog(self, country, levels, **kwargs):
@@ -217,13 +220,13 @@ class CityProvisioningPostgisTests(unittest.TestCase):
         restarted = create_engine(DATABASE_URL)
         try:
             with patch('backend.app.city_geography_provider.get_city_geography_provider', return_value=CapturedProvider()), patch(
-                    'backend.app.city_geography_provider.country_selector_profile', return_value='ca-municipal-v2'), patch.dict(
-                    os.environ, {'CITY_ADMIN_LEVELS': '{"CA":[8]}'}, clear=False):
+                    'backend.app.city_geography_provider.country_selector_profile', return_value=profile.replace('v1', 'v2')), patch.dict(
+                    os.environ, {'CITY_ADMIN_LEVELS': json.dumps({country: current_levels})}, clear=False):
                 with restarted.connect() as db:
                     persisted = dict(db.execute(text('SELECT * FROM city_public_tasks WHERE task_key=:key'),
                                                 {'key': key}).mappings().one())
                 _perform_public_request(restarted, persisted)
-            self.assertEqual(calls, [('CA', [6, 8], {'selector_profile': 'ca-municipal-v1'})])
+            self.assertEqual(calls, [(country, levels, {'selector_profile': profile})])
             with restarted.connect() as db:
                 self.assertEqual(db.execute(text('SELECT status FROM city_public_tasks WHERE task_key=:key'),
                                             {'key': key}).scalar_one(), 'succeeded')
@@ -231,6 +234,25 @@ class CityProvisioningPostgisTests(unittest.TestCase):
             restarted.dispose()
             with self.engine.begin() as db:
                 db.execute(text('DELETE FROM city_public_tasks WHERE task_key=:key'), {'key': key})
+
+    def test_azerbaijan_same_level_guard_recovers_legacy_links_without_reupload(self):
+        old_key = self._set_policy_request('AZ', old_levels=[8])
+        try:
+            self.assertEqual(_country_task_key('AZ', [8]), old_key + ':az-municipal-v1')
+            client = TestClient(create_app(self.engine, identity_resolver=lambda: self.account))
+            self.assertEqual(client.get('/api/coverage-preparation').json()['state'], 'pending')
+            self.assertTrue(_enroll_existing_sources(self.engine))
+            with self.engine.connect() as db:
+                original = db.execute(text('SELECT tracks,timestamps FROM activities WHERE id=:id'),
+                                      {'id': self.activity_id}).one()
+                self.assertEqual(tuple(original), ([[[0.002, 0.001], [0.004, 0.001]]], [[None, None]]))
+                self.assertEqual(db.execute(text('SELECT count(*) FROM activity_sources WHERE account_id=:account'),
+                                           {'account': self.account}).scalar_one(), 1)
+                self.assertEqual(db.execute(text('SELECT count(*) FROM activity_preparation_countries WHERE account_id=:account'),
+                                           {'account': self.account}).scalar_one(), 0)
+        finally:
+            with self.engine.begin() as db:
+                db.execute(text('DELETE FROM city_public_tasks WHERE task_key=:key'), {'key': old_key})
 
     def test_legacy_country_worker_keeps_original_two_argument_provider_call(self):
         key = 'country:BE:legacy-' + uuid.uuid4().hex

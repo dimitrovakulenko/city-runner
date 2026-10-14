@@ -9,104 +9,6 @@
       "candidate_levels": [
         8
       ],
-      "country_code": "AZ",
-      "country_name": "Azerbaijan",
-      "curated_levels": null,
-      "review_reasons": [],
-      "selector_profile": null,
-      "source_rows": [
-        {
-          "candidate_levels": [
-            8
-          ],
-          "evidence": [
-            {
-              "clear_phrase": true,
-              "issue": null,
-              "level": 8,
-              "segments": [
-                "municipalities (bələdiyyələr)"
-              ],
-              "subrow": 1,
-              "text": "municipalities (bələdiyyələr)"
-            }
-          ],
-          "proposed": false,
-          "row": 12
-        }
-      ],
-      "status": "candidate"
-    },
-    {
-      "candidate_levels": [
-        6
-      ],
-      "country_code": "BJ",
-      "country_name": "Benin",
-      "curated_levels": null,
-      "review_reasons": [],
-      "selector_profile": null,
-      "source_rows": [
-        {
-          "candidate_levels": [
-            6
-          ],
-          "evidence": [
-            {
-              "clear_phrase": true,
-              "issue": null,
-              "level": 6,
-              "segments": [
-                "Commune"
-              ],
-              "subrow": 1,
-              "text": "Commune"
-            }
-          ],
-          "proposed": false,
-          "row": 20
-        }
-      ],
-      "status": "candidate"
-    },
-    {
-      "candidate_levels": [
-        6
-      ],
-      "country_code": "IS",
-      "country_name": "Iceland",
-      "curated_levels": null,
-      "review_reasons": [],
-      "selector_profile": null,
-      "source_rows": [
-        {
-          "candidate_levels": [
-            6
-          ],
-          "evidence": [
-            {
-              "clear_phrase": true,
-              "issue": null,
-              "level": 6,
-              "segments": [
-                "Municipalities",
-                "Sveitarfélög",
-                "LAU"
-              ],
-              "subrow": 1,
-              "text": "Municipalities Sveitarfélög LAU"
-            }
-          ],
-          "proposed": false,
-          "row": 82
-        }
-      ],
-      "status": "candidate"
-    },
-    {
-      "candidate_levels": [
-        8
-      ],
       "country_code": "AT",
       "country_name": "Austria",
       "curated_levels": [
@@ -148,6 +50,40 @@
       "candidate_levels": [
         8
       ],
+      "country_code": "AZ",
+      "country_name": "Azerbaijan",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [],
+      "selector_profile": "az-municipal-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "municipalities (bələdiyyələr)"
+              ],
+              "subrow": 1,
+              "text": "municipalities (bələdiyyələr)"
+            }
+          ],
+          "proposed": false,
+          "row": 12
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
       "country_code": "BE",
       "country_name": "Belgium (proposed / in use) (see boundary=political for linguistic communities)",
       "curated_levels": [
@@ -178,6 +114,40 @@
           ],
           "proposed": true,
           "row": 18
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "BJ",
+      "country_name": "Benin",
+      "curated_levels": [
+        6
+      ],
+      "review_reasons": [],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 6,
+              "segments": [
+                "Commune"
+              ],
+              "subrow": 1,
+              "text": "Commune"
+            }
+          ],
+          "proposed": false,
+          "row": 20
         }
       ],
       "status": "curated"
@@ -911,6 +881,42 @@
           "evidence": [],
           "proposed": true,
           "row": 81
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "IS",
+      "country_name": "Iceland",
+      "curated_levels": [
+        6
+      ],
+      "review_reasons": [],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 6,
+              "segments": [
+                "Municipalities",
+                "Sveitarfélög",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Sveitarfélög LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 82
         }
       ],
       "status": "curated"
@@ -6608,8 +6614,8 @@
     "url": "https://wiki.openstreetmap.org/wiki/Template:Admin_level"
   },
   "summary": {
-    "candidate_count": 3,
-    "curated_count": 34,
+    "candidate_count": 0,
+    "curated_count": 37,
     "review_count": 161,
     "source_group_count": 199,
     "unresolved_count": 1

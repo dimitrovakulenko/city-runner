@@ -34,8 +34,9 @@ PROFILE_VERSION = "municipal-admin-v1"
 QUERY_VERSION = "public-scope-v1"
 # Municipal policies from the OSM administrative-level table; no global fallback.
 DEFAULT_ADMIN_LEVELS = {
-    "AT": [8], "BE": [8], "BR": [8], "CA": [6, 8], "CH": [8], "CL": [8], "CO": [6], "CZ": [8],
+    "AT": [8], "AZ": [8], "BE": [8], "BJ": [6], "BR": [8], "CA": [6, 8], "CH": [8], "CL": [8], "CO": [6], "CZ": [8],
     "DE": [8], "DK": [7], "EE": [7], "ES": [8], "FI": [8], "FR": [8], "GR": [7],
+    "IS": [6],
     "GB": [6, 8], "HU": [8], "IT": [8], "JP": [7], "LU": [8], "LV": [5], "MX": [6], "NL": [8],
     "NO": [7], "NZ": [6], "PE": [8], "PH": [6], "PL": [7], "PT": [7], "RO": [8],
     "SE": [7], "SI": [8], "SK": [8], "US": [4, 5, 8],
@@ -57,7 +58,7 @@ def country_admin_levels() -> dict[str, list[int]]:
             for country, levels in values.items():
                 _country(country)
                 normalized = _levels(levels)
-                if country in {"GB", "CA", "US"} and not levels_allowed(country, normalized):
+                if country in {"AZ", "GB", "CA", "US"} and not levels_allowed(country, normalized):
                     raise ValueError()
                 result[country] = normalized
         except (ValueError, TypeError, RecursionError) as error:

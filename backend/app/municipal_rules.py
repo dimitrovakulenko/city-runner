@@ -10,6 +10,7 @@ DEFAULT_PROFILE = "admin-levels-v1"
 GB_PROFILE = "gb-local-authority-v1"
 CA_PROFILE = "ca-municipal-v1"
 US_PROFILE = "us-municipal-v1"
+AZ_PROFILE = "az-municipal-v1"
 
 CA_PROVINCES = (
     "CA-AB", "CA-BC", "CA-MB", "CA-NB", "CA-NL", "CA-NS", "CA-NT",
@@ -35,6 +36,7 @@ _PROFILE_COUNTRIES = {
     "gb-local-authority-v1": "GB",
     "ca-municipal-v1": "CA",
     "us-municipal-v1": "US",
+    "az-municipal-v1": "AZ",
 }
 _NONMUNICIPAL_PLACE_TYPES = {
     "borough", "county", "district", "electoral_area", "neighbourhood",
@@ -47,7 +49,7 @@ _US_EXPLICIT_NONMUNICIPAL_TYPES = _NONMUNICIPAL_PLACE_TYPES | {
 
 
 def country_selector_profile(country: str) -> str:
-    return {"GB": GB_PROFILE, "CA": CA_PROFILE, "US": US_PROFILE}.get(country, DEFAULT_PROFILE)
+    return {"GB": GB_PROFILE, "CA": CA_PROFILE, "US": US_PROFILE, "AZ": AZ_PROFILE}.get(country, DEFAULT_PROFILE)
 
 
 def profile_is_valid(country: str, profile: str) -> bool:
@@ -66,11 +68,15 @@ def default_levels(country: str) -> list[int]:
         return [6, 8]
     if country == "US":
         return [4, 5, 8]
+    if country == "AZ":
+        return [8]
     raise KeyError(country)
 
 
 def levels_allowed(country: str, levels: Iterable[int]) -> bool:
     requested = set(levels)
+    if country == "AZ":
+        return requested == {8}
     allowed = set(default_levels(country))
     return bool(requested) and requested <= allowed
 
@@ -113,6 +119,12 @@ def country_query(country: str, levels: list[int], profile: str) -> str | None:
             'make scope;out;'
             ');'
         )
+    if country == "AZ" and profile == AZ_PROFILE and levels == [8]:
+        return (
+            '[out:json][timeout:120][maxsize:134217728];area["ISO3166-1"="AZ"]["admin_level"="2"]->.country;'
+            '.country out ids;rel(area.country)["boundary"="administrative"]["admin_level"="8"]'
+            '["place"~"^(city|town|village|municipality)$"];out tags bb;'
+        )
     return None
 
 
@@ -151,6 +163,10 @@ def relation_matches(
         if level == 4:
             return identifier == 162069 and tags.get("ISO3166-2") == "US-DC"
         return level == 8 and not _us_has_nonmunicipal_type(tags)
+    if profile == AZ_PROFILE and country == "AZ":
+        return (selection_scope is None and levels == [8] and level == 8
+                and tags.get("place") in _MUNICIPAL_PLACE_TYPES
+                and not _has_nonmunicipal_type(tags, _NONMUNICIPAL_PLACE_TYPES))
     if profile == CA_PROFILE and country == "CA":
         if selection_scope not in _CA_LEVELS or level not in _CA_LEVELS[selection_scope]:
             return False
@@ -199,4 +215,6 @@ def validate_selection(country: str, profile: str, levels: list[int], selection_
         return False
     if country == "CA":
         return selection_scope is None or selection_scope in CA_PROVINCES
+    if country == "AZ":
+        return selection_scope is None and levels == [8]
     return selection_scope is None

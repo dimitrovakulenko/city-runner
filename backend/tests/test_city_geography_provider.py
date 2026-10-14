@@ -10,7 +10,9 @@ from backend.app.city_geography_provider import (
     CityGeographyError, CityGeographyProvider, WORLD_CATALOG_URL,
     country_admin_levels, country_selector_profile, get_city_geography_provider,
 )
-from backend.app.municipal_rules import CA_PROVINCES, relation_matches
+from backend.app.municipal_rules import (
+    AZ_PROFILE, CA_PROVINCES, DEFAULT_PROFILE, profile_is_valid, relation_matches, validate_selection,
+)
 
 
 COUNTRY = {
@@ -241,16 +243,22 @@ class CityGeographyProviderTests(unittest.TestCase):
 
     def test_country_policies_emit_exact_municipal_level_and_reject_adjacent_levels(self):
         expected = {
-            "AT": 8, "BE": 8, "BR": 8, "CH": 8, "CL": 8, "CO": 6, "CZ": 8,
+            "AT": 8, "BE": 8, "BJ": 6, "BR": 8, "CH": 8, "CL": 8, "CO": 6, "CZ": 8,
             "DE": 8, "DK": 7, "EE": 7, "ES": 8, "FI": 8, "FR": 8, "GR": 7,
-            "HU": 8, "IT": 8, "JP": 7, "LU": 8, "LV": 5, "MX": 6, "NL": 8,
+            "HU": 8, "IS": 6, "IT": 8, "JP": 7, "LU": 8, "LV": 5, "MX": 6, "NL": 8,
             "NO": 7, "NZ": 6, "PE": 8, "PH": 6, "PL": 7, "PT": 7, "RO": 8,
             "SE": 7, "SI": 8, "SK": 8,
         }
-        policies = country_admin_levels()
-        self.assertEqual({country: values[0] for country, values in policies.items() if country not in {"CA", "GB", "US"}}, expected)
+        with patch.dict(os.environ, {}, clear=True):
+            policies = country_admin_levels()
+        self.assertEqual({country: values[0] for country, values in policies.items()
+                          if country not in {"AZ", "CA", "GB", "US"}}, expected)
+        self.assertEqual(len(policies), 37)
+        self.assertEqual(policies["AZ"], [8])
+        self.assertEqual(country_selector_profile("AZ"), AZ_PROFILE)
         for country, level in expected.items():
             with self.subTest(country=country):
+                self.assertEqual(country_selector_profile(country), "admin-levels-v1")
                 response = json.loads(json.dumps(COUNTRY))
                 response["elements"][1]["tags"]["admin_level"] = str(level)
                 requests = []
@@ -264,6 +272,110 @@ class CityGeographyProviderTests(unittest.TestCase):
                     response["elements"][1]["tags"]["admin_level"] = str(adjacent)
                     with self.subTest(adjacent=adjacent), self.assertRaisesRegex(CityGeographyError, "invalid_city_provider_response"):
                         self.provider(httpx.Response(200, json=response)).fetch_country_catalog(country, [level])
+
+    def test_azerbaijan_profile_requires_positive_municipal_proof(self):
+        self.assertTrue(profile_is_valid("AZ", AZ_PROFILE))
+        self.assertTrue(profile_is_valid("AZ", DEFAULT_PROFILE))  # queued legacy snapshots retain old semantics
+        self.assertFalse(profile_is_valid("BJ", AZ_PROFILE))
+        self.assertTrue(validate_selection("AZ", AZ_PROFILE, [8], None))
+        self.assertFalse(validate_selection("AZ", AZ_PROFILE, [6], None))
+        self.assertFalse(validate_selection("AZ", AZ_PROFILE, [8], "AZ-BA"))
+
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(country_admin_levels()["AZ"], [8])
+        with patch.dict(os.environ, {"CITY_ADMIN_LEVELS": '{"AZ":[8]}'}, clear=True):
+            self.assertEqual(country_admin_levels()["AZ"], [8])
+        for override in ('{"AZ":[6]}', '{"AZ":[8,10]}'):
+            with patch.dict(os.environ, {"CITY_ADMIN_LEVELS": override}, clear=True):
+                with self.subTest(override=override), self.assertRaisesRegex(
+                    CityGeographyError, "invalid_city_country_policy"):
+                    country_admin_levels()
+
+        payload = {"osm3s": COUNTRY["osm3s"], "elements": [COUNTRY["elements"][0],
+            {"type": "relation", "id": 3912206,
+             "tags": {"name": "Sumqayit", "boundary": "administrative", "admin_level": "8", "place": "city"},
+             "bounds": COUNTRY["elements"][1]["bounds"]},
+            {"type": "relation", "id": 90001,
+             "tags": {"name": "Baku rayonu", "boundary": "administrative", "admin_level": "8"},
+             "bounds": COUNTRY["elements"][1]["bounds"]},
+            {"type": "relation", "id": 90002,
+             "tags": {"name": "Ganja rayonu", "boundary": "administrative", "admin_level": "8"},
+             "bounds": COUNTRY["elements"][1]["bounds"]}]}
+        requests = []
+        result = self.provider(httpx.Response(200, json=payload), requests).fetch_country_catalog(
+            "AZ", [8], selector_profile=AZ_PROFILE)
+        query = parse_qs(requests[0].content.decode())["data"][0]
+        self.assertIn('["ISO3166-1"="AZ"]', query)
+        self.assertIn('["admin_level"="8"]', query)
+        self.assertIn('["place"~"^(city|town|village|municipality)$"]', query)
+        self.assertEqual([city["relation_id"] for city in result["cities"]], [3912206])
+        wrong_level = json.loads(json.dumps(payload))
+        wrong_level["elements"][1]["tags"]["admin_level"] = "6"
+        with self.assertRaisesRegex(CityGeographyError, "invalid_city_provider_response"):
+            self.provider(httpx.Response(200, json=wrong_level)).fetch_country_catalog(
+                "AZ", [8], selector_profile=AZ_PROFILE)
+
+        for key, value in (("place", "county"), ("border_type", "district"), ("designation", "district")):
+            invalid = json.loads(json.dumps(payload))
+            invalid["elements"][1]["tags"][key] = value
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(CityGeographyError, "city_country_boundary_unavailable"):
+                    self.provider(httpx.Response(200, json=invalid)).fetch_country_catalog(
+                        "AZ", [8], selector_profile=AZ_PROFILE)
+        malformed = json.loads(json.dumps(payload))
+        malformed["elements"][1]["tags"]["place"] = ["city"]
+        with self.assertRaisesRegex(CityGeographyError, "invalid_city_provider_response"):
+            self.provider(httpx.Response(200, json=malformed)).fetch_country_catalog(
+                "AZ", [8], selector_profile=AZ_PROFILE)
+        with self.assertRaisesRegex(CityGeographyError, "invalid_city_selector"):
+            self.provider(httpx.Response(200, json=payload)).fetch_country_catalog(
+                "AZ", [8], selector_profile="unknown-profile")
+
+        accepted_tags = {"boundary": "administrative", "admin_level": "8", "place": "city"}
+        self.assertTrue(relation_matches("AZ", AZ_PROFILE, [8], accepted_tags))
+        self.assertFalse(relation_matches("AZ", AZ_PROFILE, [6, 8], accepted_tags))
+        self.assertFalse(relation_matches("AZ", AZ_PROFILE, [8], accepted_tags, selection_scope="AZ-BA"))
+        self.assertFalse(relation_matches("AZ", "unknown-profile", [8], accepted_tags))
+        for key, value in (("place", "district"), ("border_type", "county"), ("designation", "district")):
+            self.assertFalse(relation_matches("AZ", AZ_PROFILE, [8], {**accepted_tags, key: value}))
+
+        # Old queued AZ tasks stay on the numeric-only selector even after the new default is enabled.
+        legacy = json.loads(json.dumps(payload))
+        legacy["elements"][1]["tags"].pop("place")
+        legacy_requests = []
+        old_result = self.provider(httpx.Response(200, json=legacy), legacy_requests).fetch_country_catalog(
+            "AZ", [8], selector_profile=DEFAULT_PROFILE)
+        old_query = parse_qs(legacy_requests[0].content.decode())["data"][0]
+        self.assertNotIn('["place"~', old_query)
+        self.assertIn(3912206, {city["relation_id"] for city in old_result["cities"]})
+
+    def test_azerbaijan_city_extract_revalidates_captured_selector_and_preserves_legacy_snapshot(self):
+        relation_id = 3912206
+        area_id = 3_600_000_000 + relation_id
+        accepted = CITY.replace(b"3600000042", str(area_id).encode()).replace(
+            b'<relation id="42">', f'<relation id="{relation_id}">'.encode()).replace(
+            b'<tag k="admin_level" v="8"/>',
+            b'<tag k="admin_level" v="8"/><tag k="place" v="city"/>')
+        result = self.provider(httpx.Response(200, content=accepted)).fetch_city_extract(
+            relation_id, selector_profile=AZ_PROFILE, country_code="AZ", admin_levels=[8])
+        self.assertEqual(result["xml"], accepted)
+
+        for mutate in (
+            lambda data: data.replace(b'<tag k="place" v="city"/>', b''),
+            lambda data: data.replace(b'<tag k="place" v="city"/>', b'<tag k="place" v="county"/>'),
+            lambda data: data.replace(b'<tag k="place" v="city"/>',
+                                      b'<tag k="place" v="city"/><tag k="designation" v="district"/>'),
+        ):
+            with self.subTest(mutate=mutate), self.assertRaisesRegex(
+                CityGeographyError, "city_boundary_unavailable"):
+                self.provider(httpx.Response(200, content=mutate(accepted))).fetch_city_extract(
+                    relation_id, selector_profile=AZ_PROFILE, country_code="AZ", admin_levels=[8])
+
+        legacy = CITY.replace(b"3600000042", str(area_id).encode()).replace(
+            b'<relation id="42">', f'<relation id="{relation_id}">'.encode())
+        legacy_result = self.provider(httpx.Response(200, content=legacy)).fetch_city_extract(
+            relation_id, selector_profile=DEFAULT_PROFILE, country_code="AZ", admin_levels=[8])
+        self.assertEqual(legacy_result["xml"], legacy)
 
     def test_disabled_mode_and_endpoint_configuration(self):
         with patch.dict(os.environ, {}, clear=True):

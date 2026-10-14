@@ -90,3 +90,19 @@ Separate disposable PostGIS/HTTP setups uploaded synthetic recordings without ci
 | New Westminster, CA | [1377803](https://www.openstreetmap.org/relation/1377803) | `2026-10-14T08:55:21Z` | 371 | 8,321 | `0cb7aab8c7d46b68839ccf0c058dbc52870bd0be82ae7b6a63afc771bef1268f` |
 
 Both use `named-highway-city-name-v1`. Actual HTTP verified original GPX bytes/coordinates/timestamps, final qualified relation validation, account isolation, second-account reuse without another provider request and API/worker restart. Chrome verified municipal labels, search/selection, street lists and 390 px layout. API account deletion removed private originals; temporary services/databases were removed. The normal Gent/Brugge/Antwerp preview was preserved. NYC/DC full-extract/large-city acceptance, complete Canadian/worldwide coverage, native execution and deployment are not established by these checks.
+
+## Generated-policy activation validation snapshots
+
+On 14 October 2026, the generated AZ/BJ/IS proposals were checked against actual public catalogs. Benin returned 77 level-6 communes and Iceland returned 61 level-6 municipalities. Azerbaijan's unqualified level-8 query returned 13 relations, including 12 Baku/Ganja districts without positive municipal proof. The captured `az-municipal-v1` place/type guard excludes those districts; plain level 8 was not activated.
+
+Separate disposable PostGIS/API/worker/Caddy setups uploaded synthetic GPX recordings without city IDs and recovered retained unsupported checkpoints through the shared discovery pipeline:
+
+| Municipality | Public relation | OSM snapshot | Streets | Original nodes | Exact XML SHA-256 |
+| --- | --- | --- | --- | --- | --- |
+| Ouidah, BJ | [2946173](https://www.openstreetmap.org/relation/2946173) | `2026-10-14T17:06:33Z` | 3 | 481 | `96da91422e6506d51c8d32fba19cedc2e4a5ead020b605ab8b2d9f4378047f09` |
+| Dalvíkurbyggð, IS | [55969](https://www.openstreetmap.org/relation/55969) | `2026-10-14T17:10:34Z` | 221 | 3,758 | `c1ffa888b18c5e0c58381b8fe31b0391a5631f3947ffe642f0b0094e468d7abb` |
+| Sumqayıt, AZ | [3912206](https://www.openstreetmap.org/relation/3912206) | `2026-10-14T17:14:35Z` | 177 | 4,007 | `933b475ec528c33b11114d8721868643981ad3e2eb9a8ae29f380f0571334b24` |
+
+All use `named-highway-city-name-v1`. Actual HTTP preserved original bytes, coordinates and timestamps, enforced account isolation, reused public geography for a second account without another provider request, credited an original public node and survived API/worker restart. Chrome verified city search/selection, public labels, street lists and 390 px layout. API account deletion removed the synthetic private originals; temporary services/databases were removed. The existing Gent/Brugge/Antwerp preview was preserved.
+
+An initial Ouidah sample also selected the bounding-box-overlapping Kpomassè candidate, whose import reported `city_import_failed`. That failure remains open; the successful Ouidah test used samples outside that neighboring box. These checks establish the three recorded flows, not nationwide data completeness or worldwide acceptance. Azerbaijani boundaries without positive municipal proof remain unsupported. Native execution and deployment remain outside this work.

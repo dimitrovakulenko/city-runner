@@ -12,22 +12,25 @@ Policy expansion must also discover cities for retained recordings previously ma
 
 ### Shipped municipal policies
 
-The development adapter ships 34 explicit country policies. These select municipal authorities, including rural municipalities, rather than built-up settlement outlines. They enable discovery; they do not certify that OSM contains complete boundaries or that every municipality fits the provider bounds.
+The development adapter ships 37 explicit country policies. These select municipal authorities, including rural municipalities, rather than built-up settlement outlines. They enable discovery; they do not certify that OSM contains complete boundaries or that every municipality fits the provider bounds.
 
 | OSM administrative level | ISO country codes |
 | --- | --- |
 | 5 | LV |
-| 6 | CO, MX, NZ, PH |
+| 6 | BJ, CO, IS, MX, NZ, PH |
 | 7 | DK, EE, GR, JP, NO, PL, PT, SE |
 | 8 | AT, BE, BR, CH, CL, CZ, DE, ES, FI, FR, HU, IT, LU, NL, PE, RO, SI, SK |
 | Qualified 6/8 | CA, GB |
 | Qualified 4/5/8 | US |
+| Qualified 8 | AZ |
 
 Policies follow the [OSM country table](https://wiki.openstreetmap.org/wiki/Tag:boundary%3Dadministrative#Country_specific_values_of_the_key_admin_level%3D*) and country guidance for [Japan](https://wiki.openstreetmap.org/wiki/Japan_tagging#Boundary), [Poland](https://wiki.openstreetmap.org/wiki/Poland/Podzia%C5%82_administracyjny), [Hungary](https://wiki.openstreetmap.org/wiki/Hungary/Boundaries), [Greece](https://wiki.openstreetmap.org/wiki/Greece/Administrative_Divisions) and [Peru](https://wiki.openstreetmap.org/wiki/ES:Per%C3%BA/Convenciones). Japan level 7 includes Tokyo special wards, while level 8 subdivisions of designated cities are excluded. Peru uses municipal districts.
 
 ### Qualified municipal rules
 
-The same provider/import/matching pipeline uses closed, immutable rule profiles. Existing tasks retain `admin-levels-v1` semantics and existing public world/city cache identities. New GB/CA/US country keys include their selector profile, as well as captured levels, profile/query version. Public tasks store the selector profile; qualified city tasks also capture levels and, for Canada, the public province scope. Execution never substitutes today's country rules for an old queued task. Unknown profiles or inconsistent country/scope/levels fail safely. Special-country `CITY_ADMIN_LEVELS` overrides can narrow the allowed levels but cannot disable municipal guards. No arbitrary query fragments are accepted.
+Generated proposals are activated only after checking actual public catalogs. Azerbaijan's table level 8 also contains Baku/Ganja city districts, so level alone is insufficient. `az-municipal-v1` requires administrative level 8 and positive `place=city|town|village|municipality` proof, rejecting explicit nonmunicipal types and missing proof. Its fixed country query includes that place filter; new city snapshots revalidate the captured rule. Overrides may narrow to level 8 and cannot remove the guard. This is conservative municipal coverage, not acceptance of all Azerbaijani cities. Benin's level-6 communes and Iceland's level-6 municipalities use the existing standard profile. Activation requires the actual synthetic HTTP/browser, reuse and restart checks below.
+
+The same provider/import/matching pipeline uses closed, immutable rule profiles. Existing tasks retain `admin-levels-v1` semantics and existing public world/city cache identities. New AZ/GB/CA/US country keys include their selector profile, as well as captured levels, profile/query version. Public tasks store the selector profile; qualified city tasks also capture levels and, for Canada, the public province scope. Execution never substitutes today's country rules for an old queued task. Unknown profiles or inconsistent country/scope/levels fail safely. Special-country `CITY_ADMIN_LEVELS` overrides can narrow the allowed levels but cannot disable municipal guards. No arbitrary query fragments are accepted.
 
 `gb-local-authority-v1` selects administrative level 6/8 authorities with [GSS identifiers](https://wiki.openstreetmap.org/wiki/Key:ref:gss) matching `^(E0[6-9]|W06|S12|N09)[0-9]{6}$`. This includes England's districts/unitary authorities/London boroughs, Welsh principal areas, Scottish councils and Northern Irish local-government districts. County, parish and electoral classes are excluded; contradictory county/parish/ward designations are rejected. The level-6 City of London is allowed by its authority code. These are local-government areas, not built-up settlement outlines.
 

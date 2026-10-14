@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -60,7 +61,8 @@ class CountryPolicyGeneratorTests(unittest.TestCase):
             data_row("Côte d’Ivoire", 8, "Municipalities<br/>Cities and districts", title="Côte d’Ivoire"),
         ])
         cldr = territories(("AD", "Andorra"), ("BJ", "Benin"), ("CG", "Congo"), ("CI", "Côte d’Ivoire"))
-        report, policy_map = generator.build_report(source, cldr)
+        with patch.object(generator, '_load_curated', return_value=({}, {})):
+            report, policy_map = generator.build_report(source, cldr)
         statuses = {row["country_code"]: row["status"] for row in report["records"] if row["country_code"] in {"AD", "BJ", "CG", "CI"}}
         self.assertEqual(statuses, {"AD": "candidate", "BJ": "review", "CG": "review", "CI": "review"})
         self.assertEqual(policy_map["AD"], [8])
