@@ -8,8 +8,9 @@ import httpx
 
 from backend.app.city_geography_provider import (
     CityGeographyError, CityGeographyProvider, WORLD_CATALOG_URL,
-    country_admin_levels, get_city_geography_provider,
+    country_admin_levels, country_selector_profile, get_city_geography_provider,
 )
+from backend.app.municipal_rules import CA_PROVINCES, relation_matches
 
 
 COUNTRY = {
@@ -37,6 +38,20 @@ CITY = b'''<osm version="0.6"><meta osm_base="2026-10-13T00:00:00Z"/>
 <relation id="42"><member type="way" ref="10" role="outer"/>
 <tag k="boundary" v="administrative"/><tag k="admin_level" v="8"/><tag k="name" v="Antwerp"/>
 </relation></osm>'''
+
+
+def canada_catalog(relation_scopes, relations):
+    elements = [{"type": "area", "id": 3600000001}]
+    by_id = {relation["id"]: relation for relation in relations}
+    for index, scope in enumerate(CA_PROVINCES, start=1):
+        province_relation_id = 1000 + index
+        province_area_id = 3_600_000_000 + province_relation_id
+        elements.append({"type": "relation", "id": province_relation_id,
+            "tags": {"ISO3166-2": scope, "boundary": "administrative", "admin_level": "4"}})
+        elements.append({"type": "area", "id": province_area_id})
+        elements.extend(json.loads(json.dumps(by_id[value])) for value in relation_scopes.get(scope, []))
+        elements.append({"type": "scope", "id": index})
+    return {"osm3s": COUNTRY["osm3s"], "elements": elements}
 
 
 class CityGeographyProviderTests(unittest.TestCase):
@@ -103,6 +118,7 @@ class CityGeographyProviderTests(unittest.TestCase):
             lambda value: value["elements"].pop(0),
             lambda value: value["elements"].append(value["elements"][1]),
             lambda value: value["elements"][1]["tags"].update(admin_level="7"),
+            lambda value: value["elements"][1]["tags"].__setitem__("ref:gss", []),
             lambda value: value["elements"][1]["bounds"].update(minlon=8),
         ):
             value = json.loads(json.dumps(COUNTRY)); modify(value); values.append(value)
@@ -127,6 +143,19 @@ class CityGeographyProviderTests(unittest.TestCase):
         for identifier in (True, 0, -1, 2**63, "42"):
             with self.subTest(identifier=identifier), self.assertRaises(CityGeographyError):
                 provider.fetch_city_extract(identifier)
+        self.assertEqual(requests, [])
+
+    def test_unknown_or_inconsistent_selector_profiles_fail_before_network(self):
+        requests = []
+        provider = self.provider(httpx.Response(200), requests)
+        for country, levels, profile in (
+            ("GB", [6, 8], "future-gb-profile"),
+            ("CA", [6, 8], "gb-local-authority-v1"),
+        ):
+            with self.subTest(country=country, profile=profile), self.assertRaises(CityGeographyError):
+                provider.fetch_country_catalog(country, levels, selector_profile=profile)
+        with self.assertRaises(CityGeographyError):
+            provider.fetch_city_extract(42, selector_profile="ca-municipal-v1", country_code="CA", admin_levels=[6, 8])
         self.assertEqual(requests, [])
 
     def test_catalog_expansion_and_duplicate_country_codes_are_bounded(self):
@@ -200,9 +229,9 @@ class CityGeographyProviderTests(unittest.TestCase):
             self.provider(httpx.Response(200, json=value)).fetch_country_catalog("BE", [8])
 
     def test_policy_is_explicit_and_trusted_overrides_are_validated(self):
-        with patch.dict(os.environ, {"CITY_ADMIN_LEVELS": '{"US":[8,6],"DK":[7]}'}, clear=True):
+        with patch.dict(os.environ, {"CITY_ADMIN_LEVELS": '{"US":[8,4],"DK":[7]}'}, clear=True):
             policies = country_admin_levels()
-        self.assertEqual(policies["US"], [6, 8])
+        self.assertEqual(policies["US"], [4, 8])
         self.assertEqual(policies["DK"], [7])
         self.assertNotIn("ZZ", policies)
         for value in ('{"ZZ":[true]}', '[]', '{"ZZ":[]}'):
@@ -216,10 +245,10 @@ class CityGeographyProviderTests(unittest.TestCase):
             "DE": 8, "DK": 7, "EE": 7, "ES": 8, "FI": 8, "FR": 8, "GR": 7,
             "HU": 8, "IT": 8, "JP": 7, "LU": 8, "LV": 5, "MX": 6, "NL": 8,
             "NO": 7, "NZ": 6, "PE": 8, "PH": 6, "PL": 7, "PT": 7, "RO": 8,
-            "SE": 7, "SI": 8, "SK": 8, "US": 8,
+            "SE": 7, "SI": 8, "SK": 8,
         }
         policies = country_admin_levels()
-        self.assertEqual({country: values[0] for country, values in policies.items()}, expected)
+        self.assertEqual({country: values[0] for country, values in policies.items() if country not in {"CA", "GB", "US"}}, expected)
         for country, level in expected.items():
             with self.subTest(country=country):
                 response = json.loads(json.dumps(COUNTRY))
@@ -244,6 +273,204 @@ class CityGeographyProviderTests(unittest.TestCase):
         for endpoint in ("http://example.com", "https://user:secret@example.com", "https://example.com/#fragment", "https://example.com/?query"):
             with self.subTest(endpoint=endpoint), self.assertRaises(CityGeographyError):
                 CityGeographyProvider(overpass_url=endpoint)
+
+    def test_profiles_are_captured_and_special_overrides_only_narrow_levels(self):
+        self.assertEqual(country_admin_levels()["CA"], [6, 8])
+        self.assertEqual(country_admin_levels()["GB"], [6, 8])
+        self.assertEqual(country_admin_levels()["US"], [4, 5, 8])
+        self.assertEqual(country_selector_profile("CA"), "ca-municipal-v1")
+        self.assertEqual(country_selector_profile("GB"), "gb-local-authority-v1")
+        self.assertEqual(country_selector_profile("US"), "us-municipal-v1")
+        with patch.dict(os.environ, {"CITY_ADMIN_LEVELS": '{"CA":[8],"US":[8],"GB":[6]}'}, clear=True):
+            policies = country_admin_levels()
+        self.assertEqual(policies["CA"], [8])
+        self.assertEqual(policies["US"], [8])
+        self.assertEqual(policies["GB"], [6])
+        for override in ('{"CA":[4]}', '{"GB":[10]}', '{"US":[6]}'):
+            with patch.dict(os.environ, {"CITY_ADMIN_LEVELS": override}, clear=True):
+                with self.subTest(override=override), self.assertRaisesRegex(CityGeographyError, "invalid_city_country_policy"):
+                    country_admin_levels()
+        # Previously queued US tasks retain the legacy numeric-only selector.
+        result = self.provider(httpx.Response(200, json=COUNTRY)).fetch_country_catalog("US", [8])
+        self.assertEqual(result["cities"][0]["relation_id"], 42)
+
+    def test_gb_catalog_uses_gss_authority_codes_and_checks_level_and_designation(self):
+        payload = {
+            "osm3s": COUNTRY["osm3s"],
+            "elements": [COUNTRY["elements"][0],
+                {"type": "relation", "id": 50,
+                 "tags": {"name": "Bristol", "boundary": "administrative", "admin_level": "6",
+                          "ref:gss": "E06000023", "designation": "unitary_authority"},
+                 "bounds": COUNTRY["elements"][1]["bounds"]}],
+        }
+        requests = []
+        result = self.provider(httpx.Response(200, json=payload), requests).fetch_country_catalog(
+            "GB", [6, 8], selector_profile="gb-local-authority-v1")
+        query = parse_qs(requests[0].content.decode())["data"][0]
+        self.assertIn('"ref:gss"~"^(E0[6-9]|W06|S12|N09)[0-9]{6}$"', query)
+        self.assertNotIn("E10", query)
+        self.assertEqual([row["relation_id"] for row in result["cities"]], [50])
+        for reference, level, designation in (
+            ("E10000001", "6", "non_metropolitan_county"),
+            ("E05000001", "8", "ward"),
+            ("E06000023", "8", "unitary_authority"),
+        ):
+            invalid = json.loads(json.dumps(payload))
+            tags = invalid["elements"][1]["tags"]
+            tags.update({"ref:gss": reference, "admin_level": level, "designation": designation})
+            with self.subTest(reference=reference, level=level), self.assertRaises(CityGeographyError):
+                self.provider(httpx.Response(200, json=invalid)).fetch_country_catalog(
+                    "GB", [6, 8], selector_profile="gb-local-authority-v1")
+        self.assertTrue(relation_matches("GB", "gb-local-authority-v1", [6, 8], {
+            "boundary": "administrative", "admin_level": "6", "ref:gss": "E09000001", "designation": "sui_generis"}))
+        self.assertTrue(relation_matches("GB", "gb-local-authority-v1", [6, 8], {
+            "boundary": "administrative", "admin_level": "8", "ref:gss": "N09000001"}))
+        self.assertFalse(relation_matches("GB", "gb-local-authority-v1", [6, 8], {
+            "boundary": "administrative", "admin_level": "6", "ref:gss": "E06000023", "designation": ["ward"]}))
+
+    def test_us_catalog_selects_level8_and_exact_exception_relations_only(self):
+        payload = {
+            "osm3s": COUNTRY["osm3s"],
+            "elements": [COUNTRY["elements"][0],
+                {"type": "relation", "id": 80, "tags": {"name": "Smallville", "boundary": "administrative",
+                 "admin_level": "8", "place": "city"}, "bounds": COUNTRY["elements"][1]["bounds"]},
+                {"type": "relation", "id": 175905, "tags": {"name": "New York", "boundary": "administrative",
+                 "admin_level": "5", "wikidata": "Q60", "border_type": "city"}, "bounds": COUNTRY["elements"][1]["bounds"]},
+                {"type": "relation", "id": 162069, "tags": {"name": "District of Columbia", "boundary": "administrative",
+                 "admin_level": "4", "ISO3166-2": "US-DC"}, "bounds": COUNTRY["elements"][1]["bounds"]}],
+        }
+        requests = []
+        result = self.provider(httpx.Response(200, json=payload), requests).fetch_country_catalog(
+            "US", [4, 5, 8], selector_profile="us-municipal-v1")
+        query = parse_qs(requests[0].content.decode())["data"][0]
+        self.assertIn("rel(175905)", query)
+        self.assertIn("rel(162069)", query)
+        self.assertIn('"ISO3166-1"="US"', query)
+        self.assertEqual({row["relation_id"] for row in result["cities"]}, {80, 175905, 162069})
+
+        narrow_requests = []
+        narrow_payload = {"osm3s": COUNTRY["osm3s"], "elements": [COUNTRY["elements"][0], payload["elements"][2]]}
+        self.provider(httpx.Response(200, json=narrow_payload), narrow_requests).fetch_country_catalog(
+            "US", [5], selector_profile="us-municipal-v1")
+        narrow_query = parse_qs(narrow_requests[0].content.decode())["data"][0]
+        self.assertIn("rel(175905)", narrow_query)
+        self.assertNotIn('admin_level"="8', narrow_query)
+        self.assertNotIn("rel(162069)", narrow_query)
+
+        nonmunicipal = json.loads(json.dumps(payload))
+        nonmunicipal["elements"][1]["tags"]["place"] = "county"
+        self.assertEqual({row["relation_id"] for row in self.provider(httpx.Response(200, json=nonmunicipal)).fetch_country_catalog(
+            "US", [4, 5, 8], selector_profile="us-municipal-v1")["cities"]}, {175905, 162069})
+        consolidated = json.loads(json.dumps(payload))
+        consolidated["elements"][1]["tags"]["border_type"] = "city;county"
+        self.assertIn(80, {row["relation_id"] for row in self.provider(httpx.Response(200, json=consolidated)).fetch_country_catalog(
+            "US", [4, 5, 8], selector_profile="us-municipal-v1")["cities"]})
+        for key in ("border_type", "designation"):
+            nonmunicipal = json.loads(json.dumps(payload))
+            nonmunicipal["elements"][1]["tags"][key] = "county"
+            self.assertEqual({row["relation_id"] for row in self.provider(httpx.Response(200, json=nonmunicipal)).fetch_country_catalog(
+                "US", [4, 5, 8], selector_profile="us-municipal-v1")["cities"]}, {175905, 162069})
+
+    def test_canada_catalog_requires_all_province_scope_markers_and_proof(self):
+        bounds = COUNTRY["elements"][1]["bounds"]
+        relation = {"type": "relation", "id": 42,
+            "tags": {"name": "Victoria", "boundary": "administrative", "admin_level": "8"},
+            "bounds": bounds, "members": [{"type": "node", "ref": 9, "role": "admin_centre"}]}
+        payload = canada_catalog({"CA-BC": [42]}, [relation])
+        requests = []
+        result = self.provider(httpx.Response(200, json=payload), requests).fetch_country_catalog(
+            "CA", [6, 8], selector_profile="ca-municipal-v1")
+        query = parse_qs(requests[0].content.decode())["data"][0]
+        self.assertIn('"ISO3166-2"~"^CA-(AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)$"', query)
+        self.assertIn('.province out tags;', query)
+        self.assertIn('make scope;out;', query)
+        self.assertNotIn('relation_ids=', query)
+        self.assertIn("out body bb", query)
+        self.assertTrue(all(set(element) == {"type", "id"} for element in payload["elements"]
+                            if element["type"] == "scope"))
+        self.assertEqual(result["cities"][0]["selection_scope"], "CA-BC")
+
+        for mutate in (
+            lambda value: value["elements"].pop(1),
+            lambda value: value["elements"][1]["tags"].update({"ISO3166-2": "CA-BC"}),
+            lambda value: next(element for element in value["elements"] if element.get("id") == 42)["members"].clear(),
+            lambda value: value["elements"][-1].update(tags={"relation_ids": "999"}),
+        ):
+            invalid = json.loads(json.dumps(payload)); mutate(invalid)
+            with self.subTest(mutate=mutate), self.assertRaises(CityGeographyError):
+                self.provider(httpx.Response(200, json=invalid)).fetch_country_catalog(
+                    "CA", [6, 8], selector_profile="ca-municipal-v1")
+
+    def test_canada_filters_unproven_types_deduplicates_identical_border_relations_and_rejects_conflicts(self):
+        bounds = COUNTRY["elements"][1]["bounds"]
+        relation = {"type": "relation", "id": 62,
+                    "tags": {"name": "Border Municipality", "boundary": "administrative", "admin_level": "6", "place": "municipality"},
+                    "bounds": bounds, "members": []}
+        payload = canada_catalog({"CA-AB": [62], "CA-SK": [62]},
+                                 [json.loads(json.dumps(relation)), json.loads(json.dumps(relation))])
+        result = self.provider(httpx.Response(200, json=payload)).fetch_country_catalog("CA", [6], selector_profile="ca-municipal-v1")
+        self.assertEqual(len(result["cities"]), 1)
+        self.assertEqual(result["cities"][0]["selection_scope"], "CA-AB")
+        next(element for element in payload["elements"] if element.get("type") == "relation" and element.get("id") == 62)["bounds"]["maxlon"] = 5.
+        with self.assertRaisesRegex(CityGeographyError, "invalid_city_provider_response"):
+            self.provider(httpx.Response(200, json=payload)).fetch_country_catalog("CA", [6], selector_profile="ca-municipal-v1")
+
+        border_relations = [element for element in payload["elements"] if element.get("type") == "relation" and element.get("id") == 62]
+        border_relations[0]["bounds"]["maxlon"] = 4.5
+        border_relations[0]["tags"]["place"] = "county"
+        border_relations[1]["tags"]["place"] = "county"
+        with self.assertRaisesRegex(CityGeographyError, "city_country_boundary_unavailable"):
+            self.provider(httpx.Response(200, json=payload)).fetch_country_catalog("CA", [6], selector_profile="ca-municipal-v1")
+
+    def test_canada_province_rules_accept_positive_municipal_types_and_reject_wrong_tiers(self):
+        bounds = COUNTRY["elements"][1]["bounds"]
+        specs = [
+            (101, "CA-BC", "8", None, [{"type": "node", "ref": 1, "role": "admin_centre"}]),
+            (102, "CA-ON", "8", "city", []),
+            (103, "CA-QC", "8", "town", []),
+            (104, "CA-QC", "6", "city", []),
+            (105, "CA-AB", "8", "village", []),
+            (106, "CA-NU", "6", "city", []),
+            (107, "CA-NU", "8", "hamlet", []),
+            (108, "CA-MB", "6", "municipality", []),
+            (109, "CA-SK", "6", "county", []),
+        ]
+        relations = []
+        scopes = {}
+        for identifier, scope, level, place, members in specs:
+            tags = {"name": f"Town {identifier}", "boundary": "administrative", "admin_level": level}
+            if place is not None:
+                tags["place"] = place
+            relations.append({"type": "relation", "id": identifier, "tags": tags, "bounds": bounds, "members": members})
+            scopes.setdefault(scope, []).append(identifier)
+        result = self.provider(httpx.Response(200, json=canada_catalog(scopes, relations))).fetch_country_catalog(
+            "CA", [6, 8], selector_profile="ca-municipal-v1")
+        self.assertEqual({row["relation_id"] for row in result["cities"]}, {101, 102, 103, 106, 107, 108})
+
+    def test_final_city_extract_revalidates_captured_profile_and_canadian_admin_centre(self):
+        gb = CITY.replace(b'<tag k="admin_level" v="8"/>', b'<tag k="admin_level" v="6"/><tag k="ref:gss" v="E06000023"/><tag k="designation" v="unitary_authority"/>')
+        self.provider(httpx.Response(200, content=gb)).fetch_city_extract(
+            42, selector_profile="gb-local-authority-v1", country_code="GB", admin_levels=[6, 8])
+        us = CITY.replace(b'<relation id="42">', b'<relation id="175905">')
+        us = us.replace(b"3600000042", b"3600175905")
+        us = us.replace(b'<tag k="admin_level" v="8"/>', b'<tag k="admin_level" v="5"/><tag k="wikidata" v="Q60"/><tag k="border_type" v="city"/>')
+        self.provider(httpx.Response(200, content=us)).fetch_city_extract(
+            175905, selector_profile="us-municipal-v1", country_code="US", admin_levels=[4, 5, 8])
+        canada = CITY.replace(b'<tag k="admin_level" v="8"/>', b'<tag k="admin_level" v="8"/><tag k="place" v="municipality"/>')
+        canada = canada.replace(b'<relation id="42">', b'<relation id="42"><member type="node" ref="9" role="admin_centre"/>')
+        self.provider(httpx.Response(200, content=canada)).fetch_city_extract(
+            42, selector_profile="ca-municipal-v1", country_code="CA", admin_levels=[6, 8], selection_scope="CA-BC")
+        dc = CITY.replace(b'<relation id="42">', b'<relation id="162069">')
+        dc = dc.replace(b"3600000042", b"3600162069")
+        dc = dc.replace(b'<tag k="admin_level" v="8"/>', b'<tag k="admin_level" v="4"/><tag k="ISO3166-2" v="US-DC"/>')
+        self.provider(httpx.Response(200, content=dc)).fetch_city_extract(
+            162069, selector_profile="us-municipal-v1", country_code="US", admin_levels=[4, 5, 8])
+        for bad_payload, kwargs in (
+            (gb.replace(b'E06000023', b'E10000001'), {"selector_profile": "gb-local-authority-v1", "country_code": "GB", "admin_levels": [6, 8]}),
+            (canada.replace(b'admin_centre', b'outer'), {"selector_profile": "ca-municipal-v1", "country_code": "CA", "admin_levels": [6, 8], "selection_scope": "CA-BC"}),
+        ):
+            with self.subTest(kwargs=kwargs), self.assertRaisesRegex(CityGeographyError, "city_boundary_unavailable"):
+                self.provider(httpx.Response(200, content=bad_payload)).fetch_city_extract(42, **kwargs)
 
 
 if __name__ == "__main__":

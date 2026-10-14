@@ -16,6 +16,11 @@ from defusedxml import ElementTree
 from defusedxml.common import DefusedXmlException
 
 from backend.app.geography import MAX_OSM_XML_BYTES, MAX_OSM_XML_DEPTH, MAX_OSM_XML_ELEMENTS, _parse_osm_stream
+from backend.app.municipal_rules import (
+    CA_PROFILE, CA_PROVINCES, DEFAULT_PROFILE, US_PROFILE, country_query, country_selector_profile as _country_selector_profile,
+    levels_allowed, relation_matches,
+    validate_selection,
+)
 
 
 WORLD_CATALOG_URL = "https://download.geofabrik.de/index-v1.json"
@@ -29,11 +34,11 @@ PROFILE_VERSION = "municipal-admin-v1"
 QUERY_VERSION = "public-scope-v1"
 # Municipal policies from the OSM administrative-level table; no global fallback.
 DEFAULT_ADMIN_LEVELS = {
-    "AT": [8], "BE": [8], "BR": [8], "CH": [8], "CL": [8], "CO": [6], "CZ": [8],
+    "AT": [8], "BE": [8], "BR": [8], "CA": [6, 8], "CH": [8], "CL": [8], "CO": [6], "CZ": [8],
     "DE": [8], "DK": [7], "EE": [7], "ES": [8], "FI": [8], "FR": [8], "GR": [7],
-    "HU": [8], "IT": [8], "JP": [7], "LU": [8], "LV": [5], "MX": [6], "NL": [8],
+    "GB": [6, 8], "HU": [8], "IT": [8], "JP": [7], "LU": [8], "LV": [5], "MX": [6], "NL": [8],
     "NO": [7], "NZ": [6], "PE": [8], "PH": [6], "PL": [7], "PT": [7], "RO": [8],
-    "SE": [7], "SI": [8], "SK": [8], "US": [8],
+    "SE": [7], "SI": [8], "SK": [8], "US": [4, 5, 8],
 }
 
 
@@ -51,10 +56,17 @@ def country_admin_levels() -> dict[str, list[int]]:
                 raise ValueError()
             for country, levels in values.items():
                 _country(country)
-                result[country] = _levels(levels)
+                normalized = _levels(levels)
+                if country in {"GB", "CA", "US"} and not levels_allowed(country, normalized):
+                    raise ValueError()
+                result[country] = normalized
         except (ValueError, TypeError, RecursionError) as error:
             raise CityGeographyError("invalid_city_country_policy") from error
     return result
+
+
+def country_selector_profile(country: str) -> str:
+    return _country_selector_profile(_country(country))
 
 
 def _country(value: str) -> str:
@@ -90,8 +102,11 @@ def _position(value) -> list[float]:
         raise CityGeographyError("invalid_city_provider_response")
     if not -180 <= value[0] <= 180 or not -90 <= value[1] <= 90:
         raise CityGeographyError("invalid_city_provider_response")
-    if any(not math.isfinite(number) for number in value):
-        raise CityGeographyError("invalid_city_provider_response")
+    try:
+        if any(not math.isfinite(number) for number in value):
+            raise CityGeographyError("invalid_city_provider_response")
+    except OverflowError as error:
+        raise CityGeographyError("invalid_city_provider_response") from error
     return value
 
 
@@ -132,6 +147,10 @@ def _json(payload: bytes) -> dict:
         return value
     except (ValueError, UnicodeError, RecursionError) as error:
         raise CityGeographyError("invalid_city_provider_response") from error
+
+
+def _valid_tags(value) -> bool:
+    return isinstance(value, dict) and all(isinstance(key, str) and isinstance(item, str) for key, item in value.items())
 
 
 class CityGeographyProvider:
@@ -207,20 +226,27 @@ class CityGeographyProvider:
                 raise CityGeographyError("city_catalog_limit")
         return result
 
-    def fetch_country_catalog(self, country: str, levels: list[int]) -> dict:
+    def fetch_country_catalog(self, country: str, levels: list[int], *, selector_profile: str = DEFAULT_PROFILE) -> dict:
         country = _country(country)
         levels = _levels(levels)
-        level_filter = "|".join(str(value) for value in levels)
-        query = (f'[out:json][timeout:120][maxsize:134217728];area["ISO3166-1"="{country}"]["admin_level"="2"]->.country;'
-                 f'.country out ids;rel(area.country)["boundary"="administrative"]["admin_level"~"^({level_filter})$"];out tags bb;')
+        if not validate_selection(country, selector_profile, levels, None):
+            raise CityGeographyError("invalid_city_selector")
+        query = country_query(country, levels, selector_profile)
+        if query is None:
+            level_filter = "|".join(str(value) for value in levels)
+            query = (f'[out:json][timeout:120][maxsize:134217728];area["ISO3166-1"="{country}"]["admin_level"="2"]->.country;'
+                     f'.country out ids;rel(area.country)["boundary"="administrative"]["admin_level"~"^({level_filter})$"];out tags bb;')
         value = _json(self._fetch(self.overpass_url, MAX_CATALOG_BYTES, query))
         metadata = value.get("osm3s")
         if not isinstance(metadata, dict):
             raise CityGeographyError("invalid_city_provider_response")
         timestamp = _timestamp(metadata.get("timestamp_osm_base"))
         elements = value.get("elements")
-        if not isinstance(elements, list) or not 1 <= len(elements) <= MAX_CITY_CANDIDATES + 1:
+        element_limit = MAX_CITY_CANDIDATES + (3 * len(CA_PROVINCES) + 1 if selector_profile == CA_PROFILE else 1)
+        if not isinstance(elements, list) or not 1 <= len(elements) <= element_limit:
             raise CityGeographyError("city_catalog_limit")
+        if selector_profile == CA_PROFILE:
+            return self._parse_canada_catalog(elements, timestamp, country, levels, selector_profile)
         areas = [element for element in elements if isinstance(element, dict) and element.get("type") == "area"]
         if len(areas) != 1:
             raise CityGeographyError("city_country_boundary_unavailable")
@@ -236,8 +262,15 @@ class CityGeographyProvider:
             bounds = element.get("bounds")
             if type(identifier) is not int or not 1 <= identifier <= 9_223_372_036_854_775_807 or identifier in seen:
                 raise CityGeographyError("invalid_city_provider_response")
-            if not isinstance(tags, dict) or tags.get("boundary") != "administrative" or not isinstance(tags.get("admin_level"), str) or tags["admin_level"] not in {str(level) for level in levels}:
+            if not _valid_tags(tags) or not isinstance(tags.get("admin_level"), str) or tags["admin_level"] not in {str(level) for level in levels}:
                 raise CityGeographyError("invalid_city_provider_response")
+            if not relation_matches(country, selector_profile, levels, tags, identifier=identifier):
+                if selector_profile == DEFAULT_PROFILE:
+                    raise CityGeographyError("invalid_city_provider_response")
+                # The public query may return a numeric-level relation that has
+                # no positive municipal proof (or is a known nonmunicipal type).
+                seen.add(identifier)
+                continue
             name = tags.get("name")
             if not isinstance(name, str) or not name.strip() or len(name) > 200 or not isinstance(bounds, dict):
                 raise CityGeographyError("invalid_city_provider_response")
@@ -249,11 +282,138 @@ class CityGeographyProvider:
             seen.add(identifier)
         if not cities:
             raise CityGeographyError("city_country_boundary_unavailable")
+        if selector_profile != DEFAULT_PROFILE:
+            cities.sort(key=lambda city: (city["name"].casefold(), city["relation_id"]))
         return {"source_timestamp": timestamp, "cities": cities}
 
-    def fetch_city_extract(self, relation_id: int) -> dict:
+    def _parse_canada_catalog(self, elements, timestamp, country, levels, selector_profile):
+        if any(not isinstance(element, dict) or element.get("type") not in {"area", "scope", "relation"}
+               for element in elements):
+            raise CityGeographyError("invalid_city_provider_response")
+        if not elements or elements[0].get("type") != "area" or type(elements[0].get("id")) is not int:
+            raise CityGeographyError("invalid_city_provider_response")
+        country_area_id = elements[0]["id"]
+        marker_ids: dict[str, set[int]] = {}
+        returned_area_ids = {country_area_id}
+        by_id: dict[int, tuple[dict, set[str]]] = {}
+        seen_markers: set[int] = set()
+        index = 1
+        while index < len(elements):
+            province = elements[index]
+            if province.get("type") != "relation":
+                raise CityGeographyError("invalid_city_provider_response")
+            province_id = province.get("id")
+            province_tags = province.get("tags")
+            scope = province_tags.get("ISO3166-2") if isinstance(province_tags, dict) else None
+            if (type(province_id) is not int or not 1 <= province_id <= 9_223_372_036_854_775_807
+                    or not _valid_tags(province_tags) or scope not in CA_PROVINCES or scope in marker_ids
+                    or province_tags.get("boundary") != "administrative"
+                    or province_tags.get("admin_level") != "4"):
+                raise CityGeographyError("invalid_city_provider_response")
+            area_index = index + 1
+            if area_index >= len(elements):
+                raise CityGeographyError("invalid_city_provider_response")
+            province_area = elements[area_index]
+            province_area_id = province_id + 3_600_000_000
+            if (province_area.get("type") != "area" or type(province_area.get("id")) is not int
+                    or province_area["id"] != province_area_id or province_area_id in returned_area_ids):
+                raise CityGeographyError("invalid_city_provider_response")
+            returned_area_ids.add(province_area_id)
+            index = area_index + 1
+            scoped_ids: set[int] = set()
+            while index < len(elements) and elements[index].get("type") != "scope":
+                relation = elements[index]
+                identifier = relation.get("id")
+                tags = relation.get("tags")
+                bounds = relation.get("bounds")
+                members = relation.get("members", [])
+                if (relation.get("type") != "relation" or type(identifier) is not int
+                        or not 1 <= identifier <= 9_223_372_036_854_775_807
+                        or not _valid_tags(tags) or not isinstance(bounds, dict) or not isinstance(members, list)
+                        or identifier in scoped_ids):
+                    raise CityGeographyError("invalid_city_provider_response")
+                if len(by_id) >= MAX_CITY_CANDIDATES and identifier not in by_id:
+                    raise CityGeographyError("city_catalog_limit")
+                if any(not isinstance(member, dict) or member.get("type") not in {"node", "way", "relation"}
+                       or type(member.get("ref")) is not int or not 1 <= member["ref"] <= 9_223_372_036_854_775_807
+                       or not isinstance(member.get("role", ""), str) for member in members):
+                    raise CityGeographyError("invalid_city_provider_response")
+                comparable = {"tags": tags, "bounds": bounds, "members": members}
+                previous = by_id.get(identifier)
+                if previous is not None:
+                    if previous[0] != comparable:
+                        raise CityGeographyError("invalid_city_provider_response")
+                    previous[1].add(scope)
+                else:
+                    by_id[identifier] = (comparable, {scope})
+                scoped_ids.add(identifier)
+                index += 1
+            if index >= len(elements):
+                raise CityGeographyError("invalid_city_provider_response")
+            marker = elements[index]
+            marker_id = marker.get("id")
+            if (type(marker_id) is not int or marker_id <= 0 or marker_id in seen_markers
+                    or set(marker) != {"type", "id"}):
+                raise CityGeographyError("invalid_city_provider_response")
+            seen_markers.add(marker_id)
+            marker_ids[scope] = scoped_ids
+            index += 1
+        if (set(marker_ids) != set(CA_PROVINCES) or len(seen_markers) != len(CA_PROVINCES)
+                or len(returned_area_ids) != len(CA_PROVINCES) + 1):
+            raise CityGeographyError("invalid_city_provider_response")
+
+        cities = []
+        for identifier, (element, scopes) in by_id.items():
+            tags = element["tags"]
+            bounds = element["bounds"]
+            members = element["members"]
+            matching_scopes = sorted(scope for scope in scopes if relation_matches(
+                country, selector_profile, levels, tags, selection_scope=scope,
+                members=((member["type"], member.get("ref", 1), member.get("role", "")) for member in members),
+            ))
+            if not matching_scopes:
+                continue
+            name = tags.get("name")
+            if not isinstance(name, str) or not name.strip() or len(name) > 200:
+                raise CityGeographyError("invalid_city_provider_response")
+            west, south = _position([bounds.get("minlon"), bounds.get("minlat")])
+            east, north = _position([bounds.get("maxlon"), bounds.get("maxlat")])
+            if west > east or south > north:
+                raise CityGeographyError("invalid_city_provider_response")
+            cities.append({"relation_id": identifier, "name": name, "bounds": [west, south, east, north],
+                           "selection_scope": matching_scopes[0]})
+        if not cities:
+            raise CityGeographyError("city_country_boundary_unavailable")
+        cities.sort(key=lambda city: (city["name"].casefold(), city["relation_id"], city["selection_scope"]))
+        return {"source_timestamp": timestamp, "cities": cities}
+
+    def fetch_city_extract(self, relation_id: int, *, selector_profile: str = DEFAULT_PROFILE,
+                           country_code: str | None = None, admin_levels: list[int] | None = None,
+                           selection_scope: str | None = None) -> dict:
         if type(relation_id) is not int or not 1 <= relation_id <= 9_223_372_036_854_775_807:
             raise CityGeographyError("invalid_city_relation")
+        if selector_profile == DEFAULT_PROFILE:
+            if selection_scope is not None:
+                raise CityGeographyError("invalid_city_selector")
+            if country_code is not None:
+                country_code = _country(country_code)
+            if admin_levels is not None:
+                admin_levels = _levels(admin_levels)
+                if country_code is not None and not validate_selection(country_code, selector_profile, admin_levels, None):
+                    raise CityGeographyError("invalid_city_selector")
+        else:
+            if country_code is None or admin_levels is None:
+                raise CityGeographyError("invalid_city_selector")
+            country_code = _country(country_code)
+            admin_levels = _levels(admin_levels)
+            if not validate_selection(country_code, selector_profile, admin_levels, selection_scope):
+                raise CityGeographyError("invalid_city_selector")
+            if selector_profile == CA_PROFILE and selection_scope is None:
+                raise CityGeographyError("invalid_city_selector")
+            if selector_profile == US_PROFILE and relation_id in {175905, 162069}:
+                expected = 5 if relation_id == 175905 else 4
+                if expected not in admin_levels:
+                    raise CityGeographyError("invalid_city_selector")
         query = (f'[out:xml][timeout:120][maxsize:268435456];rel({relation_id})->.city;.city map_to_area->.area;'
                  '.area out ids;(.city;way(r.city);way(area.area)["highway"]["name"];);out body;>;out skel qt;')
         payload = self._fetch(self.overpass_url, MAX_OSM_XML_BYTES, query)
@@ -287,6 +447,15 @@ class CityGeographyProvider:
             document = _parse_osm_stream(io.BytesIO(payload), {relation_id})
             relation = document.relations.get(relation_id)
             if relation is None or relation.tags.get("boundary") != "administrative":
+                raise CityGeographyError("city_boundary_unavailable")
+            if selector_profile != DEFAULT_PROFILE and not relation_matches(
+                country_code, selector_profile, admin_levels, relation.tags,
+                selection_scope=selection_scope, identifier=relation_id, members=relation.members,
+            ):
+                raise CityGeographyError("city_boundary_unavailable")
+            if selector_profile == DEFAULT_PROFILE and admin_levels is not None and relation.tags.get("admin_level") not in {
+                str(level) for level in admin_levels
+            }:
                 raise CityGeographyError("city_boundary_unavailable")
             timestamp = _timestamp(document.source_timestamp)
         except CityGeographyError:
