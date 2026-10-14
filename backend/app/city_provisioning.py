@@ -51,14 +51,15 @@ def enabled() -> bool:
 
 def ensure_public_task(db: Connection, task_key: str, task_kind: str, *, country_code: str | None = None,
                        admin_levels: list[int] | None = None, relation_id: int | None = None,
-                       city_name: str | None = None) -> None:
+                       city_name: str | None = None, selector_profile: str = 'admin-levels-v1',
+                       selection_scope: str | None = None) -> None:
     db.execute(text("""INSERT INTO city_public_tasks
-        (task_key,task_kind,country_code,admin_levels,relation_id,city_name)
-        VALUES (:key,:kind,:country,CAST(:levels AS jsonb),:relation,:name)
+        (task_key,task_kind,country_code,admin_levels,relation_id,city_name,selector_profile,selection_scope)
+        VALUES (:key,:kind,:country,CAST(:levels AS jsonb),:relation,:name,:selector,:scope)
         ON CONFLICT (task_key) DO NOTHING"""), {
         "key": task_key, "kind": task_kind, "country": country_code,
         "levels": json.dumps(admin_levels) if admin_levels is not None else None,
-        "relation": relation_id, "name": city_name,
+        "relation": relation_id, "name": city_name, "selector": selector_profile, "scope": selection_scope,
     })
 
 
@@ -67,22 +68,31 @@ def _provider_versions() -> tuple[str, str]:
     return PROFILE_VERSION, QUERY_VERSION
 
 
-def _city_task_key(relation_id: int) -> str:
+def _country_task_key(country: str, levels: list[int]) -> str:
+    from backend.app.city_geography_provider import country_selector_profile
+    profile, query = _provider_versions()
+    selector = country_selector_profile(country)
+    key = f"country:{country}:{profile}:{','.join(map(str, levels))}:{query}"
+    return key if selector == 'admin-levels-v1' else key + ':' + selector
+
+
+def _city_task_key(relation_id: int, *, selector_profile: str = 'admin-levels-v1',
+                   admin_levels: list[int] | None = None, selection_scope: str | None = None) -> str:
     from backend.app.geography import ELIGIBILITY_RULE_VERSION
     profile_version, query_version = _provider_versions()
-    return f"city:{relation_id}:{profile_version}:{query_version}:{ELIGIBILITY_RULE_VERSION}"
+    key = f"city:{relation_id}:{profile_version}:{query_version}:{ELIGIBILITY_RULE_VERSION}"
+    return key if selector_profile == 'admin-levels-v1' else (
+        f"{key}:{selector_profile}:{','.join(map(str, admin_levels or []))}:{selection_scope or '-'}")
 
 
 def preparation_policy_parameters() -> dict[str, str]:
     from backend.app.city_geography_provider import CityGeographyError, country_admin_levels
-    profile, query = _provider_versions()
     try:
         policies = country_admin_levels()
     except CityGeographyError:
         # The country checkpoint persists the safe configuration error.
         policies = {}
-    return {"city_policy_tasks": json.dumps({country:
-        f"country:{country}:{profile}:{','.join(map(str, levels))}:{query}"
+    return {"city_policy_tasks": json.dumps({country: _country_task_key(country, levels)
         for country, levels in policies.items()})}
 
 
@@ -335,9 +345,8 @@ def _defer_preparation(db: Connection, account_id: str, source_id: int, revision
 
 def _enqueue_country_page(db: Connection, account: str, source_id: int, revision: int,
                           countries: list[str], cursor: str | None) -> str | None:
-    from backend.app.city_geography_provider import country_admin_levels
+    from backend.app.city_geography_provider import country_admin_levels, country_selector_profile
 
-    profile_version, query_version = _provider_versions()
     page = [code for code in countries if cursor is None or code > cursor][:MAX_OWNER_COUNTRIES]
     if not page:
         return cursor
@@ -346,8 +355,9 @@ def _enqueue_country_page(db: Connection, account: str, source_id: int, revision
         levels = policies.get(country)
         if levels is None:
             continue
-        key = f"country:{country}:{profile_version}:{','.join(map(str, levels))}:{query_version}"
-        ensure_public_task(db, key, "country", country_code=country, admin_levels=levels)
+        key = _country_task_key(country, levels)
+        ensure_public_task(db, key, "country", country_code=country, admin_levels=levels,
+                           selector_profile=country_selector_profile(country))
         db.execute(text("""INSERT INTO activity_preparation_countries
             (account_id,source_id,source_revision,country_code,task_key)
             VALUES (:account,:source,:revision,:country,:key) ON CONFLICT DO NOTHING"""), {
@@ -423,7 +433,7 @@ def _prepare_one_owner_step(engine: Engine) -> bool:
         if request["phase"] == "country":
             countries = db.execute(text("""SELECT scope.country_code,scope.task_key,scope.state,
                     scope.candidate_cursor,
-                    task.status AS task_status,task.result_json,task.safe_error
+                    task.status AS task_status,task.result_json,task.safe_error,task.selector_profile,task.admin_levels
                 FROM activity_preparation_countries scope JOIN city_public_tasks task USING(task_key)
                 WHERE scope.account_id=:account AND scope.source_id=:source
                   AND scope.source_revision=:revision ORDER BY scope.country_code"""), {
@@ -489,9 +499,14 @@ def _prepare_one_owner_step(engine: Engine) -> bool:
                 if not any(point[0] <= bounds[2] and bounds[1] <= point[1] <= bounds[3]
                            for point in ordered_points[point_index:]):
                     continue
-                task_key = _city_task_key(relation)
+                selector = pending_country['selector_profile']
+                levels = list(pending_country['admin_levels']) if selector != 'admin-levels-v1' else None
+                scope = item.get('selection_scope') if selector == 'ca-municipal-v1' else None
+                task_key = _city_task_key(relation, selector_profile=selector,
+                                          admin_levels=levels, selection_scope=scope)
                 ensure_public_task(db, task_key, "city", country_code=pending_country["country_code"],
-                                   relation_id=relation, city_name=str(item["name"])[:200])
+                                   relation_id=relation, city_name=str(item["name"])[:200],
+                                   selector_profile=selector, admin_levels=levels, selection_scope=scope)
                 dataset_id = _active_relation_dataset(db, relation)
                 if dataset_id is not None:
                     db.execute(text("""UPDATE city_public_tasks SET status='succeeded'
@@ -758,6 +773,7 @@ def _reserve_public_request(engine: Engine) -> dict[str, Any] | None:
             safe_error='city_provider_unavailable',updated_at=clock_timestamp()
         FROM expired WHERE task.task_key=expired.task_key"""))
         rows = db.execute(text("""SELECT task_key,task_kind,country_code,admin_levels,relation_id,city_name,
+                selector_profile,selection_scope,
                 attempts,result_json FROM city_public_tasks
             WHERE (status='queued' AND available_at<=clock_timestamp() OR
                    status='running' AND leased_until<=clock_timestamp())
@@ -856,10 +872,16 @@ def _perform_public_request(engine: Engine, task: dict[str, Any]) -> None:
             result = provider.fetch_world_catalog()
             _finish_public_request(engine, task, result=result)
         elif task["task_kind"] == "country":
-            result = provider.fetch_country_catalog(str(task["country_code"]), list(task["admin_levels"]))
+            selector = task.get('selector_profile', 'admin-levels-v1')
+            arguments = {'selector_profile': selector} if selector != 'admin-levels-v1' else {}
+            result = provider.fetch_country_catalog(str(task["country_code"]), list(task["admin_levels"]), **arguments)
             _finish_public_request(engine, task, result=result)
         else:
-            result = provider.fetch_city_extract(int(task["relation_id"]))
+            selector = task.get('selector_profile', 'admin-levels-v1')
+            arguments = {'selector_profile': selector, 'country_code': task['country_code'],
+                'admin_levels': task['admin_levels'], 'selection_scope': task.get('selection_scope')
+            } if selector != 'admin-levels-v1' else {}
+            result = provider.fetch_city_extract(int(task["relation_id"]), **arguments)
             payload = result["xml"]
             if not isinstance(payload, bytes) or len(payload) > task["max_bytes"]:
                 raise CityGeographyError("city_provider_response_limit")

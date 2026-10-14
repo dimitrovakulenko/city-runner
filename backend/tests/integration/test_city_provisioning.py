@@ -19,6 +19,7 @@ from sqlalchemy.engine import make_url
 from backend.app.city_provisioning import (
     _enroll_existing_sources,
     _enqueue_country_page,
+    _country_task_key,
     _perform_public_request,
     _provider_versions,
     _world_candidate_countries,
@@ -177,6 +178,84 @@ class CityProvisioningPostgisTests(unittest.TestCase):
             self.assertEqual(tuple(original), ([[[0.002, 0.001], [0.004, 0.001]]], [[None, None]], False))
             self.assertEqual(db.execute(text("SELECT count(*) FROM activity_sources WHERE account_id=:account"),
                                        {"account": self.account}).scalar_one(), 1)
+
+    def test_same_level_selector_upgrade_recovers_old_country_links_without_changing_legacy_keys(self):
+        old_key = self._set_policy_request('GB', old_levels=[6, 8])
+        try:
+            self.assertEqual(_country_task_key('BE', [8]),
+                             'country:BE:municipal-admin-v1:8:public-scope-v1')
+            self.assertEqual(_country_task_key('GB', [6, 8]), old_key + ':gb-local-authority-v1')
+            client = TestClient(create_app(self.engine, identity_resolver=lambda: self.account))
+            self.assertEqual(client.get('/api/coverage-preparation').json()['state'], 'pending')
+            self.assertTrue(_enroll_existing_sources(self.engine))
+            self.assertFalse(_enroll_existing_sources(self.engine))
+            with self.engine.connect() as db:
+                self.assertEqual(db.execute(text('SELECT selector_profile FROM city_public_tasks WHERE task_key=:key'),
+                                           {'key': old_key}).scalar_one(), 'admin-levels-v1')
+                self.assertEqual(db.execute(text('SELECT count(*) FROM activity_preparation_countries WHERE account_id=:account'),
+                                           {'account': self.account}).scalar_one(), 0)
+        finally:
+            with self.engine.begin() as db:
+                db.execute(text('DELETE FROM activity_preparation_countries WHERE account_id=:account'), {'account': self.account})
+                db.execute(text('DELETE FROM city_public_tasks WHERE task_key=:key'), {'key': old_key})
+
+    def test_captured_country_selector_and_levels_survive_restart_and_policy_upgrade(self):
+        key = 'country:CA:captured-' + uuid.uuid4().hex
+        token = uuid.uuid4().hex
+        task = {'task_key': key, 'task_kind': 'country', 'country_code': 'CA',
+                'selector_profile': 'ca-municipal-v1', 'admin_levels': [6, 8], 'lease_token': token}
+        with self.engine.begin() as db:
+            db.execute(text("""INSERT INTO city_public_tasks
+                (task_key,task_kind,country_code,admin_levels,selector_profile,status,attempts,lease_token,leased_until)
+                VALUES (:key,'country','CA','[6,8]'::jsonb,'ca-municipal-v1','running',1,:token,
+                    clock_timestamp()+interval '5 minutes')"""), {'key': key, 'token': token})
+        calls = []
+        class CapturedProvider:
+            def fetch_country_catalog(self, country, levels, **kwargs):
+                calls.append((country, levels, kwargs))
+                return {'source_timestamp': '2026-10-13T00:00:00Z', 'cities': []}
+        restarted = create_engine(DATABASE_URL)
+        try:
+            with patch('backend.app.city_geography_provider.get_city_geography_provider', return_value=CapturedProvider()), patch(
+                    'backend.app.city_geography_provider.country_selector_profile', return_value='ca-municipal-v2'), patch.dict(
+                    os.environ, {'CITY_ADMIN_LEVELS': '{"CA":[8]}'}, clear=False):
+                with restarted.connect() as db:
+                    persisted = dict(db.execute(text('SELECT * FROM city_public_tasks WHERE task_key=:key'),
+                                                {'key': key}).mappings().one())
+                _perform_public_request(restarted, persisted)
+            self.assertEqual(calls, [('CA', [6, 8], {'selector_profile': 'ca-municipal-v1'})])
+            with restarted.connect() as db:
+                self.assertEqual(db.execute(text('SELECT status FROM city_public_tasks WHERE task_key=:key'),
+                                            {'key': key}).scalar_one(), 'succeeded')
+        finally:
+            restarted.dispose()
+            with self.engine.begin() as db:
+                db.execute(text('DELETE FROM city_public_tasks WHERE task_key=:key'), {'key': key})
+
+    def test_legacy_country_worker_keeps_original_two_argument_provider_call(self):
+        key = 'country:BE:legacy-' + uuid.uuid4().hex
+        token = uuid.uuid4().hex
+        with self.engine.begin() as db:
+            db.execute(text("""INSERT INTO city_public_tasks
+                (task_key,task_kind,country_code,admin_levels,status,attempts,lease_token,leased_until)
+                VALUES (:key,'country','BE','[8]'::jsonb,'running',1,:token,clock_timestamp()+interval '5 minutes')"""),
+                {'key': key, 'token': token})
+        calls = []
+        class LegacyProvider:
+            def fetch_country_catalog(self, country, levels):
+                calls.append((country, levels))
+                return {'source_timestamp': '2026-10-13T00:00:00Z', 'cities': []}
+        try:
+            with self.engine.connect() as db:
+                task = dict(db.execute(text('SELECT * FROM city_public_tasks WHERE task_key=:key'), {'key': key}).mappings().one())
+            with patch('backend.app.city_geography_provider.get_city_geography_provider', return_value=LegacyProvider()):
+                _perform_public_request(self.engine, task)
+            self.assertEqual(calls, [('BE', [8])])
+            with self.engine.connect() as db:
+                self.assertEqual(db.execute(text('SELECT status FROM city_public_tasks WHERE task_key=:key'), {'key': key}).scalar_one(), 'succeeded')
+        finally:
+            with self.engine.begin() as db:
+                db.execute(text('DELETE FROM city_public_tasks WHERE task_key=:key'), {'key': key})
 
     def test_changed_levels_rebind_pending_request_and_preserve_shared_tasks(self):
         old_key = self._set_policy_request('BE', state='pending', old_levels=[8])
