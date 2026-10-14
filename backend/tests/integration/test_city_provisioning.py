@@ -811,6 +811,9 @@ class CityProvisioningPostgisTests(unittest.TestCase):
                 self.assertEqual((applicable, touched), (expected, False), point)
 
     def test_unrelated_import_backfill_skips_tracks_but_advances_cursor(self):
+        from backend.app.map_imports import _advance_backfill_source, _release_backfill_task
+
+        lease_token = uuid.uuid4().hex
         with self.engine.begin() as db:
             dataset_id = db.execute(text("""INSERT INTO map_datasets
                 (region,source_timestamp,source_checksum,eligibility_rule_version,selection_key,
@@ -824,11 +827,14 @@ class CityProvisioningPostgisTests(unittest.TestCase):
                 VALUES (:dataset,990906,'Far City','8',
                     ST_Multi(ST_MakeEnvelope(100,20,101,21,4326)))"""), {"dataset": dataset_id})
             task_id = db.execute(text("""INSERT INTO map_import_tasks
-                (task_type,phase,dataset_id,status,source_cursor)
-                VALUES ('coverage_backfill','backfill',:dataset,'backfilling',:cursor) RETURNING id"""), {
-                "dataset": dataset_id, "cursor": self.source_id - 1,
+                (task_type,phase,region,dataset_id,status,source_cursor,lease_token,leased_until)
+                VALUES ('coverage_backfill','backfill',:region,:dataset,'running',:cursor,:token,
+                    clock_timestamp()+interval '5 minutes') RETURNING id"""), {
+                "region": self.unrelated_region, "dataset": dataset_id,
+                "cursor": self.source_id - 1, "token": lease_token,
             }).scalar_one()
-        self.assertTrue(process_map_task_step(self.engine, max_sources=1))
+        self.assertTrue(_advance_backfill_source(self.engine, int(task_id), lease_token))
+        _release_backfill_task(self.engine, int(task_id), lease_token)
         with self.engine.connect() as db:
             task = db.execute(text("SELECT status,source_cursor FROM map_import_tasks WHERE id=:id"), {
                 "id": task_id,
