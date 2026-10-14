@@ -1,0 +1,6641 @@
+{
+  "cldr": {
+    "locale": "en",
+    "sha256": "158c1d575308f7e46912edbeda435c8fe2ef5dad280798231f3a432e406b1807",
+    "url": "https://github.com/unicode-org/cldr-json/blob/91c267402229a59e3ef2774544f001bf959e8809/cldr-json/cldr-localenames-full/main/en/territories.json"
+  },
+  "records": [
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "AZ",
+      "country_name": "Azerbaijan",
+      "curated_levels": null,
+      "review_reasons": [],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "municipalities (bələdiyyələr)"
+              ],
+              "subrow": 1,
+              "text": "municipalities (bələdiyyələr)"
+            }
+          ],
+          "proposed": false,
+          "row": 12
+        }
+      ],
+      "status": "candidate"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "BJ",
+      "country_name": "Benin",
+      "curated_levels": null,
+      "review_reasons": [],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 6,
+              "segments": [
+                "Commune"
+              ],
+              "subrow": 1,
+              "text": "Commune"
+            }
+          ],
+          "proposed": false,
+          "row": 20
+        }
+      ],
+      "status": "candidate"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "IS",
+      "country_name": "Iceland",
+      "curated_levels": null,
+      "review_reasons": [],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 6,
+              "segments": [
+                "Municipalities",
+                "Sveitarfélög",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Sveitarfélög LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 82
+        }
+      ],
+      "status": "candidate"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "AT",
+      "country_name": "Austria",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 8,
+              "segments": [
+                "Municipality",
+                "Gemeinde",
+                "Gemeindekennzahl: xxxyy",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipality Gemeinde Gemeindekennzahl: xxxyy LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 11
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "BE",
+      "country_name": "Belgium (proposed / in use) (see boundary=political for linguistic communities)",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities LAU"
+            }
+          ],
+          "proposed": true,
+          "row": 18
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "BR",
+      "country_name": "Brazil",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Municípios e regiões administrativas do Distrito Federal",
+                "(municipalities and administrative regions of the Federal District)"
+              ],
+              "subrow": 1,
+              "text": "Municípios e regiões administrativas do Distrito Federal (municipalities and administrative regions of the Federal District)"
+            }
+          ],
+          "proposed": false,
+          "row": 25
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        6,
+        8
+      ],
+      "country_code": "CA",
+      "country_name": "Canada Varies by province; see Canada admin level.",
+      "curated_levels": [
+        6,
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "ca-municipal-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Regional municipalities & single-tier municipalities"
+              ],
+              "subrow": 1,
+              "text": "Regional municipalities & single-tier municipalities"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Lower-tier municipalities in rural areas;",
+                "Districts/communities within cities"
+              ],
+              "subrow": 1,
+              "text": "Lower-tier municipalities in rural areas; Districts/communities within cities"
+            }
+          ],
+          "proposed": false,
+          "row": 32
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        7,
+        8
+      ],
+      "country_code": "CH",
+      "country_name": "Switzerland (proposed by studerap, extended by t-i)",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Circles or something other between districts and municipalities"
+              ],
+              "subrow": 1,
+              "text": "Circles or something other between districts and municipalities"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "Gemeinden/Städte / communes/villes",
+                "LAU",
+                "Example: Basel, Montreux"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Gemeinden/Städte / communes/villes LAU Example: Basel, Montreux"
+            }
+          ],
+          "proposed": true,
+          "row": 182
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "CL",
+      "country_name": "Chile",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 36
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        6,
+        8
+      ],
+      "country_code": "CO",
+      "country_name": "Colombia",
+      "curated_levels": [
+        6
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Municipality / Municipio"
+              ],
+              "subrow": 1,
+              "text": "Municipality / Municipio"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Urban / Urbano: locality or commune / localidad o comuna",
+                "Rural / Rural: village / vereda"
+              ],
+              "subrow": 1,
+              "text": "Urban / Urbano: locality or commune / localidad o comuna Rural / Rural: village / vereda"
+            }
+          ],
+          "proposed": false,
+          "row": 40
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        5,
+        8,
+        9
+      ],
+      "country_code": "CZ",
+      "country_name": "Czechia",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            5,
+            8,
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 5,
+              "segments": [
+                "Districts",
+                "okresy",
+                "(ex LAU 1)",
+                "/",
+                "Prague municipal districts",
+                "obvody Prahy"
+              ],
+              "subrow": 1,
+              "text": "Districts okresy (ex LAU 1) / Prague municipal districts obvody Prahy"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "obce",
+                "LAU",
+                "/",
+                "Military areas",
+                "vojenské újezdy"
+              ],
+              "subrow": 1,
+              "text": "Municipalities obce LAU / Military areas vojenské újezdy"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Municipal boroughs of statutory cities",
+                "městské části/městské obvody"
+              ],
+              "subrow": 1,
+              "text": "Municipal boroughs of statutory cities městské části/městské obvody"
+            }
+          ],
+          "proposed": false,
+          "row": 49
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        8,
+        9,
+        10
+      ],
+      "country_code": "DE",
+      "country_name": "new levels: Germany see also Grenzen in Deutschland and Diskussionsseite / discussion page",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8,
+            9,
+            10
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Municipalities, Towns / City-districts",
+                "Stadt, Gemeinde",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities, Towns / City-districts Stadt, Gemeinde LAU"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Parts of a municipality with parish councils / self government",
+                "Stadtbezirk / Gemeindeteil mit Selbstverwaltung"
+              ],
+              "subrow": 1,
+              "text": "Parts of a municipality with parish councils / self government Stadtbezirk / Gemeindeteil mit Selbstverwaltung"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 10,
+              "segments": [
+                "Parts of a municipality without ...",
+                "Stadtteil / Gemeindeteil ohne Selbstverwaltung / Gemarkung"
+              ],
+              "subrow": 1,
+              "text": "Parts of a municipality without ... Stadtteil / Gemeindeteil ohne Selbstverwaltung / Gemarkung"
+            }
+          ],
+          "proposed": false,
+          "row": 69
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "DK",
+      "country_name": "Denmark (proposed)",
+      "curated_levels": [
+        7
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 7,
+              "segments": [
+                "Municipalities",
+                "Kommune",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Kommune LAU"
+            }
+          ],
+          "proposed": true,
+          "row": 50
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "EE",
+      "country_name": "Estonia (proposed)",
+      "curated_levels": [
+        7
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 7,
+              "segments": [
+                "Municipalities",
+                "vallad, omavalitsuslikud linnad",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities vallad, omavalitsuslikud linnad LAU"
+            }
+          ],
+          "proposed": true,
+          "row": 59
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "ES",
+      "country_name": "Spain (proposed) Frontera nacional",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "multirow_country_entry",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "Municipios",
+                "LAU",
+                "Euivalent to townships, communes"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Municipios LAU Euivalent to townships, communes"
+            }
+          ],
+          "proposed": true,
+          "row": 176
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        8,
+        10
+      ],
+      "country_code": "FI",
+      "country_name": "Finland (proposed by Boozeman, augmented by Skela)",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8,
+            10
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "Kunnat / Kaupungit",
+                "LAU",
+                "for ref=*, see Väestörekisterikeskus, kuntaluettelo): Helsinki"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Kunnat / Kaupungit LAU for ref=*, see Väestörekisterikeskus, kuntaluettelo): Helsinki"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 10,
+              "segments": [
+                "City/municipal districts",
+                "kaupunginosat/kunnanosat",
+                "Kulosaari"
+              ],
+              "subrow": 1,
+              "text": "City/municipal districts kaupunginosat/kunnanosat Kulosaari"
+            }
+          ],
+          "proposed": true,
+          "row": 63
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        8,
+        9
+      ],
+      "country_code": "FR",
+      "country_name": "France (in use)",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "multirow_country_entry",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8,
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 8,
+              "segments": [
+                "Communes",
+                "LAU",
+                "Use name=* to indicate the name of the commune, and ref:INSEE=* to indicate the unique identifier given by INSEE (COG)."
+              ],
+              "subrow": 1,
+              "text": "Communes LAU Use name=* to indicate the name of the commune, and ref:INSEE=* to indicate the unique identifier given by INSEE (COG)."
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Arrondissements municipaux (in Paris, Lyon, Marseille only), or communes associées and communes déléguées (in partially merged communes)."
+              ],
+              "subrow": 1,
+              "text": "Arrondissements municipaux (in Paris, Lyon, Marseille only), or communes associées and communes déléguées (in partially merged communes)."
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 8,
+              "segments": [
+                "Communes",
+                "(unitaires ou groupées)"
+              ],
+              "subrow": 2,
+              "text": "Communes (unitaires ou groupées)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Communes associées"
+              ],
+              "subrow": 2,
+              "text": "Communes associées"
+            }
+          ],
+          "proposed": false,
+          "row": 64
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "GB",
+      "country_name": "United Kingdom",
+      "curated_levels": [
+        6,
+        8
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "multirow_country_entry",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": "gb-local-authority-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 199
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        7,
+        8,
+        9
+      ],
+      "country_code": "GR",
+      "country_name": "Greece (in use)",
+      "curated_levels": [
+        7
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7,
+            8,
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 7,
+              "segments": [
+                "Municipalities",
+                "Δήμοι"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Δήμοι"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Municipal units",
+                "Δημοτικές ενότητες"
+              ],
+              "subrow": 1,
+              "text": "Municipal units Δημοτικές ενότητες"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Municipal communes",
+                "Δημοτικές κοινότητες",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipal communes Δημοτικές κοινότητες LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 71
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "HU",
+      "country_name": "Hungary (proposed / used)",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 81
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        7,
+        8
+      ],
+      "country_code": "IT",
+      "country_name": "Italy (as discussed on the Italian Mailing list Vol 16, Issue 27, Dieterdreist - Updated March 9 2019 Ilbano)",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Mountain community",
+                "per le comunità montane",
+                "/",
+                "union of municipalities",
+                "le unioni di comuni"
+              ],
+              "subrow": 1,
+              "text": "Mountain community per le comunità montane / union of municipalities le unioni di comuni"
+            },
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "Comuni",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Comuni LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 89
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "JP",
+      "country_name": "Japan (copied from Japan tagging#Boundary)",
+      "curated_levels": [
+        7
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Municipal border (Cities, Towns, Villages, Special wards of Tokyo)"
+              ],
+              "subrow": 1,
+              "text": "Municipal border (Cities, Towns, Villages, Special wards of Tokyo)"
+            }
+          ],
+          "proposed": false,
+          "row": 91
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "LU",
+      "country_name": "Luxembourg",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 8,
+              "segments": [
+                "Communes",
+                "communes, Gemeinden, Gemengen",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Communes communes, Gemeinden, Gemengen LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 108
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        5
+      ],
+      "country_code": "LV",
+      "country_name": "Latvia (proposed)",
+      "curated_levels": [
+        5
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            5
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 5,
+              "segments": [
+                "Municipalities",
+                "Novadi",
+                "/",
+                "Cities",
+                "Valstspilsētas",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Novadi / Cities Valstspilsētas LAU"
+            }
+          ],
+          "proposed": true,
+          "row": 101
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "MX",
+      "country_name": "Mexico (proposed by OSM México) (source: [2])",
+      "curated_levels": [
+        6
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Municipal borders"
+              ],
+              "subrow": 1,
+              "text": "Municipal borders"
+            }
+          ],
+          "proposed": true,
+          "row": 118
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        8,
+        10
+      ],
+      "country_code": "NL",
+      "country_name": "Netherlands (see administrative divisions of the Kingdom and administrative divisions of the Netherlands)",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "multirow_country_entry",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8,
+            10
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "gemeenten",
+                "LAU",
+                "Only in European Netherlands), e.g. Amsterdam, Schiermonnikoog"
+              ],
+              "subrow": 1,
+              "text": "Municipalities gemeenten LAU Only in European Netherlands), e.g. Amsterdam, Schiermonnikoog"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 10,
+              "segments": [
+                "Settlements",
+                "woonplaatsen",
+                "Only in European Netherlands): non-autonomous municipal subdivisions, registered in BAG. Retain even if congruent with municipality (admin_level=8) and thus not a subdivision in the strict sense"
+              ],
+              "subrow": 1,
+              "text": "Settlements woonplaatsen Only in European Netherlands): non-autonomous municipal subdivisions, registered in BAG. Retain even if congruent with municipality (admin_level=8) and thus not a subdivision in the strict sense"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Caribbean public bodies",
+                "Caribische openbare lichamen",
+                "Only in Caribbean Netherlands. These are Bonaire, Sint Eustatius and Saba. Known colloquially as special municipalities (bijzondere gemeenten)"
+              ],
+              "subrow": 2,
+              "text": "Caribbean public bodies Caribische openbare lichamen Only in Caribbean Netherlands. These are Bonaire, Sint Eustatius and Saba. Known colloquially as special municipalities (bijzondere gemeenten)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 10,
+              "segments": [
+                "Settlements",
+                "woonplaatsen",
+                "Only in European Netherlands): non-autonomous municipal subdivisions, registered in BAG. Retain even if congruent with municipality (admin_level=8) and thus not a subdivision in the strict sense"
+              ],
+              "subrow": 2,
+              "text": "Settlements woonplaatsen Only in European Netherlands): non-autonomous municipal subdivisions, registered in BAG. Retain even if congruent with municipality (admin_level=8) and thus not a subdivision in the strict sense"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "In Aruba (proposed): Districts (municipalities) known as GAC regions"
+              ],
+              "subrow": 3,
+              "text": "In Aruba (proposed): Districts (municipalities) known as GAC regions"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 10,
+              "segments": [
+                "Settlements",
+                "woonplaatsen",
+                "Only in European Netherlands): non-autonomous municipal subdivisions, registered in BAG. Retain even if congruent with municipality (admin_level=8) and thus not a subdivision in the strict sense"
+              ],
+              "subrow": 3,
+              "text": "Settlements woonplaatsen Only in European Netherlands): non-autonomous municipal subdivisions, registered in BAG. Retain even if congruent with municipality (admin_level=8) and thus not a subdivision in the strict sense"
+            }
+          ],
+          "proposed": false,
+          "row": 131
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "NO",
+      "country_name": "Norway (proposed)",
+      "curated_levels": [
+        7
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 140
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "NZ",
+      "country_name": "New Zealand (in use)",
+      "curated_levels": [
+        6
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 134
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "PE",
+      "country_name": "Peru",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 147
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        6,
+        7
+      ],
+      "country_code": "PH",
+      "country_name": "new levels Philippines 10-admin level proposal is replaced by 11-admin_level, with sitios and puroks taking admin_level=11",
+      "curated_levels": [
+        6
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Cities/municipalities (Lungsod/bayan)"
+              ],
+              "subrow": 1,
+              "text": "Cities/municipalities (Lungsod/bayan)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "City/municipal legislative districts"
+              ],
+              "subrow": 1,
+              "text": "City/municipal legislative districts"
+            }
+          ],
+          "proposed": false,
+          "row": 148
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "PL",
+      "country_name": "Poland",
+      "curated_levels": [
+        7
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 7,
+              "segments": [
+                "Municipalities",
+                "gminy",
+                "LAU",
+                "Some cities have municipality status - in OSM their borders have both relations - one as a city and second as a municipality.",
+                "Details in Polish"
+              ],
+              "subrow": 1,
+              "text": "Municipalities gminy LAU Some cities have municipality status - in OSM their borders have both relations - one as a city and second as a municipality. Details in Polish"
+            }
+          ],
+          "proposed": false,
+          "row": 149
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "PT",
+      "country_name": "Portugal (Project page)",
+      "curated_levels": [
+        7
+      ],
+      "review_reasons": [
+        "country_label_annotation"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 7,
+              "segments": [
+                "Municipalities",
+                "Municípios",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Municípios LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 150
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        6,
+        7,
+        8,
+        9
+      ],
+      "country_code": "RO",
+      "country_name": "Romania (România) (proposed)",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            7,
+            8,
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Counties",
+                "Judeţe",
+                "/",
+                "Municipality of Bucharest",
+                "NUTS 3",
+                "Currently those are set to 4, this is intended and will be changed if and when higher levels will be implemented in administration"
+              ],
+              "subrow": 1,
+              "text": "Counties Judeţe / Municipality of Bucharest NUTS 3 Currently those are set to 4, this is intended and will be changed if and when higher levels will be implemented in administration"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Metropolitan zones",
+                "(or other type of inter-municipal association)"
+              ],
+              "subrow": 1,
+              "text": "Metropolitan zones (or other type of inter-municipal association)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "Comune, Orașe, Municipii",
+                "LAU",
+                "/",
+                "Bucharest's sectors"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Comune, Orașe, Municipii LAU / Bucharest's sectors"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Villages, administrative parts of cities / municipalities"
+              ],
+              "subrow": 1,
+              "text": "Villages, administrative parts of cities / municipalities"
+            }
+          ],
+          "proposed": true,
+          "row": 152
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "SE",
+      "country_name": "Sweden",
+      "curated_levels": [
+        7
+      ],
+      "review_reasons": [
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 181
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "SI",
+      "country_name": "Slovenia (see Regije and Upravna delitev Slovenije)",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "občine",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities občine LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 169
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        8,
+        9
+      ],
+      "country_code": "SK",
+      "country_name": "Slovakia",
+      "curated_levels": [
+        8
+      ],
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "admin-levels-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8,
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "obce",
+                "LAU/RŠÚJ 5"
+              ],
+              "subrow": 1,
+              "text": "Municipalities obce LAU/RŠÚJ 5"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Municipal boroughs of Bratislava and Košice",
+                "mestské časti Bratislavy a Košíc"
+              ],
+              "subrow": 1,
+              "text": "Municipal boroughs of Bratislava and Košice mestské časti Bratislavy a Košíc"
+            }
+          ],
+          "proposed": false,
+          "row": 168
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        6,
+        8
+      ],
+      "country_code": "US",
+      "country_name": "United States Simplified/generalized; see United_States_admin_level and United States/Boundaries",
+      "curated_levels": [
+        4,
+        5,
+        8
+      ],
+      "review_reasons": [
+        "country_label_annotation",
+        "curated_source_no_clear_level",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": "us-municipal-v1",
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "State counties and \"county equivalents,\"",
+                "Territorial municipalities"
+              ],
+              "subrow": 1,
+              "text": "State counties and \"county equivalents,\" Territorial municipalities"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "state Municipalities: cities, towns and villages; infrequently, hamlets"
+              ],
+              "subrow": 1,
+              "text": "state Municipalities: cities, towns and villages; infrequently, hamlets"
+            }
+          ],
+          "proposed": false,
+          "row": 203
+        }
+      ],
+      "status": "curated"
+    },
+    {
+      "candidate_levels": [
+        7,
+        8
+      ],
+      "country_code": "AD",
+      "country_name": "Andorra (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Parròquies borders (communes)"
+              ],
+              "subrow": 1,
+              "text": "Parròquies borders (communes)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Municipality borders Only used for the capital city Andorra la Vella"
+              ],
+              "subrow": 1,
+              "text": "Municipality borders Only used for the capital city Andorra la Vella"
+            }
+          ],
+          "proposed": true,
+          "row": 5
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "AE",
+      "country_name": "United Arab Emirates (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "Municipalities"
+              ],
+              "subrow": 1,
+              "text": "Municipalities"
+            }
+          ],
+          "proposed": true,
+          "row": 198
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "AF",
+      "country_name": "Afghanistan (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 2
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "AG",
+      "country_name": "Antigua and Barbuda (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 7
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7,
+        8
+      ],
+      "country_code": "AL",
+      "country_name": "Albania (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 7,
+              "segments": [
+                "municipalities",
+                "bashkia",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "municipalities bashkia LAU"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "administrative unit (njësia administrative)",
+                "(former urban (bashki) and rural (komunë) municipalities)"
+              ],
+              "subrow": 1,
+              "text": "administrative unit (njësia administrative) (former urban (bashki) and rural (komunë) municipalities)"
+            }
+          ],
+          "proposed": true,
+          "row": 3
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        5
+      ],
+      "country_code": "AM",
+      "country_name": "Armenia (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            5
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 5,
+              "segments": [
+                "Municipality / Yerevan districts"
+              ],
+              "subrow": 1,
+              "text": "Municipality / Yerevan districts"
+            }
+          ],
+          "proposed": true,
+          "row": 9
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6,
+        7
+      ],
+      "country_code": "AO",
+      "country_name": "Angola (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Municípios (Municipalities)"
+              ],
+              "subrow": 1,
+              "text": "Municípios (Municipalities)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Comunas (Urban districts or Communes)"
+              ],
+              "subrow": 1,
+              "text": "Comunas (Urban districts or Communes)"
+            }
+          ],
+          "proposed": true,
+          "row": 6
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "AR",
+      "country_name": "Argentina (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 8
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "AU",
+      "country_name": "Australia see Aust. Tagging Guidelines",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 10
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "BA",
+      "country_name": "Bosnia and Herzegovina (proposed / in use)",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 23
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "BB",
+      "country_name": "Barbados (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 16
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "BD",
+      "country_name": "Bangladesh (proposed) (see also administrative divisions)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 15
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6,
+        9
+      ],
+      "country_code": "BF",
+      "country_name": "Burkina Faso (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Départements/Communes"
+              ],
+              "subrow": 1,
+              "text": "Départements/Communes"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Urban sectors (only in cities, and in the capital town of other urban municipalities)"
+              ],
+              "subrow": 1,
+              "text": "Urban sectors (only in cities, and in the capital town of other urban municipalities)"
+            }
+          ],
+          "proposed": true,
+          "row": 28
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        5
+      ],
+      "country_code": "BG",
+      "country_name": "Bulgaria",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            5
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 5,
+              "segments": [
+                "Municipalities",
+                "общини)",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities общини) LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 27
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "BH",
+      "country_name": "Bahrain (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Municipality Example: Al Manamah, Ras Rumman etc"
+              ],
+              "subrow": 1,
+              "text": "Municipality Example: Al Manamah, Ras Rumman etc"
+            }
+          ],
+          "proposed": true,
+          "row": 14
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "BI",
+      "country_name": "Burundi (proposed by Arie Scheffer)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 6,
+              "segments": [
+                "Communes"
+              ],
+              "subrow": 1,
+              "text": "Communes"
+            }
+          ],
+          "proposed": true,
+          "row": 29
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "BN",
+      "country_name": "Brunei (proposed by User:Zulfadli51)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 26
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "BO",
+      "country_name": "Bolivia (proposed / in use)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "División administrativa de tercer nivel (Third-level administrative division):",
+                "→ Municipios, Territorio indígena originario campesinos (Municipalities, Indigenous originary campesino territories / Native community lands)"
+              ],
+              "subrow": 1,
+              "text": "División administrativa de tercer nivel (Third-level administrative division): → Municipios, Territorio indígena originario campesinos (Municipalities, Indigenous originary campesino territories / Native community lands)"
+            }
+          ],
+          "proposed": true,
+          "row": 22
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "BS",
+      "country_name": "Bahamas (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 13
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "BT",
+      "country_name": "Bhutan (proposed by ff5722)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 21
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "BW",
+      "country_name": "Botswana proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 24
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        10
+      ],
+      "country_code": "BY",
+      "country_name": "Belarus (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            10
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 10,
+              "segments": [
+                "Municipalities (населены пункт / населённый пункт)"
+              ],
+              "subrow": 1,
+              "text": "Municipalities (населены пункт / населённый пункт)"
+            }
+          ],
+          "proposed": true,
+          "row": 17
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "BZ",
+      "country_name": "Belize",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 19
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "CD",
+      "country_name": "Congo-Kinshasa (DRC) (proposed by clairedelune)",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Collectivité (secteur, chefferie, cité) / Commune"
+              ],
+              "subrow": 1,
+              "text": "Collectivité (secteur, chefferie, cité) / Commune"
+            }
+          ],
+          "proposed": true,
+          "row": 43
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "CF",
+      "country_name": "Central African Republic (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Communes?"
+              ],
+              "subrow": 1,
+              "text": "Communes?"
+            }
+          ],
+          "proposed": true,
+          "row": 34
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "CG",
+      "country_name": "Congo-Brazzaville proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 42
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "CI",
+      "country_name": "Côte d'Ivoire",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Commune (example: Yopougon)",
+                "place=municipality"
+              ],
+              "subrow": 1,
+              "text": "Commune (example: Yopougon) place=municipality"
+            }
+          ],
+          "proposed": false,
+          "row": 45
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "CM",
+      "country_name": "Cameroon",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Communes, like Melong. Use name=* to indicate the name of the commune"
+              ],
+              "subrow": 1,
+              "text": "Communes, like Melong. Use name=* to indicate the name of the commune"
+            }
+          ],
+          "proposed": false,
+          "row": 31
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        4
+      ],
+      "country_code": "CN",
+      "country_name": "China You'd better read China/Boundaries before editing. Maybe conflict with this table, please use that as standard",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "multirow_country_entry",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            4
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 4,
+              "segments": [
+                "Municipality / Province / Autonomous Region",
+                "省级行政区"
+              ],
+              "subrow": 1,
+              "text": "Municipality / Province / Autonomous Region 省级行政区"
+            }
+          ],
+          "proposed": false,
+          "row": 37
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "CR",
+      "country_name": "Costa Rica",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 44
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "CU",
+      "country_name": "Cuba (proposed by User:Ricky75, User:Carluti)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 47
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "CV",
+      "country_name": "Cape Verde proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 6,
+              "segments": [
+                "Municipalities"
+              ],
+              "subrow": 1,
+              "text": "Municipalities"
+            }
+          ],
+          "proposed": true,
+          "row": 33
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6,
+        7,
+        9
+      ],
+      "country_code": "CY",
+      "country_name": "Cyprus / Κύπρος / Kıbrıs",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            7,
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Municipalities & Community Clusters",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities & Community Clusters LAU"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Municipal Quarters"
+              ],
+              "subrow": 1,
+              "text": "Municipal Quarters"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Municipality Districts/ Parishes"
+              ],
+              "subrow": 1,
+              "text": "Municipality Districts/ Parishes"
+            }
+          ],
+          "proposed": false,
+          "row": 48
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "DJ",
+      "country_name": "Djibouti proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 51
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "DM",
+      "country_name": "Dominica proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 52
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6,
+        8
+      ],
+      "country_code": "DO",
+      "country_name": "Dominican Republic (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 6,
+              "segments": [
+                "Municipality (Municipio)"
+              ],
+              "subrow": 1,
+              "text": "Municipality (Municipio)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "District (Distrito municipal)"
+              ],
+              "subrow": 1,
+              "text": "District (Distrito municipal)"
+            }
+          ],
+          "proposed": true,
+          "row": 53
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6,
+        8
+      ],
+      "country_code": "DZ",
+      "country_name": "Algeria (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Daïras borders (group of municipalities or districts)"
+              ],
+              "subrow": 1,
+              "text": "Daïras borders (group of municipalities or districts)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Communes borders (municipalities). Use name=* to indicate the name of the commune, and ref:ONS=* to indicate the unique identifier given by ONS"
+              ],
+              "subrow": 1,
+              "text": "Communes borders (municipalities). Use name=* to indicate the name of the commune, and ref:ONS=* to indicate the unique identifier given by ONS"
+            }
+          ],
+          "proposed": true,
+          "row": 4
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "EC",
+      "country_name": "Ecuador (proposed by Temporalista)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 54
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "EG",
+      "country_name": "Egypt (proposed by Metehyi)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Municipal division"
+              ],
+              "subrow": 1,
+              "text": "Municipal division"
+            }
+          ],
+          "proposed": true,
+          "row": 55
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "EH",
+      "country_name": "Western Sahara (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Municipalities (الجماعات الحضرية)"
+              ],
+              "subrow": 1,
+              "text": "Municipalities (الجماعات الحضرية)"
+            }
+          ],
+          "proposed": true,
+          "row": 209
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "ER",
+      "country_name": "Eritrea proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 58
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "ET",
+      "country_name": "Ethiopia (proposed by Ukundji)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 61
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "FJ",
+      "country_name": "Fiji proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 62
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "FM",
+      "country_name": "Micronesia (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "Municipalities"
+              ],
+              "subrow": 1,
+              "text": "Municipalities"
+            }
+          ],
+          "proposed": true,
+          "row": 119
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "GA",
+      "country_name": "Gabon (proposed by johanemilsson)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 66
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "GD",
+      "country_name": "Grenada proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 72
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "GE",
+      "country_name": "Georgia (Details - Administrative Divisions of Georgia)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 6,
+              "segments": [
+                "Borders of municipalities"
+              ],
+              "subrow": 1,
+              "text": "Borders of municipalities"
+            }
+          ],
+          "proposed": false,
+          "row": 68
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "GG",
+      "country_name": "Guernsey (Bailiwick of) (in use)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 74
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "GH",
+      "country_name": "Ghana (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 70
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "GM",
+      "country_name": "Gambia (proposed by kalc 7 May 2017)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 67
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "GN",
+      "country_name": "Guinea (proposed / used)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Sub-prefectures (Communes)"
+              ],
+              "subrow": 1,
+              "text": "Sub-prefectures (Communes)"
+            }
+          ],
+          "proposed": true,
+          "row": 75
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "GQ",
+      "country_name": "Equatorial Guinea (proposed by johanemilsson)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 57
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "GT",
+      "country_name": "Guatemala (proposed by Esteban Ortiz 21 June 2009",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Municipal border (Municipios)"
+              ],
+              "subrow": 1,
+              "text": "Municipal border (Municipios)"
+            }
+          ],
+          "proposed": true,
+          "row": 73
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "GW",
+      "country_name": "Guinea-Bissau proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 76
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "GY",
+      "country_name": "Guyana proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 77
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "HN",
+      "country_name": "Honduras (proposed by Antonio Locandro 11 March 2014)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Municipios (Municipal Border)"
+              ],
+              "subrow": 1,
+              "text": "Municipios (Municipal Border)"
+            }
+          ],
+          "proposed": true,
+          "row": 80
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "HR",
+      "country_name": "Croatia (see Upravna podjela)'",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "cities/towns or municipalities",
+                "gradovi ili općine",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "cities/towns or municipalities gradovi ili općine LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 46
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "HT",
+      "country_name": "Haiti (Republic of) (proposed by Vsandre 15 January 2010",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "City and town border (communes) (Layer 2)"
+              ],
+              "subrow": 1,
+              "text": "City and town border (communes) (Layer 2)"
+            }
+          ],
+          "proposed": true,
+          "row": 78
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "ID",
+      "country_name": "Indonesia",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 84
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "IE",
+      "country_name": "Ireland",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 87
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "IL",
+      "country_name": "Israel Palestine",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 88
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "IN",
+      "country_name": "India (see also administrative divisions)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Municipal Corporation / Municipality / City Council"
+              ],
+              "subrow": 1,
+              "text": "Municipal Corporation / Municipality / City Council"
+            }
+          ],
+          "proposed": false,
+          "row": 83
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "IQ",
+      "country_name": "Iraq (proposed by johanemilsson, modified Øukasz",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 86
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "IR",
+      "country_name": "Iran",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "• City (شهر / Shahr)",
+                "• Municipality or rural agglomeration (دهستان / Dehestan)"
+              ],
+              "subrow": 1,
+              "text": "• City (شهر / Shahr) • Municipality or rural agglomeration (دهستان / Dehestan)"
+            }
+          ],
+          "proposed": false,
+          "row": 85
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "JE",
+      "country_name": "Jersey (Bailiwick of) (in use)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 92
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "JM",
+      "country_name": "Jamaica proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 90
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "JO",
+      "country_name": "Jordan",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 93
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "KE",
+      "country_name": "Kenya (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Local authorities & Divisions cities, municipalities, towns and counties (not to be confused with national counties admin_level=4)"
+              ],
+              "subrow": 1,
+              "text": "Local authorities & Divisions cities, municipalities, towns and counties (not to be confused with national counties admin_level=4)"
+            }
+          ],
+          "proposed": true,
+          "row": 95
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "KG",
+      "country_name": "Kyrgyzstan (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 99
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6,
+        8
+      ],
+      "country_code": "KH",
+      "country_name": "Cambodia (proposed by User:GeoMechain) See also Wikipedia",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Districts (ស្រុក srok), Sections (ខណ្ឌ khan), Municipalities (ក្រុង krong)"
+              ],
+              "subrow": 1,
+              "text": "Districts (ស្រុក srok), Sections (ខណ្ឌ khan), Municipalities (ក្រុង krong)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Communes (ឃុំ khum), Quarters (សង្កាត់ sangkat)"
+              ],
+              "subrow": 1,
+              "text": "Communes (ឃុំ khum), Quarters (សង្កាត់ sangkat)"
+            }
+          ],
+          "proposed": true,
+          "row": 30
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "KI",
+      "country_name": "Kiribati (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 96
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "KM",
+      "country_name": "Comoros proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "communes"
+              ],
+              "subrow": 1,
+              "text": "communes"
+            }
+          ],
+          "proposed": true,
+          "row": 41
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "KN",
+      "country_name": "Saint Kitts and Nevis (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 156
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "KP",
+      "country_name": "North Korea (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 138
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "KR",
+      "country_name": "South Korea (ROK) (proposed by namuori under discussion talk-ko Sep-2012)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "multirow_country_entry",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 173
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "KW",
+      "country_name": "Kuwait (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 98
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "KZ",
+      "country_name": "Kazakhstan proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 94
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "LA",
+      "country_name": "Laos (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 100
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6,
+        7
+      ],
+      "country_code": "LB",
+      "country_name": "Lebanon source [1])",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Federation of municipalities (إتحاد بلديات)"
+              ],
+              "subrow": 1,
+              "text": "Federation of municipalities (إتحاد بلديات)"
+            },
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 7,
+              "segments": [
+                "Municipality (بلدية)"
+              ],
+              "subrow": 1,
+              "text": "Municipality (بلدية)"
+            }
+          ],
+          "proposed": false,
+          "row": 102
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "LC",
+      "country_name": "Saint Lucia (proposed by Pierrick Blaise)",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 157
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "LI",
+      "country_name": "Liechtenstein (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "Gemeinde",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Gemeinde LAU"
+            }
+          ],
+          "proposed": true,
+          "row": 106
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "LK",
+      "country_name": "Sri Lanka (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Municipalities ?"
+              ],
+              "subrow": 1,
+              "text": "Municipalities ?"
+            }
+          ],
+          "proposed": true,
+          "row": 178
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "LR",
+      "country_name": "Liberia (proposed by Rafael Ávila Coya)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 104
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "LS",
+      "country_name": "Lesotho (proposed by Adrian Frith)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 103
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        5
+      ],
+      "country_code": "LT",
+      "country_name": "Lithuania",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            5
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 5,
+              "segments": [
+                "Municipalities",
+                "Savivaldybės / Rajonai",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Savivaldybės / Rajonai LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 107
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "LY",
+      "country_name": "Libya (proposed by Jano John Akim Franke)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 105
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "MA",
+      "country_name": "Morocco",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "multirow_country_entry",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Urban Communes (Municipalities) (البلديات) (الجماعات الحضرية)"
+              ],
+              "subrow": 1,
+              "text": "Urban Communes (Municipalities) (البلديات) (الجماعات الحضرية)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Rural Communes (الجماعات القروية)"
+              ],
+              "subrow": 2,
+              "text": "Rural Communes (الجماعات القروية)"
+            }
+          ],
+          "proposed": false,
+          "row": 124
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "MC",
+      "country_name": "Monaco (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "Commune"
+              ],
+              "subrow": 1,
+              "text": "Commune"
+            }
+          ],
+          "proposed": true,
+          "row": 121
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        4,
+        6,
+        7,
+        8
+      ],
+      "country_code": "MD",
+      "country_name": "Moldova (Republic of Moldova) (proposed by Moldovan_Merkator, Anatolie Golovco, Oleg_MD / in use)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            4,
+            6,
+            7,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 4,
+              "segments": [
+                "- Autonomous regions UTA Găgauzia and ATU from the left bank of the Dniester (UAT din stînga Nistrului)",
+                "- Districts (Raioane) [ex: Florești, Briceni, etc.]",
+                "- Second level Municipalities (Municipiile de nivelul II) Chișinău, Bălți and Bender"
+              ],
+              "subrow": 1,
+              "text": "- Autonomous regions UTA Găgauzia and ATU from the left bank of the Dniester (UAT din stînga Nistrului) - Districts (Raioane) [ex: Florești, Briceni, etc.] - Second level Municipalities (Municipiile de nivelul II) Chișinău, Bălți and Bender"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "First level Municipalities (Municipiile de nivelul I) [ex.: Orhei, Ungheni, etc.]"
+              ],
+              "subrow": 1,
+              "text": "First level Municipalities (Municipiile de nivelul I) [ex.: Orhei, Ungheni, etc.]"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Chișinău Municipality's sectors (Sectoarele Municipiului Chișinău) [ex.: Rîșcani, Buiucani, etc.]"
+              ],
+              "subrow": 1,
+              "text": "Chișinău Municipality's sectors (Sectoarele Municipiului Chișinău) [ex.: Rîșcani, Buiucani, etc.]"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "- Towns (Orașe) [ex.: Briceni, Glodeni, Dubăsari, etc.]",
+                "- Communes (Comune) [ex.: Larga, Crocmaz, etc.]",
+                "- Villages that do not form a commune (Satele care nu formează o comună) [ex.: Talmaza, Copanca, Bocani, etc.]"
+              ],
+              "subrow": 1,
+              "text": "- Towns (Orașe) [ex.: Briceni, Glodeni, Dubăsari, etc.] - Communes (Comune) [ex.: Larga, Crocmaz, etc.] - Villages that do not form a commune (Satele care nu formează o comună) [ex.: Talmaza, Copanca, Bocani, etc.]"
+            }
+          ],
+          "proposed": true,
+          "row": 120
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "ME",
+      "country_name": "Montenegro (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 6,
+              "segments": [
+                "Municipalities",
+                "opštine / општине",
+                "(ex LAU 1)"
+              ],
+              "subrow": 1,
+              "text": "Municipalities opštine / општине (ex LAU 1)"
+            }
+          ],
+          "proposed": true,
+          "row": 123
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "MG",
+      "country_name": "Madagascar (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Kaominina (communes)"
+              ],
+              "subrow": 1,
+              "text": "Kaominina (communes)"
+            }
+          ],
+          "proposed": true,
+          "row": 109
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "MH",
+      "country_name": "Marshall Islands (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Atolls (municipalities"
+              ],
+              "subrow": 1,
+              "text": "Atolls (municipalities"
+            }
+          ],
+          "proposed": true,
+          "row": 115
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "MK",
+      "country_name": "North Macedonia (proposed by User:borces) (see also mk:Административна поделба на Македонија)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 7,
+              "segments": [
+                "Municipalities",
+                "Општини",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Општини LAU"
+            }
+          ],
+          "proposed": true,
+          "row": 139
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "ML",
+      "country_name": "Mali (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "Commune"
+              ],
+              "subrow": 1,
+              "text": "Commune"
+            }
+          ],
+          "proposed": true,
+          "row": 113
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "MM",
+      "country_name": "Myanmar (proposed) (see Administrative divisions of Myanmar)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 127
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "MN",
+      "country_name": "Mongolia (in use) (see administrative divisions)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 122
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        9
+      ],
+      "country_code": "MR",
+      "country_name": "Mauritania (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 9,
+              "segments": [
+                "Communes"
+              ],
+              "subrow": 1,
+              "text": "Communes"
+            }
+          ],
+          "proposed": true,
+          "row": 116
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "MT",
+      "country_name": "Malta (in use)",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 114
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "MU",
+      "country_name": "Mauritius (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 117
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "MV",
+      "country_name": "Maldives (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 112
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "MW",
+      "country_name": "Malawi (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 110
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        10
+      ],
+      "country_code": "MY",
+      "country_name": "Malaysia",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            10
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 10,
+              "segments": [
+                "kampung, taman, dll (municipalities, including townships, cities, villages, etc.)"
+              ],
+              "subrow": 1,
+              "text": "kampung, taman, dll (municipalities, including townships, cities, villages, etc.)"
+            }
+          ],
+          "proposed": false,
+          "row": 111
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "MZ",
+      "country_name": "Mozambique (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 126
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "NA",
+      "country_name": "Namibia (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "Municipalities"
+              ],
+              "subrow": 1,
+              "text": "Municipalities"
+            }
+          ],
+          "proposed": true,
+          "row": 128
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "NE",
+      "country_name": "Niger (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 8,
+              "segments": [
+                "Communes"
+              ],
+              "subrow": 1,
+              "text": "Communes"
+            }
+          ],
+          "proposed": true,
+          "row": 136
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "NG",
+      "country_name": "Nigeria (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 137
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "NI",
+      "country_name": "Nicaragua (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 135
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "NP",
+      "country_name": "Nepal",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 7,
+              "segments": [
+                "Municipalities",
+                "Rural municipalities, Municipalities, Sub metropolitans and Metropolitans (Nepali: गाउँपालिका,नगरपालिका, उप-महानगरपालिका, महानगरपालिका)"
+              ],
+              "subrow": 1,
+              "text": "Municipalities Rural municipalities, Municipalities, Sub metropolitans and Metropolitans (Nepali: गाउँपालिका,नगरपालिका, उप-महानगरपालिका, महानगरपालिका)"
+            }
+          ],
+          "proposed": false,
+          "row": 130
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "NR",
+      "country_name": "Nauru (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 129
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "OM",
+      "country_name": "Oman (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 141
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "PA",
+      "country_name": "Panama",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 144
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "PG",
+      "country_name": "Papua New Guinea (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 145
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "PK",
+      "country_name": "Pakistan (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 142
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "PW",
+      "country_name": "Palau (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 143
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "PY",
+      "country_name": "Paraguay",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "municipal, city limits",
+                "municipalidades / distritos"
+              ],
+              "subrow": 1,
+              "text": "municipal, city limits municipalidades / distritos"
+            }
+          ],
+          "proposed": false,
+          "row": 146
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        4
+      ],
+      "country_code": "QA",
+      "country_name": "Qatar (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            4
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 4,
+              "segments": [
+                "Municipalities (baladiyah مدينة)"
+              ],
+              "subrow": 1,
+              "text": "Municipalities (baladiyah مدينة)"
+            }
+          ],
+          "proposed": true,
+          "row": 151
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "RS",
+      "country_name": "Serbia (agreed) (see Administrative division or Statistical regions for possible future division)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Municipalities and urban municipalities",
+                "општине и градске општине",
+                "LAU"
+              ],
+              "subrow": 1,
+              "text": "Municipalities and urban municipalities општине и градске општине LAU"
+            }
+          ],
+          "proposed": false,
+          "row": 164
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        5,
+        6,
+        8,
+        9
+      ],
+      "country_code": "RU",
+      "country_name": "Russia (Russian Federation) (details)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "multirow_country_entry",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            5,
+            6,
+            8,
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 5,
+              "segments": [
+                "Groups of municipal districts / urban okrugs, administrative okrugs / districts of federal cities"
+              ],
+              "subrow": 1,
+              "text": "Groups of municipal districts / urban okrugs, administrative okrugs / districts of federal cities"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Municipal districts and okrugs of federal subjects (except federal cities), urban okrugs, including ZATO and urban okrugs with intracity division"
+              ],
+              "subrow": 1,
+              "text": "Municipal districts and okrugs of federal subjects (except federal cities), urban okrugs, including ZATO and urban okrugs with intracity division"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Urban and rural municipalities, municipal intra-city territories of federal cities, districts of urban okrugs with intracity division"
+              ],
+              "subrow": 1,
+              "text": "Urban and rural municipalities, municipal intra-city territories of federal cities, districts of urban okrugs with intracity division"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Districts and other administrative-territorial units of urban and municipal okrugs"
+              ],
+              "subrow": 1,
+              "text": "Districts and other administrative-territorial units of urban and municipal okrugs"
+            }
+          ],
+          "proposed": false,
+          "row": 153
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "RW",
+      "country_name": "Rwanda (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "In use: Municipalities ?"
+              ],
+              "subrow": 1,
+              "text": "In use: Municipalities ?"
+            }
+          ],
+          "proposed": true,
+          "row": 155
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        9
+      ],
+      "country_code": "SA",
+      "country_name": "Saudi Arabia (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": true,
+              "issue": null,
+              "level": 9,
+              "segments": [
+                "Municipalities (بلدية)"
+              ],
+              "subrow": 1,
+              "text": "Municipalities (بلدية)"
+            }
+          ],
+          "proposed": true,
+          "row": 162
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "SB",
+      "country_name": "Solomon Islands (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 170
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "SC",
+      "country_name": "Seychelles (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 165
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        9
+      ],
+      "country_code": "SD",
+      "country_name": "Sudan (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Municipalities ?"
+              ],
+              "subrow": 1,
+              "text": "Municipalities ?"
+            }
+          ],
+          "proposed": true,
+          "row": 179
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "SG",
+      "country_name": "Singapore (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 167
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        5
+      ],
+      "country_code": "SL",
+      "country_name": "Sierra Leone (proposed by IndoFio)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            5
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 5,
+              "segments": [
+                "borders of 12 administrative districts, 6 municipalities (including Freetown) and Western Area Rural"
+              ],
+              "subrow": 1,
+              "text": "borders of 12 administrative districts, 6 municipalities (including Freetown) and Western Area Rural"
+            }
+          ],
+          "proposed": true,
+          "row": 166
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "SM",
+      "country_name": "San Marino (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_suffix_not_closed_translation_or_lau",
+              "level": 8,
+              "segments": [
+                "Municipalities",
+                "castelli]]"
+              ],
+              "subrow": 1,
+              "text": "Municipalities castelli]]"
+            }
+          ],
+          "proposed": true,
+          "row": 160
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8,
+        9
+      ],
+      "country_code": "SN",
+      "country_name": "Senegal (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8,
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "boundary of communes like Dakar, Tambacounda, Ziguinchor...see a list here or rural communities"
+              ],
+              "subrow": 1,
+              "text": "boundary of communes like Dakar, Tambacounda, Ziguinchor...see a list here or rural communities"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "boundary of \"Arrondissement municipal\""
+              ],
+              "subrow": 1,
+              "text": "boundary of \"Arrondissement municipal\""
+            }
+          ],
+          "proposed": true,
+          "row": 163
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "SO",
+      "country_name": "Somalia (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 171
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "SR",
+      "country_name": "Suriname (proposed by Pander)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Ressorten (resorts approximately equivalent to municipalities)"
+              ],
+              "subrow": 1,
+              "text": "Ressorten (resorts approximately equivalent to municipalities)"
+            }
+          ],
+          "proposed": true,
+          "row": 180
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "SS",
+      "country_name": "South Sudan (proposed by clairedelune)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 175
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7
+      ],
+      "country_code": "ST",
+      "country_name": "Sao Tome and Principe (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Municipalities ?"
+              ],
+              "subrow": 1,
+              "text": "Municipalities ?"
+            }
+          ],
+          "proposed": true,
+          "row": 161
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "SV",
+      "country_name": "El Salvador (proposed by AragonChristopherR17z)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 56
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "SY",
+      "country_name": "Syria",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Cities, towns and villages of SubdistrictDamascus Municipalities",
+                "بلدية",
+                "baladiyah"
+              ],
+              "subrow": 1,
+              "text": "Cities, towns and villages of SubdistrictDamascus Municipalities بلدية baladiyah"
+            }
+          ],
+          "proposed": false,
+          "row": 183
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "SZ",
+      "country_name": "Eswatini (proposed by Adrian Frith)",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 60
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "TD",
+      "country_name": "Chad (proposed by Pete Masters) See also Wikipedia",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 35
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        4,
+        7,
+        8
+      ],
+      "country_code": "TG",
+      "country_name": "Togo (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            4,
+            7,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 4,
+              "segments": [
+                "Région",
+                "Commune de Lomé (statut particulier)"
+              ],
+              "subrow": 1,
+              "text": "Région Commune de Lomé (statut particulier)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Commune (sauf Lomé)"
+              ],
+              "subrow": 1,
+              "text": "Commune (sauf Lomé)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Arrondissement municipal"
+              ],
+              "subrow": 1,
+              "text": "Arrondissement municipal"
+            }
+          ],
+          "proposed": true,
+          "row": 189
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7,
+        9
+      ],
+      "country_code": "TH",
+      "country_name": "Thailand See also Thailand administrative levels",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7,
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "→ Subdistrict Administrative Organization (SAO) / องค์การบริหารส่วนตําบล (อบต.)",
+                "→ City Municipality / เทศบาลนคร",
+                "→ Town Municipality / เทศบาลเมือง",
+                "→ Subdistrict Municipality / เทศบาลตําบล",
+                "→ Pattaya City / เมืองพัทยา"
+              ],
+              "subrow": 1,
+              "text": "→ Subdistrict Administrative Organization (SAO) / องค์การบริหารส่วนตําบล (อบต.) → City Municipality / เทศบาลนคร → Town Municipality / เทศบาลเมือง → Subdistrict Municipality / เทศบาลตําบล → Pattaya City / เมืองพัทยา"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Khwaeng / แขวง (in municipality)"
+              ],
+              "subrow": 1,
+              "text": "Khwaeng / แขวง (in municipality)"
+            }
+          ],
+          "proposed": false,
+          "row": 187
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "TJ",
+      "country_name": "Tajikistan (proposed by Maailma)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 185
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        4
+      ],
+      "country_code": "TL",
+      "country_name": "Timor-Leste (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            4
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 4,
+              "segments": [
+                "Municipalities (pt:município, tet:munisípiu)"
+              ],
+              "subrow": 1,
+              "text": "Municipalities (pt:município, tet:munisípiu)"
+            }
+          ],
+          "proposed": true,
+          "row": 188
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        7,
+        9
+      ],
+      "country_code": "TM",
+      "country_name": "Turkmenistan (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            7,
+            9
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "Municipal Boroughs with mayors / Şäheryň häkimli uly etraplary / Крупные городские районы с мэром (e.g., Awaza)"
+              ],
+              "subrow": 1,
+              "text": "Municipal Boroughs with mayors / Şäheryň häkimli uly etraplary / Крупные городские районы с мэром (e.g., Awaza)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 9,
+              "segments": [
+                "Municipal Districts / Şäheryň kiçi etraplary (etrapçalary) / Микрорайоны (e.g., Parahat 7)"
+              ],
+              "subrow": 1,
+              "text": "Municipal Districts / Şäheryň kiçi etraplary (etrapçalary) / Микрорайоны (e.g., Parahat 7)"
+            }
+          ],
+          "proposed": true,
+          "row": 194
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "TN",
+      "country_name": "Tunisia",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 192
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "TO",
+      "country_name": "Tonga (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 190
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "TR",
+      "country_name": "Turkey See NUTS as well",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 193
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        4
+      ],
+      "country_code": "TT",
+      "country_name": "Trinidad and Tobago (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            4
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 4,
+              "segments": [
+                "Regional corporations / Municipalities / Ward"
+              ],
+              "subrow": 1,
+              "text": "Regional corporations / Municipalities / Ward"
+            }
+          ],
+          "proposed": true,
+          "row": 191
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "TV",
+      "country_name": "Tuvalu (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 195
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        4
+      ],
+      "country_code": "TW",
+      "country_name": "Taiwan (Rep. of China)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            4
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 4,
+              "segments": [
+                "Municipality 直轄市; Provintial municipality 省轄市; County 縣"
+              ],
+              "subrow": 1,
+              "text": "Municipality 直轄市; Provintial municipality 省轄市; County 縣"
+            }
+          ],
+          "proposed": false,
+          "row": 184
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "TZ",
+      "country_name": "Tanzania (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 186
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "UA",
+      "country_name": "Ukraine (details) The admin_level values listed here are deprecated and not recommended for use. The Ukrainian community is currently discussing a new tagging scheme.",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 197
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "UG",
+      "country_name": "Uganda",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": false,
+          "row": 196
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "UY",
+      "country_name": "Uruguay (proposed by Zeroth)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 204
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "UZ",
+      "country_name": "Uzbekistan (proposed by User:Uzbekistaan)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 205
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "VA",
+      "country_name": "Holy See (Vatican City) proposed",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 79
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "VC",
+      "country_name": "Saint Vincent (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 158
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "VE",
+      "country_name": "Venezuela",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Second-level administrative division:",
+                "→ Municipality (Municipio)"
+              ],
+              "subrow": 1,
+              "text": "Second-level administrative division: → Municipality (Municipio)"
+            }
+          ],
+          "proposed": false,
+          "row": 207
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_code": "VN",
+      "country_name": "Vietnam",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Commune (phường), ward (xã), special administrative region (đặc khu)"
+              ],
+              "subrow": 1,
+              "text": "Commune (phường), ward (xã), special administrative region (đặc khu)"
+            }
+          ],
+          "proposed": false,
+          "row": 208
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6,
+        8
+      ],
+      "country_code": "VU",
+      "country_name": "Vanuatu (proposed by Øukasz (talk) 17 November 2018 )",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "Area (sometimes referred to as Area Council. Municipalities of Port Vila and Luganville are their own Areas)"
+              ],
+              "subrow": 1,
+              "text": "Area (sometimes referred to as Area Council. Municipalities of Port Vila and Luganville are their own Areas)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Ward (subdivision of Municipalities, and in some cases former Municipalities)"
+              ],
+              "subrow": 1,
+              "text": "Ward (subdivision of Municipalities, and in some cases former Municipalities)"
+            }
+          ],
+          "proposed": true,
+          "row": 206
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "WS",
+      "country_name": "Samoa (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 159
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "YE",
+      "country_name": "Yemen (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 210
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        6,
+        7,
+        8
+      ],
+      "country_code": "ZA",
+      "country_name": "South Africa",
+      "curated_levels": null,
+      "review_reasons": [
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            6,
+            7,
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 6,
+              "segments": [
+                "district borders (borders of district municipalities and metropolitan municipalities)"
+              ],
+              "subrow": 1,
+              "text": "district borders (borders of district municipalities and metropolitan municipalities)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 7,
+              "segments": [
+                "N/A",
+                "Proposed change to municipal borders (borders of local municipalities within districts) (proposed by Ian Coetzee on 4 December 2021)"
+              ],
+              "subrow": 1,
+              "text": "N/A Proposed change to municipal borders (borders of local municipalities within districts) (proposed by Ian Coetzee on 4 December 2021)"
+            },
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "municipal borders (borders of local municipalities within districts)",
+                "Proposed change to city/town borders (proposed by Ian Coetzee on 4 December 2021)"
+              ],
+              "subrow": 1,
+              "text": "municipal borders (borders of local municipalities within districts) Proposed change to city/town borders (proposed by Ian Coetzee on 4 December 2021)"
+            }
+          ],
+          "proposed": false,
+          "row": 172
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [],
+      "country_code": "ZM",
+      "country_name": "Zambia (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "no_municipal_evidence",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [],
+          "evidence": [],
+          "proposed": true,
+          "row": 211
+        }
+      ],
+      "status": "review"
+    },
+    {
+      "candidate_levels": [
+        8
+      ],
+      "country_code": "ZW",
+      "country_name": "Zimbabwe (proposed)",
+      "curated_levels": null,
+      "review_reasons": [
+        "country_label_annotation",
+        "multiple_municipal_tiers_or_cells",
+        "non_simple_municipal_cell",
+        "proposed_country_row"
+      ],
+      "selector_profile": null,
+      "source_rows": [
+        {
+          "candidate_levels": [
+            8
+          ],
+          "evidence": [
+            {
+              "clear_phrase": false,
+              "issue": "cell_phrase_not_exact",
+              "level": 8,
+              "segments": [
+                "Municipalities ?"
+              ],
+              "subrow": 1,
+              "text": "Municipalities ?"
+            }
+          ],
+          "proposed": true,
+          "row": 212
+        }
+      ],
+      "status": "review"
+    }
+  ],
+  "schema_version": 1,
+  "source": {
+    "caption": "Overview of administrative subdivisions of states",
+    "revision": 3104571,
+    "sha256": "be7b97da694aba12a13e6e50bab4905fc837a78d54447112b46aeb8278d8934d",
+    "url": "https://wiki.openstreetmap.org/wiki/Template:Admin_level"
+  },
+  "summary": {
+    "candidate_count": 3,
+    "curated_count": 34,
+    "review_count": 161,
+    "source_group_count": 199,
+    "unresolved_count": 1
+  },
+  "unresolved": [
+    {
+      "candidate_levels": [
+        6
+      ],
+      "country_label": "Kosovo (proposed/used, proposed by MarcRKS & bardhazizi)",
+      "evidence": [
+        {
+          "clear_phrase": true,
+          "issue": null,
+          "level": 6,
+          "segments": [
+            "Municipalities",
+            "Komunat e Kosovës",
+            "LAU"
+          ],
+          "subrow": 1,
+          "text": "Municipalities Komunat e Kosovës LAU"
+        }
+      ],
+      "reason": "unmatched_cldr_name",
+      "source_row": 97
+    }
+  ]
+}
