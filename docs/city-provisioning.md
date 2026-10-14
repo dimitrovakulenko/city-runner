@@ -1,6 +1,6 @@
 # Activity-triggered city provisioning
 
-Worldwide availability is a product requirement. Geography is indexed on demand, shared across accounts: the first retained recorded activity in Antwerp requests Antwerp, without operator-supplied city IDs. This replaces manual town onboarding; it does not require a planet database on a developer laptop. A country policy, valid OSM boundary and complete extract must exist before its city can report completion. Unsupported places and provider failures remain explicit; this development adapter is not worldwide release acceptance.
+The initial geographic target is Europe and the US. Remaining planned feature implementation takes priority; resume country-policy expansion and regional validation afterwards. Worldwide expansion is deferred. Geography is indexed on demand, shared across accounts: the first retained recorded activity in Antwerp requests Antwerp, without operator-supplied city IDs. This replaces manual town onboarding; it does not require a planet database on a developer laptop. A country policy, valid OSM boundary and complete extract must exist before its city can report completion. Unsupported places and provider failures remain explicit; this development adapter does not establish complete Europe and US release acceptance.
 
 ## Discovery and privacy
 
