@@ -89,7 +89,6 @@ try {
     await copyRow.getByRole('button', { name: /delete/i }).click();
     const deletion = board.getByRole('dialog');
     await deletion.getByRole('textbox').fill('DELETE');
-    await deletion.getByRole('textbox').press('Tab');
     const [deleted] = await Promise.all([
       board.waitForResponse((response) => response.url().endsWith(`/api/v1/dashboard/${copyId}`) && response.request().method() === 'DELETE'),
       deletion.getByRole('button', { name: /delete/i }).click({ force: true }),
