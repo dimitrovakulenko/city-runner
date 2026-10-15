@@ -4,10 +4,11 @@ import unittest
 from unittest.mock import patch
 
 import httpx
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
 from fastapi.testclient import TestClient
 
 from services.analytics.gateway import COOKIE, create_app
+from services.analytics.proxy import AuthoringProxy, Identity
 
 
 class AuthoringGatewayTests(unittest.TestCase):
@@ -85,6 +86,26 @@ class AuthoringGatewayTests(unittest.TestCase):
         app, mocked = self.gateway(startup_failure=True)
         with mocked, self.assertRaises(HTTPException), TestClient(app):
             self.fail("Unreconciled gateway started.")
+
+
+class NavigationAbortTests(unittest.IsolatedAsyncioTestCase):
+    async def test_abort_before_upstream_clears_admission_without_fencing(self):
+        events = []
+        async def resolve(token):
+            return Identity("synthetic-owner", "one")
+        async def record(*args):
+            events.append(args)
+        async def disconnected():
+            return {"type": "http.disconnect"}
+        boundary = AuthoringProxy(resolve=resolve, fence=record, admit=record, finish=record,
+            check_origin=lambda _: None, cookie="session", upstream="http://unused.invalid", public_origin="http://127.0.0.1:8091")
+        request = Request({"type": "http", "method": "GET", "headers": [], "path": "/api/v1/database/1/table_metadata/extra/", "query_string": b""}, disconnected)
+        with patch("services.analytics.proxy.httpx.AsyncClient", side_effect=AssertionError("No upstream dispatch allowed")):
+            response = await boundary.proxy("api/v1/database/1/table_metadata/extra/", request)
+        self.assertEqual(response.status_code, 499)
+        self.assertEqual(len(events), 2)  # admission and completion; no failure fence
+        self.assertFalse(boundary.blocked)
+        self.assertFalse(boundary.active)
 
 
 if __name__ == "__main__":

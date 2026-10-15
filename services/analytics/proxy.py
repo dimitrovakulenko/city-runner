@@ -13,6 +13,7 @@ from urllib.parse import urlsplit
 import httpx
 from fastapi import HTTPException, Request
 from fastapi.responses import Response
+from starlette.requests import ClientDisconnect
 
 REQUEST_CAP = 1024 * 1024
 RESPONSE_CAP = 8 * 1024 * 1024
@@ -122,15 +123,19 @@ class AuthoringProxy:
             if not asset:
                 await self.block(account, "outer_deadline")
             return Response(status_code=504, headers={"Cache-Control": "no-store"})
+        except asyncio.CancelledError:
+            if not asset:
+                await asyncio.shield(self.block(account, "dispatched_request_cancelled"))
+            raise
         except HTTPException as error:
             if error.status_code in (401, 409):
                 return Response(status_code=error.status_code, headers={"Cache-Control": "no-store"})
             if not asset:
                 await self.block(account, "admission_or_authentication_failed")
             return Response(status_code=503, headers={"Cache-Control": "no-store"})
-        except Exception:
+        except Exception as error:
             if not asset:
-                await self.block(account, "unexpected_boundary_failure")
+                await self.block(account, "unexpected_" + type(error).__name__)
             return Response(status_code=503, headers={"Cache-Control": "no-store"})
         finally:
             if not asset:
@@ -145,10 +150,15 @@ class AuthoringProxy:
     async def upstream(self, path, request, token, identity, started, asset):
         account = identity.owner
         body = bytearray()
-        async for chunk in request.stream():
-            if len(body) + len(chunk) > REQUEST_CAP:
-                return Response(status_code=413)
-            body.extend(chunk)
+        try:
+            async for chunk in request.stream():
+                if len(body) + len(chunk) > REQUEST_CAP:
+                    return Response(status_code=413)
+                body.extend(chunk)
+        except ClientDisconnect:
+            # Nothing has been sent upstream; a page navigation may abort an
+            # introspection request here. Clear its admission without fencing.
+            return Response(status_code=499)
         headers = {key: value for key, value in request.headers.items() if not key.lower().startswith(("x-forwarded-", "x-city-runner-")) and key.lower() not in {
             "host", "connection", "authorization", "x-city-runner-account", "remote-user",
             "forwarded", "cookie", "accept-encoding", "x-analytics-secret", "proxy-authorization", "x-remote-user",
