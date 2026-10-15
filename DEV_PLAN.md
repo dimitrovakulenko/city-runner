@@ -8,7 +8,7 @@ Owner direction on 14 October 2026: complete the remaining planned features firs
 
 Continue dependency-ready feature tasks from the D backlog below. Web functionality remains this team's focus; native execution belongs to the separate device team. Provider approvals/access and deployment retain their existing gates. Historical execution records below describe what was verified at the time, not the current geographic priority.
 
-Owner-selected next feature: Superset personal analytics, D43–D47/T23/CR-23, following [the implementation plan](docs/superset-analytics.md). D43's two-account full-authoring/isolation pilot is verified locally and in hosted CI (`579925f`); D44 datasets/publication are in progress and D45–D47 identity/lifecycle/Insights/operational acceptance remain pending. Provider registration and private issue reporting are postponed. Remind the owner about Strava/Garmin registration after three further completed implementation tasks (1/3; documentation-only work does not count).
+Owner-selected next feature: Superset personal analytics, D43–D47/T23/CR-23, following [the implementation plan](docs/superset-analytics.md). D43's two-account full-authoring/isolation pilot is verified locally and in hosted CI (`579925f`); D44 datasets/publication are verified (`203a3ca`, `331a831`); D45 identity/lifecycle is in progress and D46–D47 remain pending. Provider registration and private issue reporting are postponed. Remind the owner about Strava/Garmin registration after three further completed implementation tasks (2/3; documentation-only work does not count).
 
 ## Execution record
 
@@ -43,6 +43,8 @@ Owner-selected next feature: Superset personal analytics, D43–D47/T23/CR-23, f
 | D37 | Partial: reviewed browser account data, filters, map controls, activity impact, discovery, imports and planner verified | `79b5867`, `c3c977d`, `5154077`, `cf838ff`, earlier browser commits; [browser client](apps/web/README.md); real activities/map/cities/corrections, per-run contribution results, completion sorting, nearly-done filter, map street details and Node Hunter, resumable GPX/FIT imports, per-import provenance/removal and saved-route planning; 25 web unit/adapter tests, typecheck/build, 27 production Chrome flows and public automatic-Antwerp verification; provider connections, real Google consent and desktop packages remain open |
 
 | D43 | Done: reviewed exact-version full-authoring pilot verified | `9e83b19`, `579925f`; [hosted CI](https://github.com/dimitrovakulenko/city-runner/actions/runs/38740305743), [plan/evidence](docs/superset-analytics.md); two-account Chrome SQL/chart/board save/reopen, 138 privacy, 25 bounds, 5 fault-recovery checks; selected isolated projections after measured live-view advisory-lock collision |
+
+| D44 | Done: reviewed bounded datasets and atomic publication verified | `203a3ca`, `331a831`; [dataset contract](docs/analytics-datasets.md), [hosted CI](https://github.com/dimitrovakulenko/city-runner/actions/runs/38742930993); 15 new PostGIS tests / 177 integration checks, logical statistics/history parity, provider exclusion, fixed RLS, nonblocking refresh reads, source/deletion races and final validation fences |
 
 Other D tasks remain todo. The coordinator owns these status updates.
 
