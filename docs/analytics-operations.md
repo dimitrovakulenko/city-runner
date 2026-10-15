@@ -37,8 +37,28 @@ Recovery verifies that owner database work has stopped, clears interrupted admis
 
 Account export includes `data/analytics.json`: private board/chart/query/editor/dataset definitions, calculated columns/metrics and the default/region mapping. Connection credentials, result caches and session digests are excluded. Account deletion immediately revokes source sessions and fences reads. The durable registry survives account deletion; cleanup terminates the exact owner's work, drops its login/projected rows and removes Superset objects/identity. Only verified cleanup across stores allows the existing deletion receipt to become complete. Failed cleanup remains retryable. Superset serializes integration mutations per owner and commits a permanent hash-only deletion tombstone, so a timed-out provisioner cannot recreate deleted metadata.
 
-Back up the application database, originals, deletion ledger, analytics database, Superset metadata and server secrets together. Preserve the deletion ledger independently of database backup age. During restore, keep app/worker/gateway traffic stopped, restore all databases/volumes/secrets, then run `python -m backend.app.account_data --restore` in the configured application image. This force-replays the ledger, drains cleanup, and verifies primary rows, originals, projection rows/logins/requests and Superset identities/connections. A failed verification blocks reopening traffic. Restore an old Superset backup only while traffic is fenced; replay must remove tombstoned objects before serving it.
+Back up the application database, originals, deletion ledger, analytics database, Superset metadata and server secrets together. Preserve the deletion ledger independently of database backup age. During restore, keep app/worker/gateway traffic stopped. Restore the primary database and stable server secrets first. Create the empty isolated analytics/metadata databases with their configured owners, then run `python -m backend.app.analytics_worker --prepare-restore` in the configured application image. This recreates deterministic owner roles needed by the old analytics policies and ACLs, including roles removed by a later account deletion. Restore the analytics dump with its policies/ACLs and restore Superset metadata as the configured metadata role (`pg_restore --role superset_meta --no-owner` in the sample stack). Restore originals, retain the latest deletion ledger, and start Superset only on its internal network so cleanup can reach it. Then run `python -m backend.app.account_data --restore` in the configured application image. This force-replays the ledger, drains cleanup, and verifies primary rows, originals, projection rows/logins/requests and Superset identities/connections. A failed verification blocks reopening traffic. Restore an old Superset backup only while traffic is fenced; replay must remove tombstoned objects before serving it.
 
 For a Superset upgrade, back up metadata and rehearse on disposable copies first. Run native `superset db upgrade` and `superset init`; repeat both pilot privacy/bounds/browser suites and the application handoff/export/delete/restore suites on the candidate image. Review `security.py`, `editor_state.py`, `query_boundary.py` and metadata cleanup against that exact release. Rebuild with the previous pinned digest and restore its metadata backup to roll back. Do not automatically upgrade the image tag.
 
-Application acceptance is still in progress; measured capacity, restore and upgrade reports must be recorded before D47 is marked verified.
+## Disposable acceptance
+
+Use a dedicated loopback PostGIS admin database, never the application or private PoC database. The harness creates its own empty source database, isolated service project, synthetic originals and secrets; `finally` removes that project, its volumes, the generated database and temporary credentials.
+
+```sh
+SUPERSET_PROBE_ADMIN_DATABASE_URL=postgresql+psycopg://postgres:DISPOSABLE_PASSWORD@127.0.0.1:55447/postgres \
+  python scripts/superset/application_acceptance.py --capacity --recovery --output /tmp/analytics-acceptance
+```
+
+This runs two-owner native browser authoring and session races, a 5,000-activity/five-million-sample mixed SQL/map/import workload, actual query timeout/stop, a killed gateway with durable-admission recovery, API/Superset/worker restart, and backup restore followed by deletion-journal verification. The large account archive is outside the capacity claim; the existing 512 MiB export limit remains explicit.
+
+`upgrade-compose.yaml` layers a pinned 6.0.0 offline initializer over the disposable pilot, populates two private owners' saved queries/charts/boards, then migrates to pinned 6.1.0 and verifies preservation. Run privacy and native browser authoring against the migrated store before removing it:
+
+```sh
+docker compose -p city-runner-superset-upgrade -f scripts/superset/compose.yaml -f scripts/superset/upgrade-compose.yaml up -d --build --wait --wait-timeout 240
+SUPERSET_PROBE_ORIGIN=http://127.0.0.1:18090 SUPERSET_PROBE_PROJECT=city-runner-superset-upgrade python scripts/superset/probe.py --output /tmp/upgrade-privacy.json
+SUPERSET_PROBE_ORIGIN=http://127.0.0.1:18090 node scripts/superset/browser_probe.mjs --output /tmp/upgrade-browser.json
+docker compose -p city-runner-superset-upgrade -f scripts/superset/compose.yaml -f scripts/superset/upgrade-compose.yaml down -v
+```
+
+Local measured evidence is recorded with the implementation checkpoint in `docs/benchmarks/d45-*.json`, `d46-*.json` and `d47-*.json`. These synthetic local measurements do not establish a fleet SLA. Hosted application and upgrade jobs repeat the clean acceptance independently of the original pilot bounds regression.

@@ -48,7 +48,7 @@ class Recovery:
             owner = "superset_meta" if name == "superset_meta" else "postgres"
             self.run([*self.compose, "exec", "-T", "analytics-postgres", "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
                 "-c", f"DROP DATABASE {name} WITH (FORCE)", "-c", f"CREATE DATABASE {name} OWNER {owner}"])
-        self.run([*self.compose, "run", "--rm", "--no-deps", "-T", "app", "python", "scripts/superset/recovery_fixture.py", "restore-roles"])
+        self.run([*self.compose, "run", "--rm", "--no-deps", "-T", "app", "python", "-m", "backend.app.analytics_worker", "--prepare-restore"])
         for name in ("analytics", "superset_meta"):
             with (self.directory / f"{name}.dump").open("rb") as file:
                 role = ["--role", "superset_meta"] if name == "superset_meta" else []

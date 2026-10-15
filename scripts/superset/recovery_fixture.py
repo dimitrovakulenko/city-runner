@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from backend.app.account_data import verify_account_deletions
 from backend.app.analytics_api import private_call
 from backend.app.analytics_config import AnalyticsConfig
-from backend.app.analytics_store import initialize_store, owner_key, provision_role, role_name
+from backend.app.analytics_store import owner_key, role_name
 from backend.app.analytics_worker import recover_owner
 from backend.app.storage import LocalObjectStore
 
@@ -31,16 +31,6 @@ def main():
         with config.store.begin() as db:
             db.exec_driver_sql("CREATE OR REPLACE FUNCTION analytics.acceptance_slow(seconds double precision) RETURNS integer LANGUAGE sql AS $$ SELECT 1 FROM pg_sleep(least(seconds,30)) $$")
         print(json.dumps({"prepared": True}))
-    elif mode == "restore-roles":
-        # Traffic is stopped. Recreate deterministic credentials before restoring
-        # old table ACLs/policies, including the role dropped by account deletion.
-        initialize_store(config.store, config.secret)
-        with engine.connect() as db:
-            owners = db.execute(text("SELECT owner_key FROM analytics_accounts")).scalars().all()
-        with config.store.begin() as db:
-            for key in owners:
-                provision_role(db, key, config.secret)
-        print(json.dumps({"restored_role_count": len(owners)}))
     elif mode == "audit-restored":
         with engine.connect() as db:
             primary = db.execute(text("SELECT 1 FROM accounts WHERE id=:account"), {"account": account}).first() is not None

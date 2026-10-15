@@ -105,11 +105,23 @@ def recover_owner(engine, config, owner):
             WHERE account_id=:account"""), {"account": account, "generation": uuid.uuid4()})
 
 
+def prepare_restore(engine, config):
+    # Operator-only, with all traffic stopped: old policies/ACLs refer to roles
+    # that a later deletion may have dropped. Journal replay removes them again.
+    initialize_store(config.store, config.secret)
+    with engine.connect() as db:
+        owners = db.execute(text("SELECT owner_key FROM analytics_accounts")).scalars().all()
+    with config.store.begin() as db:
+        for owner in owners:
+            provision_role(db, owner, config.secret)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Run bounded personal analytics maintenance")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--initialize-store", action="store_true")
     parser.add_argument("--recover-owner")
+    parser.add_argument("--prepare-restore", action="store_true", help="Recreate restored registry roles before restoring isolated DB policies; traffic must remain stopped")
     args = parser.parse_args()
     config = AnalyticsConfig.from_env()
     if config is None:
@@ -126,7 +138,9 @@ def main():
     engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True, pool_size=4, max_overflow=0,
                            pool_timeout=1, connect_args={"connect_timeout": 1})
     try:
-        if args.recover_owner:
+        if args.prepare_restore:
+            prepare_restore(engine, config)
+        elif args.recover_owner:
             recover_owner(engine, config, args.recover_owner)
         elif args.once:
             run_once(engine, config)
