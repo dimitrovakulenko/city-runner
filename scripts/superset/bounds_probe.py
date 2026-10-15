@@ -32,6 +32,14 @@ def execute(client, sql, client_id=None):
     })
 
 
+def cancelled(response):
+    code, body = response
+    # Stock Superset can observe STOPPED before handling the driver error and
+    # return HTTP 200 with no results, instead of its usual HTTP 500 error.
+    return code >= 400 or (code == 200 and isinstance(body, dict)
+                           and body.get('status') == 'stopped' and not body.get('data'))
+
+
 def run(report):
     def check(name, passed, detail=None):
         report["checks"][name] = bool(passed)
@@ -117,10 +125,13 @@ def run(report):
         code, _ = control.request("POST", "/api/v1/query/stop", {"client_id": client_id})
         result = job.result()
         seconds = round(time.monotonic() - started, 3)
-        check("explicit_cancel_terminates_database_query", code == 200 and result[0] >= 400 and active() == 1 and seconds < 2, {"seconds": seconds, "status": code})
+        check("explicit_cancel_terminates_database_query", code == 200 and cancelled(result) and active() == 1 and seconds < 2, {"seconds": seconds, "status": code, "execution_status": result[0]})
         check('cancel_preserves_other_running_query', not second_job.done() and active() == 1)
         code, _ = control.request('POST', '/api/v1/query/stop', {'client_id': second_id})
-        check('second_cancel_terminates_remaining_query', code == 200 and second_job.result()[0] >= 400 and active() == 0)
+        second_result = second_job.result()
+        remaining = active()
+        check('second_cancel_terminates_remaining_query', code == 200 and cancelled(second_result) and remaining == 0,
+              {'status': code, 'execution_status': second_result[0], 'remaining_queries': remaining})
 
     running = Client("pilot-a")
     # Revocation during an admitted request must withhold the completed result.
