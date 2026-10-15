@@ -38,13 +38,14 @@ def verify(*, run, compose, fixture, output):
         assert 5 < elapsed < 11 and wait(lambda state: state["active"] == 0)["active"] == 0
         report["checks"]["immutable_deadline_terminates_actual_database_work"] = True
         report["deadline_seconds"] = round(elapsed, 3)
+        control = ApplicationClient(account, "sql")
         with ThreadPoolExecutor(1) as pool:
             handle = uuid.uuid4().hex[:10]
+            running_since = time.monotonic()
             pending = pool.submit(client.request, "POST", "/api/v1/sqllab/execute/", {
                 "database_id": database, "schema": "analytics", "sql": "SELECT analytics.acceptance_slow(30)",
                 "runAsync": False, "client_id": handle, "sql_editor_id": str(uuid.uuid4()), "expand_data": True})
             wait(lambda state: state["active"] == 1)
-            control = ApplicationClient(account, "sql")
             assert operator("activity")["active"] == 1 and not pending.done()
             stopped = time.monotonic()
             assert control.request("POST", "/api/v1/query/stop", {"client_id": handle})[0] == 200
@@ -52,6 +53,7 @@ def verify(*, run, compose, fixture, output):
             assert code >= 400 or result.get("status") == "stopped" and not result.get("data")
             wait(lambda state: state["active"] == 0)
             assert time.monotonic() - stopped < 3
+            assert time.monotonic() - running_since < 7
         report["checks"]["native_stop_terminates_actual_database_work"] = True
         with ThreadPoolExecutor(1) as pool:
             pending = pool.submit(client.execute, database, "SELECT analytics.acceptance_slow(6)")
