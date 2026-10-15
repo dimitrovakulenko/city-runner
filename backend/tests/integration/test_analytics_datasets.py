@@ -164,6 +164,10 @@ class AnalyticsDatasetPostgisTests(unittest.TestCase):
             db.exec_driver_sql("INSERT INTO template_history VALUES(NULL,'normal',NULL,1,'unknown-dates')")
             rows = db.execute(text(sql)).mappings().all()
             self.assertIsNone(next(row for row in rows if row["rule"] == "normal")["cumulative_retained_nodes"])
+            db.exec_driver_sql("DELETE FROM template_history WHERE supported_nodes=1")
+            db.exec_driver_sql("INSERT INTO template_history VALUES('2026-10-03','normal',NULL,NULL,'missing-provenance')")
+            rows = db.execute(text(sql)).mappings().all()
+            self.assertTrue(all(row["cumulative_retained_nodes"] is None for row in rows if row["rule"] == "normal"))
 
     def test_provider_only_and_mixed_provenance_do_not_affect_metrics_or_readiness(self):
         f = self.fixture

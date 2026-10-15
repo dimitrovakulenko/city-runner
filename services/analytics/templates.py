@@ -46,7 +46,7 @@ TEMPLATES = {
         ("Retained GPS support growth by day", """WITH daily AS (
             SELECT recorded_date,rule,
               sum(CASE WHEN supported_nodes=0 THEN 0 ELSE new_nodes END) AS new_nodes,
-              bool_and((history_status='ready' AND new_nodes IS NOT NULL) OR supported_nodes=0) AS ready
+              bool_and((history_status='ready' AND new_nodes IS NOT NULL) OR COALESCE(supported_nodes=0,false)) AS ready
             FROM analytics.exploration_history GROUP BY recorded_date,rule), growth AS (
             SELECT recorded_date,rule,
               CASE WHEN bool_and(ready) OVER (PARTITION BY rule)

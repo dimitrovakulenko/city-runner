@@ -45,7 +45,7 @@ def run(fixture, report, before_delete=None):
         "db_id": database, "label": "Synthetic lifecycle definition", "schema": "analytics", "sql": "SELECT 1"})
     assert code == 201
     marker = "lifecycle-authoring-" + hashlib.sha256(account["id"].encode()).hexdigest()
-    code, cached = client.request("POST", f"/api/v1/dashboard/{state['boards'][0]['id']}/filter_state", {"value": marker})
+    code, cached = client.request("POST", f"/api/v1/dashboard/{state['boards'][0]['id']}/filter_state", {"value": json.dumps({"private_marker": marker})})
     assert code == 201, (code, cached)
     report["checks"]["private_filter_state_created"] = marker in str(client.request("GET", f"/api/v1/dashboard/{state['boards'][0]['id']}/filter_state/{cached['key']}")[1])
     code, datasets = client.request("GET", "/api/v1/dataset/")
