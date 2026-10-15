@@ -1,0 +1,40 @@
+{
+  "version": "6.1.0",
+  "checks": {
+    "create_chart_and_dashboard_A": true,
+    "edit_reopen_chart_A": true,
+    "edit_reopen_dashboard_A": true,
+    "metadata_admission_A": true,
+    "execute_sql_A": true,
+    "save_reopen_sql_A": true,
+    "create_chart_and_dashboard_B": true,
+    "edit_reopen_chart_B": true,
+    "edit_reopen_dashboard_B": true,
+    "metadata_admission_B": true,
+    "execute_sql_B": true,
+    "save_reopen_sql_B": true,
+    "foreign_chart_denied_A": true,
+    "foreign_dashboard_denied_A": true,
+    "foreign_saved_query_denied_A": true,
+    "foreign_chart_denied_B": true,
+    "foreign_dashboard_denied_B": true,
+    "foreign_saved_query_denied_B": true,
+    "probe_completed": true
+  },
+  "objects": {
+    "A": {
+      "chart": 16,
+      "dashboard": 19,
+      "marker": "Browser A 1792069166997",
+      "saved_query": 6
+    },
+    "B": {
+      "chart": 17,
+      "dashboard": 20,
+      "marker": "Browser B 1792069180296",
+      "saved_query": 7
+    }
+  },
+  "failures": [],
+  "probe_passed": true
+}

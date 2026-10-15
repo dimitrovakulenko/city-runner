@@ -1,0 +1,99 @@
+name: city-runner-superset-pilot
+
+services:
+  postgres:
+    image: postgres:16.10@sha256:21f6013073bc6b92830a2129570e2f5ec42a6c734b5a985a41e83aa58f54c3c1
+    mem_limit: 512m
+    cpus: 1
+    environment:
+      POSTGRES_PASSWORD: disposable-pilot-only
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - ./fixture.sql:/docker-entrypoint-initdb.d/fixture.sql:ro
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U postgres]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [pilot]
+
+  init:
+    build: .
+    environment:
+      PILOT_BOOTSTRAP: '1'
+      <<: &superset-env
+        SUPERSET_CONFIG_PATH: /pilot/superset_config.py
+        PILOT_STOCK_SECURITY: ${PILOT_STOCK_SECURITY:-0}
+    volumes: &superset-volumes
+      - ./:/pilot:ro
+    command: [sh, -c, 'superset db upgrade && superset init && python /pilot/bootstrap.py']
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [pilot]
+
+  superset:
+    build: .
+    environment: *superset-env
+    mem_limit: 2g
+    cpus: 2
+    volumes: *superset-volumes
+    command: [gunicorn, --bind, '0.0.0.0:8088', --workers, '2', --threads, '4', --timeout, '30', 'superset.app:create_app()']
+    depends_on:
+      init: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8088/health', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 90
+    networks: [pilot]
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Gateway.Dockerfile
+    command: [uvicorn, gateway:app, --host, 0.0.0.0, --port, '8090', --no-access-log]
+    environment:
+      PILOT_SESSION_DATABASE_URL: postgresql+psycopg2://pilot_sessions:disposable-sessions@postgres/pilot_sessions
+      PILOT_APP_URL: http://app:8000
+    mem_limit: 512m
+    cpus: 1
+    ports: ['127.0.0.1:8090:8090']
+    volumes:
+      - ../../backend:/pilot/backend:ro
+    depends_on:
+      superset: {condition: service_healthy}
+      app: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/pilot/', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [pilot, loopback]
+
+  app:
+    build:
+      context: .
+      dockerfile: Gateway.Dockerfile
+    command: [uvicorn, app_fixture:app, --host, 0.0.0.0, --port, '8000', --no-access-log]
+    environment:
+      PILOT_SESSION_DATABASE_URL: postgresql+psycopg2://pilot_sessions:disposable-sessions@postgres/pilot_sessions
+    volumes:
+      - ../../backend:/pilot/backend:ro
+    mem_limit: 256m
+    cpus: 1
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [pilot]
+
+networks:
+  pilot:
+    internal: true
+  loopback:
+
+volumes:
+  postgres:

@@ -1,0 +1,64 @@
+{
+  "checks": {
+    "sql_lab_external_deadline_select": true,
+    "queries_continue_after_successful_termination": true,
+    "sql_lab_external_deadline_set": true,
+    "sql_lab_external_deadline_reset": true,
+    "download_external_deadline": true,
+    "explore_external_deadline": true,
+    "ten_thousand_rows_allowed": true,
+    "row_overflow_explicitly_rejected": true,
+    "request_size_bound": true,
+    "two_owner_queries_running": true,
+    "third_owner_request_rejected": true,
+    "other_account_remains_available": true,
+    "admitted_queries_finish": true,
+    "two_queries_running_before_cancel": true,
+    "third_sql_rejected_during_cancel": true,
+    "other_account_cannot_cancel_query": true,
+    "explicit_cancel_terminates_database_query": true,
+    "cancel_preserves_other_running_query": true,
+    "second_cancel_terminates_remaining_query": true,
+    "logout_fences_inflight_result": true,
+    "cancel_role_has_no_analytics_data_access": true,
+    "owners_cannot_call_cancel_control": true,
+    "response_size_bound": true,
+    "discarded_upstream_response_fences_owner": true,
+    "probe_completed": true
+  },
+  "observations": {
+    "sql_lab_external_deadline_select": {
+      "status": 500,
+      "seconds": 8.119,
+      "database_query_gone": true
+    },
+    "sql_lab_external_deadline_set": {
+      "status": 500,
+      "seconds": 8.116,
+      "database_query_gone": true
+    },
+    "sql_lab_external_deadline_reset": {
+      "status": 500,
+      "seconds": 8.116,
+      "database_query_gone": true
+    },
+    "download_external_deadline": {
+      "status": 500,
+      "seconds": 8.117,
+      "database_query_gone": true
+    },
+    "explore_external_deadline": {
+      "status": 400,
+      "seconds": 8.123,
+      "database_query_gone": true
+    },
+    "two_owner_queries_running": {
+      "active": 2
+    },
+    "explicit_cancel_terminates_database_query": {
+      "seconds": 0.032,
+      "status": 200
+    }
+  },
+  "probe_passed": true
+}

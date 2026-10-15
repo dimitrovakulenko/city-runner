@@ -8,6 +8,54 @@ permissions:
   contents: read
 
 jobs:
+  superset-pilot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install pilot regression dependencies
+        run: |
+          python -m pip install -r scripts/superset/gateway-requirements.txt
+          npm ci --prefix apps/web
+      - name: Install browser
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+      - name: Verify session and admission concurrency
+        run: python -m unittest discover -s scripts/superset -p 'test_*.py' -v
+      - name: Start disposable synthetic Superset
+        run: docker compose -f scripts/superset/compose.yaml up -d --build --wait --wait-timeout 180
+      - name: Verify authoring, privacy and query boundaries
+        run: |
+          mkdir -p /tmp/superset-pilot-results
+          python scripts/superset/probe.py --output /tmp/superset-pilot-results/privacy.json
+          PILOT_BROWSER_CHANNEL=chromium node scripts/superset/browser_probe.mjs --output /tmp/superset-pilot-results/browser.json
+          python scripts/superset/bounds_probe.py --output /tmp/superset-pilot-results/bounds.json
+          docker compose -f scripts/superset/compose.yaml restart superset gateway
+          docker compose -f scripts/superset/compose.yaml up -d --no-deps --wait --wait-timeout 60 superset gateway
+          python scripts/superset/bounds_probe.py --failure-only --output /tmp/superset-pilot-results/failure.json
+          python scripts/superset/bounds_probe.py --provision-only --output /tmp/superset-pilot-results/provisioning.json
+      - name: Collect pilot diagnostics
+        if: always()
+        run: |
+          mkdir -p /tmp/superset-pilot-results
+          docker compose -f scripts/superset/compose.yaml logs --no-color > /tmp/superset-pilot-results/containers.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: superset-pilot-results
+          path: /tmp/superset-pilot-results
+      - name: Remove disposable pilot
+        if: always()
+        run: docker compose -f scripts/superset/compose.yaml down -v
+
   hosting:
     runs-on: ubuntu-latest
     steps:

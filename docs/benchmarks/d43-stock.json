@@ -1,0 +1,190 @@
+{
+  "version": "6.1.0",
+  "checks": {
+    "database_owner_a": true,
+    "database_denies_other_role_a": true,
+    "database_denies_superuser_role_a": true,
+    "database_denies_other_identity_a": true,
+    "database_denies_excluded_fields_a": true,
+    "database_denies_write_a": true,
+    "database_denies_create_a": true,
+    "database_denies_privileged_function_a": true,
+    "mutable_setting_cannot_change_owner_a": true,
+    "database_deadline_immutable_a": false,
+    "database_owner_b": true,
+    "database_denies_other_role_b": true,
+    "database_denies_superuser_role_b": true,
+    "database_denies_other_identity_b": true,
+    "database_denies_excluded_fields_b": true,
+    "database_denies_write_b": true,
+    "database_denies_create_b": true,
+    "database_denies_privileged_function_b": true,
+    "mutable_setting_cannot_change_owner_b": true,
+    "database_deadline_immutable_b": false,
+    "private_connection_catalog_a": true,
+    "private_dataset_catalog_a": true,
+    "sql_lab_owner_a": true,
+    "create_reopen_saved_query_a": true,
+    "own_saved_query_export_a": true,
+    "create_reopen_chart_a": true,
+    "own_chart_export_a": true,
+    "create_reopen_dashboard_a": true,
+    "own_dashboard_export_a": true,
+    "own_result_download_a": true,
+    "ui_shell_sqllab_a": true,
+    "ui_shell_explore_a": true,
+    "private_connection_catalog_b": true,
+    "private_dataset_catalog_b": true,
+    "sql_lab_owner_b": true,
+    "create_reopen_saved_query_b": true,
+    "own_saved_query_export_b": true,
+    "create_reopen_chart_b": true,
+    "own_chart_export_b": true,
+    "create_reopen_dashboard_b": true,
+    "own_dashboard_export_b": true,
+    "own_result_download_b": true,
+    "ui_shell_sqllab_b": true,
+    "ui_shell_explore_b": true,
+    "other_connection_execution_denied_a": true,
+    "other_dataset_detail_denied_a": true,
+    "other_dataset_list_private_a": true,
+    "other_saved_query_detail_denied_a": true,
+    "other_saved_query_list_private_a": true,
+    "other_chart_detail_denied_a": true,
+    "other_chart_list_private_a": true,
+    "other_dashboard_detail_denied_a": true,
+    "other_dashboard_list_private_a": true,
+    "other_chart_export_denied_a": true,
+    "other_saved_query_export_denied_a": true,
+    "other_dashboard_export_denied_a": true,
+    "other_query_history_detail_denied_a": true,
+    "other_query_history_list_private_a": true,
+    "other_result_download_denied_a": false,
+    "forged_identity_ignored_a": true,
+    "other_connection_execution_denied_b": true,
+    "other_dataset_detail_denied_b": true,
+    "other_dataset_list_private_b": true,
+    "other_saved_query_detail_denied_b": true,
+    "other_saved_query_list_private_b": true,
+    "other_chart_detail_denied_b": true,
+    "other_chart_list_private_b": true,
+    "other_dashboard_detail_denied_b": true,
+    "other_dashboard_list_private_b": true,
+    "other_chart_export_denied_b": true,
+    "other_saved_query_export_denied_b": true,
+    "other_dashboard_export_denied_b": true,
+    "other_query_history_detail_denied_b": true,
+    "other_query_history_list_private_b": true,
+    "other_result_download_denied_b": false,
+    "forged_identity_ignored_b": true,
+    "logout_revokes_copied_cookie": true,
+    "probe_completed": true
+  },
+  "observations": {
+    "database_owner_a": {
+      "seconds": 0.107
+    },
+    "database_deadline_immutable_a": {
+      "returned": "0"
+    },
+    "database_owner_b": {
+      "seconds": 0.117
+    },
+    "database_deadline_immutable_b": {
+      "returned": "0"
+    },
+    "sql_lab_owner_a": {
+      "status": 200
+    },
+    "sql_lab_owner_b": {
+      "status": 200
+    },
+    "other_connection_execution_denied_a": {
+      "status": 500
+    },
+    "other_dataset_detail_denied_a": {
+      "status": 404
+    },
+    "other_saved_query_detail_denied_a": {
+      "status": 404
+    },
+    "other_chart_detail_denied_a": {
+      "status": 404
+    },
+    "other_dashboard_detail_denied_a": {
+      "status": 404
+    },
+    "other_chart_export_denied_a": {
+      "status": 404
+    },
+    "other_saved_query_export_denied_a": {
+      "status": 404
+    },
+    "other_dashboard_export_denied_a": {
+      "status": 404
+    },
+    "other_result_download_denied_a": {
+      "status": 200,
+      "other_value_returned": true
+    },
+    "other_connection_execution_denied_b": {
+      "status": 500
+    },
+    "other_dataset_detail_denied_b": {
+      "status": 404
+    },
+    "other_saved_query_detail_denied_b": {
+      "status": 404
+    },
+    "other_chart_detail_denied_b": {
+      "status": 404
+    },
+    "other_dashboard_detail_denied_b": {
+      "status": 404
+    },
+    "other_chart_export_denied_b": {
+      "status": 404
+    },
+    "other_saved_query_export_denied_b": {
+      "status": 404
+    },
+    "other_dashboard_export_denied_b": {
+      "status": 404
+    },
+    "other_result_download_denied_b": {
+      "status": 200,
+      "other_value_returned": true
+    }
+  },
+  "objects": {
+    "a": {
+      "database": 1,
+      "dataset": 1,
+      "saved_query": 4,
+      "chart": 4,
+      "dashboard": 4,
+      "marker": "a-private-85f86f5c",
+      "query_id": 8,
+      "client_id": "241f74c2da"
+    },
+    "b": {
+      "database": 2,
+      "dataset": 2,
+      "saved_query": 5,
+      "chart": 5,
+      "dashboard": 5,
+      "marker": "b-private-83a5239d",
+      "query_id": 10,
+      "client_id": "d0c7c28363"
+    }
+  },
+  "unproven": [
+    "external deadline and actual database termination across all execution paths",
+    "two active queries per owner and measured global/resource/response-size budgets",
+    "asynchronous execution, private cached results, cancellation and job handles",
+    "account deletion, restore fencing and production identity provisioning",
+    "representative live-view versus projection load measurements"
+  ],
+  "probe_passed": false,
+  "d43_accepted": false
+}

@@ -8,7 +8,7 @@ Owner direction on 14 October 2026: complete the remaining planned features firs
 
 Continue dependency-ready feature tasks from the D backlog below. Web functionality remains this team's focus; native execution belongs to the separate device team. Provider approvals/access and deployment retain their existing gates. Historical execution records below describe what was verified at the time, not the current geographic priority.
 
-Owner-selected next feature: Superset personal analytics, D43–D47/T23/CR-23, following [the implementation plan](docs/superset-analytics.md). Start with D43's local synthetic two-account full-authoring/isolation pilot and reviewed contract; no installation or deployment is performed by this planning update. Provider registration and private issue reporting are postponed. Remind the owner about Strava/Garmin registration after three further completed implementation tasks (0/3; documentation-only work does not count).
+Owner-selected next feature: Superset personal analytics, D43–D47/T23/CR-23, following [the implementation plan](docs/superset-analytics.md). D43's disposable local two-account pilot is implemented, with authoring/privacy, real query-termination and cancellation-failure probes; production datasets/identity/Insights remain pending, and D43 is not verified until the remaining acceptance gates pass. Provider registration and private issue reporting are postponed. Remind the owner about Strava/Garmin registration after three further completed implementation tasks (0/3; documentation-only work does not count).
 
 ## Execution record
 

@@ -1,0 +1,63 @@
+{
+  "recorded_at": "2026-10-15T13:02:38.879603+00:00",
+  "base_commit": "a43a6a8c1c8cc013a9c9290e47bbbbe0fcd05c69",
+  "state": "local D43 acceptance passed; hosted CI pending; D44\u2013D47 not implemented",
+  "reports": {
+    "bounds": {
+      "checks": 25,
+      "passed": 25,
+      "report_sha256": "12d4d37d00d3420978bcd66656ce8b8686d0637e82ec6185bf5b359188977adb"
+    },
+    "browser": {
+      "checks": 19,
+      "passed": 19,
+      "report_sha256": "c41ad65378332fd46fda3fbcaee8904a5fd61a21480e459853fe8bf99824a74e"
+    },
+    "failure": {
+      "checks": 5,
+      "passed": 5,
+      "report_sha256": "120d9b8e934f2e595fb08ce3478d9c969c7c00f8609a6b21057b640003540070"
+    },
+    "privacy": {
+      "checks": 138,
+      "passed": 138,
+      "report_sha256": "40e67238bc4cdeba81484206f6eda7fd9c87f867140d24aa4084558a06b682c9"
+    },
+    "provisioning": {
+      "checks": 2,
+      "passed": 2,
+      "report_sha256": "9b5bdd8f38ba673569b33733a88ab6bfae26795e9d09f5789be7e60b2a6fa27f"
+    },
+    "stock": {
+      "checks": 78,
+      "passed": 74,
+      "report_sha256": "4794b8c0b11391f430d074036190ea77615d77622442c9fc09327b9b3696a398"
+    },
+    "views": {
+      "checks": 15,
+      "passed": 15,
+      "report_sha256": "37fdca99162730d84ab929753dbc01d4bfe695e3d82b2f9c4686f441c037b3a1"
+    }
+  },
+  "source_sha256": {
+    "scripts/superset/Dockerfile": "3b608cb4b976c59487de64b3af9f18de90c277efd2661951b05cced5245ffc80",
+    "scripts/superset/Gateway.Dockerfile": "653f17f61fcc487011f6c8a47e4097e10ecd8e0495245602dcc7504fed5f97e4",
+    "scripts/superset/README.md": "1937dd5f25dfe22647777bca239c7230fc23a27da2da9807246b11047a2478f6",
+    "scripts/superset/app_fixture.py": "6ae78b2fee18c78e25e0aef3399aabb02adf4b623769a0f396e7319342c11d77",
+    "scripts/superset/bootstrap.py": "7440b78c8721dc121e273c47dfb9d59a4f799cf5b1c2dc1b05559978dad877ff",
+    "scripts/superset/bounds_probe.py": "ce6f42859e2be46e57c7e1a2fa8d6e4f2b3ba4a13a6495133f79958c083cfde4",
+    "scripts/superset/browser_probe.mjs": "3f755877bd177d498e8197eb2aad19f8f976c3511e0ffe05dea820486097b205",
+    "scripts/superset/compose.yaml": "b6f874882d696b29b536c325e19bafdbe50301ce44ccdf5052cddacd6fdb9ed6",
+    "scripts/superset/editor_state.py": "f27eff50f7293b82046179c3d8c1d9b5d72b13cb7601d6e007336a54021c06fb",
+    "scripts/superset/fixture.sql": "b1040b58bc13d8beee3f70021ab8f33c42bfe4cb72e7789931e4c80ac8d9dddc",
+    "scripts/superset/gateway-requirements.txt": "4a6f5cb345da663d3d2cf52b40ab322e4b2dd79b16cd244c83e88891ac93d1b5",
+    "scripts/superset/gateway.py": "94a3d1d56ca2a351eaf09fdc20798867caf8456d9527b06905f6cd024779c0d5",
+    "scripts/superset/live_views_probe.py": "e9feca96308d4b044b5a0d9eb7611f3142774f8c3515f27007d129812ea9e352",
+    "scripts/superset/probe.py": "6a2eb076124ba724e7d9e9e0f73b42212158f7013adab677c0ea8e132830c769",
+    "scripts/superset/provisioning.sql": "309042c871093b748d8f9d94d3929a94f14415b27204ae29869dd2926c824cd7",
+    "scripts/superset/query_boundary.py": "9d8a4249b27d484cd04989562bfed4433e8579e696cdbd14e90d8a828bbd1433",
+    "scripts/superset/security.py": "3945fd6be5b78e68f49735308bb9129ca80716388332893789c69cce630b3c27",
+    "scripts/superset/superset_config.py": "a6860357baeb00005a971b85852dd6299b89d31ed700688f819748b278151558",
+    "scripts/superset/test_gateway.py": "77575947621351269067a88e73a9daf14d09c22ef36ce35a96c3091b910813fd"
+  }
+}
