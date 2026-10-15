@@ -87,7 +87,8 @@ class AnalyticsProjectionPostgisTests(unittest.TestCase):
         finally:
             f.account = original
         owner = owner_key(f.account)
-        reader = create_engine(self.target_url.set(username=role_name(owner), password=role_password(SECRET, owner)))
+        reader = create_engine(self.target_url.set(host=self.target_url.host or "127.0.0.1",
+            port=self.target_url.port or 5432, username=role_name(owner), password=role_password(SECRET, owner)))
         try:
             with reader.connect() as db:
                 self.assertEqual(db.execute(text("SELECT activity_id FROM analytics.activities")).scalars().all(), [fixture_module.BASE_ID])
