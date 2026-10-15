@@ -59,6 +59,9 @@ class AuthoringProxy:
         if account in self.blocked or any(deadline <= time.time() for deadline in self.deadlines.get(account, {}).values()):
             return Response(status_code=503, headers={"Cache-Control": "no-store"})
         self.check_origin(request)
+        # Legacy telemetry is already disabled; reject it before SQL admission.
+        if path.rstrip('/') == 'superset/log':
+            return Response(status_code=405, headers={"Cache-Control": "no-store"})
         asset = request.method in {"GET", "HEAD"} and path.startswith("static/") and "%" not in path and ".." not in path.split("/")
         # Only explicitly metadata-only GET routes bypass query admission. Unknown
         # routes (including downloads, samples and previews) retain the query budget.
@@ -96,7 +99,7 @@ class AuthoringProxy:
             self.waiting[account] += 1
             queued = True
             try:
-                until = time.monotonic() + 1
+                until = time.monotonic() + 3
                 while counters.get(account, 0) >= per_owner or sum(counters.values()) >= global_cap:
                     if time.monotonic() >= until:
                         return Response(status_code=429, headers={'Cache-Control': 'no-store'})

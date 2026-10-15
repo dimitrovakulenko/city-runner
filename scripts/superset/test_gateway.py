@@ -61,6 +61,42 @@ class SessionTests(unittest.TestCase):
 
 
 class AdmissionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_disabled_telemetry_never_competes_for_query_slots(self):
+        gateway.boundary.blocked.clear()
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=gateway.app), base_url='http://127.0.0.1:8090') as client:
+            await client.post('/pilot/login/pilot-a')
+            gateway.boundary.active['pilot-a'] = 2
+            try:
+                with patch.object(gateway.boundary, 'upstream', side_effect=AssertionError('Telemetry must not reach Superset')):
+                    response = await client.post('/superset/log/?explode=events')
+                self.assertEqual(response.status_code, 405)
+                self.assertEqual(response.headers['cache-control'], 'no-store')
+                self.assertEqual(gateway.boundary.active['pilot-a'], 2)
+                self.assertFalse(gateway.boundary.waiting)
+            finally:
+                gateway.boundary.active.clear()
+
+    async def test_cold_dashboard_burst_waits_without_increasing_query_concurrency(self):
+        gateway.boundary.blocked.clear()
+        calls, peak, active = 0, 0, 0
+        async def upstream(*args):
+            nonlocal calls, peak, active
+            calls += 1; active += 1; peak = max(peak, active)
+            try:
+                await asyncio.sleep(0.65)
+                return Response(status_code=200)
+            finally:
+                active -= 1
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=gateway.app), base_url='http://127.0.0.1:8090') as client:
+            await client.post('/pilot/login/pilot-a')
+            with patch.object(gateway.boundary, 'upstream', upstream):
+                responses = await asyncio.gather(*(client.post('/api/v1/chart/data') for _ in range(5)))
+            self.assertEqual(calls, 5)
+            self.assertEqual(peak, 2)
+            self.assertTrue(all(response.status_code == 200 for response in responses))
+            self.assertFalse(gateway.boundary.active)
+            self.assertFalse(gateway.boundary.waiting)
+
     async def test_multiple_preview_waiters_reserve_slots_before_async_validation(self):
         gateway.boundary.blocked.clear()
         first, second, started = asyncio.Event(), asyncio.Event(), asyncio.Event()
