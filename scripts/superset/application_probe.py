@@ -98,6 +98,7 @@ def run(fixture, report):
             "sql": "SELECT activity_id,distance_m FROM analytics.activities", "owners": [],
         })
         assert code == 201, (code, dataset)
+        objects[label]["dataset"] = dataset["id"]
         code, edited = client.request("PUT", f"/api/v1/dataset/{dataset['id']}", {
             "columns": [{"column_name": "authored_km", "expression": "distance_m / 1000.0", "type": "FLOAT"}],
             "metrics": [{"metric_name": "authored_distance", "expression": "SUM(distance_m)", "metric_type": "sum"}],
@@ -129,6 +130,7 @@ def run(fixture, report):
         report["checks"][f"foreign_dashboard_denied_{label}"] = client.request("GET", f"/api/v1/dashboard/{other['board']}")[0] in (403, 404)
         report["checks"][f"foreign_saved_query_denied_{label}"] = client.request("GET", f"/api/v1/saved_query/{other['query']}")[0] in (403, 404)
         report["checks"][f"foreign_execution_denied_{label}"] = client.execute(other["database"], "SELECT 1")[0] in (403, 404)
+        report["checks"][f"foreign_drill_metadata_denied_{label}"] = client.request("GET", f"/api/v1/dataset/{other['dataset']}/drill_info/?q=(dashboard_id:{other['board']})")[0] in (403, 404)
         report["checks"][f"foreign_default_denied_{label}"] = application(accounts[label], "PUT", "/api/analytics/preferences", {"default_dashboard_id": other["board"]})[0] == 404
         report["checks"][f"foreign_blank_uuid_denied_{label}"] = client.request("GET", f"/api/v1/dashboard/{other['blank_uuid']}")[0] in (403, 404)
         report["checks"][f"foreign_blank_page_denied_{label}"] = client.request("GET", f"/superset/dashboard/{other['blank_uuid']}/")[0] in (403, 404)

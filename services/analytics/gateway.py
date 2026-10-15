@@ -24,10 +24,17 @@ def create_app(*, backend_url, secret, public_origin, web_origin, superset_url, 
     public_origin, web_origin = checked_origins(public_origin, web_origin)
     secure = urlsplit(public_origin).scheme == "https"
     instance = None
+    rpc_slots, rpc_pending = asyncio.Semaphore(2), 0
 
     async def rpc(action, data, timeout=1.5):
+        nonlocal rpc_pending
+        if rpc_pending >= 64:
+            raise HTTPException(503, "Analytics authentication is busy.")
+        rpc_pending += 1
         try:
-            async with asyncio.timeout(timeout), httpx.AsyncClient(transport=transport, timeout=timeout) as client:
+            # Bound cold asset bursts before they reach the backend's four-slot
+            # database pools. Queueing remains inside the existing RPC deadline.
+            async with asyncio.timeout(timeout), rpc_slots, httpx.AsyncClient(transport=transport, timeout=timeout) as client:
                 async with client.stream("POST", f"{backend_url}/internal/analytics/{action}", json=data,
                                          headers={"X-Analytics-Secret": secret}) as result:
                     if result.status_code in (401, 409):
@@ -41,6 +48,8 @@ def create_app(*, backend_url, secret, public_origin, web_origin, superset_url, 
             return json.loads(body) if body else None
         except (httpx.HTTPError, TimeoutError, ValueError):
             raise HTTPException(503, "Analytics authentication is unavailable.") from None
+        finally:
+            rpc_pending -= 1
 
     async def resolve(token):
         if not token or len(token) > 512:

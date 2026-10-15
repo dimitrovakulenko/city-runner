@@ -1,5 +1,6 @@
 """Real gateway entry, identity forwarding and result-generation regressions."""
 
+import asyncio
 import unittest
 from unittest.mock import patch
 
@@ -89,6 +90,39 @@ class AuthoringGatewayTests(unittest.TestCase):
 
 
 class NavigationAbortTests(unittest.IsolatedAsyncioTestCase):
+    async def test_asset_burst_revalidates_every_response_without_exhausting_authentication(self):
+        active, maximum, validations = 0, 0, 0
+        async def respond(request):
+            nonlocal active, maximum, validations
+            if request.url.host == "superset.internal":
+                return httpx.Response(200, content=b"synthetic asset")
+            if request.url.path.endswith("/validate"):
+                active += 1
+                maximum = max(maximum, active)
+                validations += 1
+                try:
+                    await asyncio.sleep(.01)
+                    return httpx.Response(200 if active <= 2 else 503,
+                        json={"owner": "a" * 64, "version": "one"})
+                finally:
+                    active -= 1
+            return httpx.Response(204)
+        transport = httpx.MockTransport(respond)
+        app = create_app(backend_url="http://backend.internal", secret="synthetic-server-key-at-least-32-bytes",
+            public_origin="http://127.0.0.1:8091", web_origin="http://127.0.0.1:4183",
+            superset_url="http://superset.internal", transport=transport)
+        original = httpx.AsyncClient
+        def client(*args, **kwargs):
+            kwargs.setdefault("transport", transport)
+            return original(*args, **kwargs)
+        with patch("services.analytics.proxy.httpx.AsyncClient", side_effect=client):
+            async with app.router.lifespan_context(app), original(transport=httpx.ASGITransport(app=app),
+                    base_url="http://127.0.0.1:8091", cookies={COOKIE: "synthetic-linked-session"}) as browser:
+                responses = await asyncio.gather(*(browser.get(f"/static/asset-{number}.js") for number in range(24)))
+        self.assertTrue(all(response.status_code == 200 for response in responses))
+        self.assertEqual(maximum, 2)
+        self.assertEqual(validations, 48)
+
     async def test_abort_before_upstream_clears_admission_without_fencing(self):
         events = []
         async def resolve(token):

@@ -1,5 +1,5 @@
 // Production web bundle and the real authenticated Superset services.
-import { chromium, expect } from '../../apps/web/node_modules/@playwright/test/index.mjs';
+import { chromium, expect as baseExpect } from '../../apps/web/node_modules/@playwright/test/index.mjs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 
@@ -9,7 +9,7 @@ const output = argument('--output', '/tmp/d46-browser.json');
 const screenshot = (name) => output.replace(/\.json$/, `-${name}.png`);
 const fixture = JSON.parse(await readFile(argument('--fixture', '/tmp/city-runner-analytics-acceptance.json'), 'utf8'));
 const browser = await chromium.launch({ channel: process.env.PILOT_BROWSER_CHANNEL || 'chrome', headless: true });
-expect.configure({ timeout: 30_000 });
+const expect = baseExpect.configure({ timeout: 30_000 });
 const report = { checks: {}, failures: [], objects: {} };
 report.chart_errors = [];
 report.chart_statuses = {};

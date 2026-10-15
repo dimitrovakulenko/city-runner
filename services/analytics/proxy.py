@@ -65,6 +65,7 @@ class AuthoringProxy:
         metadata = request.method in {"GET", "HEAD"} and re.fullmatch(
             r"api/v1/(?:chart|dashboard|saved_query|query)/(?:\d+/?|_info/?|favorite_status/?|related/[^/]+/?)?"
             r"|api/v1/dashboard/\d+/(?:datasets|charts)/?"
+            r"|api/v1/dataset/\d+/drill_info/?"
             r"|api/v1/(?:me|database|security/csrf_token)/?"
             r"|api/v1/explore/(?:form_data/[^/]+/?)?"
             r"|(?:explore|sqllab|superset/welcome)/?"

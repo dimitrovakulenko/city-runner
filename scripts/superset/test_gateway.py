@@ -144,6 +144,7 @@ class AdmissionTests(unittest.IsolatedAsyncioTestCase):
                         client.get('/api/v1/chart/'), client.get('/api/v1/dashboard/'),
                         client.get('/api/v1/chart/1'), client.get('/api/v1/dashboard/_info'),
                         client.get('/api/v1/dashboard/1/datasets'), client.get('/api/v1/dashboard/1/charts'),
+                        client.get('/api/v1/dataset/1/drill_info/'),
                     ])
                     self.assertTrue(all(response.status_code == 200 for response in responses))
                     for path in ('/api/v1/chart/', '/api/v1/dashboard/1', '/api/v1/saved_query/1', '/api/v1/explore/form_data/',
