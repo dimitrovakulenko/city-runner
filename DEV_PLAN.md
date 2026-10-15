@@ -1,6 +1,6 @@
 # City Runner development plan
 
-Updated 14 October 2026; original baseline main `f3e67ba`. This is the execution plan for a working development application. [PROJECT.md](PROJECT.md) owns product requirements; [BUILD_PLAN.md](BUILD_PLAN.md) owns architecture and risks; [BACKLOG.md](BACKLOG.md) owns work-package status. D IDs below subdivide the existing T packages, not additional scope or estimates. Current execution states are recorded below.
+Updated 15 October 2026; original baseline main `f3e67ba`. This is the execution plan for a working development application. [PROJECT.md](PROJECT.md) owns product requirements; [BUILD_PLAN.md](BUILD_PLAN.md) owns architecture and risks; [BACKLOG.md](BACKLOG.md) owns work-package status. D IDs below subdivide the existing T packages, not additional scope or estimates. Current execution states are recorded below.
 
 ## Current implementation priority
 
@@ -8,7 +8,7 @@ Owner direction on 14 October 2026: complete the remaining planned features firs
 
 Continue dependency-ready feature tasks from the D backlog below. Web functionality remains this team's focus; native execution belongs to the separate device team. Provider approvals/access and deployment retain their existing gates. Historical execution records below describe what was verified at the time, not the current geographic priority.
 
-Owner-selected next feature: Superset personal analytics, D43–D47/T23/CR-23, following [the implementation plan](docs/superset-analytics.md). D43's two-account full-authoring/isolation pilot is verified locally and in hosted CI (`579925f`); D44 datasets/publication are verified (`203a3ca`, `331a831`); D45 identity/lifecycle is in progress and D46–D47 remain pending. Provider registration and private issue reporting are postponed. Remind the owner about Strava/Garmin registration after three further completed implementation tasks (2/3; documentation-only work does not count).
+Owner-selected current feature: D29 web foreground route following. Superset D43–D47 is complete and verified in all seven [hosted CI jobs](https://github.com/dimitrovakulenko/city-runner/actions/runs/38767948590); see [the evidence](docs/superset-analytics.md). Provider registration and private issue reporting remain postponed. The Strava/Garmin reminder threshold was reached and the reminder delivered on 15 October 2026.
 
 ## Execution record
 
@@ -37,6 +37,7 @@ Owner-selected next feature: Superset personal analytics, D43–D47/T23/CR-23, f
 | D26 | Development foot-routing adapter verified; public provider acceptance pending | `c7fe102`, `9f76ca3`; [routing](docs/routing.md); explicit FOSSGIS foot graph, 100 m bounded snapping, shared database quota, bounded response/timeout and safe errors; access profile reviewed, live restriction/capacity/terms acceptance remains open |
 | D27 | Web waypoint editor verified; native UI pending | `3d4036f`, `cf838ff`; add/drag/move/reorder/remove/undo, remaining-node entry, explicit distance preview and stale edit/account response fencing; responsive Chrome controls verified |
 | D28 | Saved-route backend/web flows verified; native UI pending | `9f76ca3`, `3d4036f`, `cf838ff`; owner-only persistence, revision-qualified edits/deletion, reopen across browser sessions/API restart and valid planned GPX export; no GPS coverage effects |
+| D29 | Web foreground following verified; native acceptance separate | `4c07b24`; 33 web unit tests, all 31 production Chrome flows, compatibility correction `4628a93` with 12 gateway tests, lightweight recovery probes `01d706d`, and [all seven hosted CI jobs](https://github.com/dimitrovakulenko/city-runner/actions/runs/38779194141); [following contract](docs/routing.md#web-route-following); existing preview/saved geometry, live GPS, accuracy-aware on/off-route status, pan/recenter, stale-fix recovery, foreground pause/resume and route/account/logout fences. No native execution claimed. |
 | D32 | GPX/FIT account backend/shared client/web verified; provider/native/hosted retention pending | `c9b4644`, `a34621e`, `4ea0273`, `f9c80fe`; [account data](docs/account-data.md); bounded private ZIP, typed deletion, owner/identity fencing, independent fsynced intent, leased retryable file cleanup and real synthetic backup/restore; provider-specific retention and hosted backup operations remain separate |
 | D33 | Local history benchmark and measured map fix verified; hosted/device capacity pending | `2048642`; [benchmark](docs/history-benchmark.md); 5,000 activities/5 million GPS samples, 20 concurrent users, actual sequential HTTP imports alongside browsing, resource/storage/error/p50/p95 records; map clipping fix eliminates GEOS work-limit failures, worst tested map p95 158 ms |
 | D34 | Partial: Hetzner installation/configuration reviewed and locally checked; deployment deferred by owner | `f6b7d53`, `83bff01`, `a3456c2`, `2a4f563`, `5d56740`; [hosting runbook](infra/hetzner/README.md); read-only Terraform validation, ShellCheck, release allowlist and actual local Caddy/API checks passed; no resources created, project/auth configuration and hosted install/real Google/import/restart/restore remain open |
@@ -45,6 +46,7 @@ Owner-selected next feature: Superset personal analytics, D43–D47/T23/CR-23, f
 | D43 | Done: reviewed exact-version full-authoring pilot verified | `9e83b19`, `579925f`; [hosted CI](https://github.com/dimitrovakulenko/city-runner/actions/runs/38740305743), [plan/evidence](docs/superset-analytics.md); two-account Chrome SQL/chart/board save/reopen, 138 privacy, 25 bounds, 5 fault-recovery checks; selected isolated projections after measured live-view advisory-lock collision |
 
 | D44 | Done: reviewed bounded datasets and atomic publication verified | `203a3ca`, `331a831`; [dataset contract](docs/analytics-datasets.md), [hosted CI](https://github.com/dimitrovakulenko/city-runner/actions/runs/38742930993); 15 new PostGIS tests / 177 integration checks, logical statistics/history parity, provider exclusion, fixed RLS, nonblocking refresh reads, source/deletion races and final validation fences |
+| D45–D47 | Done: identity/lifecycle, Insights and operational acceptance verified | `2d7b2d5`; all seven [hosted CI jobs](https://github.com/dimitrovakulenko/city-runner/actions/runs/38767948590), 32 native authoring browser checks, concurrent capacity, query stop/deadline, restart, backup/deletion-journal restore and pinned upgrade; [manifest](docs/benchmarks/d47-manifest.json). Deployment remains D34. |
 
 Other D tasks remain todo. The coordinator owns these status updates.
 
