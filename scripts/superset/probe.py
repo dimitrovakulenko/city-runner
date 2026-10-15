@@ -3,6 +3,7 @@
 import argparse
 import http.cookiejar
 import json
+import os
 import subprocess
 import shutil
 import time
@@ -13,8 +14,9 @@ import uuid
 from pathlib import Path
 
 
-BASE = "http://127.0.0.1:8090"
+BASE = os.getenv("SUPERSET_PROBE_ORIGIN", "http://127.0.0.1:8090")
 COMPOSE = Path(__file__).with_name("compose.yaml")
+PROJECT = ["-p", os.environ["SUPERSET_PROBE_PROJECT"]] if os.getenv("SUPERSET_PROBE_PROJECT") else []
 DOCKER = ["rtk", "docker"] if shutil.which("rtk") else ["docker"]
 
 
@@ -76,7 +78,7 @@ class Client:
 def database_query(suffix, sql):
     start = time.monotonic()
     result = subprocess.run([
-        *DOCKER, "compose", "-f", str(COMPOSE), "exec", "-T",
+        *DOCKER, "compose", *PROJECT, "-f", str(COMPOSE), "exec", "-T",
         "-e", f"PGPASSWORD=disposable-{suffix}", "postgres", "psql", "-X",
         "-v", "ON_ERROR_STOP=1", "-h", "127.0.0.1", "-U", f"pilot_{suffix}",
         "-d", "analytics", "-Atc", sql,
@@ -138,7 +140,7 @@ def probe(report):
         check(f'async_execution_rejected_{name}', code == 403)
         check(f'async_result_not_created_{name}', client.request('GET', f'/api/v1/sqllab/export/{async_id}/')[0] in (403, 404))
         unpublished = subprocess.run([
-            *DOCKER, 'compose', '-f', str(COMPOSE), 'exec', '-T', 'postgres',
+            *DOCKER, 'compose', *PROJECT, '-f', str(COMPOSE), 'exec', '-T', 'postgres',
             'psql', '-X', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', 'superset_meta', '-Atc',
             f"SELECT count(*) FROM query WHERE client_id='{async_id}'",
         ], capture_output=True, text=True, check=True, timeout=3)
@@ -165,6 +167,9 @@ def probe(report):
             }),
         }))
         objects[name] = {"database": database["id"], "dataset": dataset["id"], "saved_query": query["id"], "chart": chart["id"], "dashboard": dashboard["id"], "marker": marker, "query_id": private_result["query_id"], "client_id": private_result["query"]["id"]}
+        blank = accepted(client.request("POST", "/api/v1/dashboard/", {"dashboard_title": marker + " blank", "published": False}))
+        detail = accepted(client.request("GET", f"/api/v1/dashboard/{blank['id']}"))
+        objects[name]["blank"], objects[name]["blank_uuid"] = blank["id"], detail["result"]["uuid"]
         tab = accepted(client.form('POST', '/tabstateview/', {'queryEditor': {'dbId': database['id'], 'name': marker, 'sql': f"SELECT '{marker}'", 'remoteId': query['id']}}))
         objects[name]['tab'] = tab['id']
         check(f'own_editor_state_reopens_{name}', client.request('GET', f"/tabstateview/{tab['id']}")[0] == 200)
@@ -188,6 +193,16 @@ def probe(report):
     for name, client in clients.items():
         other = objects["b" if name == "a" else "a"]
         current = objects[name]
+        check(f"foreign_blank_uuid_denied_{name}", client.request("GET", f"/api/v1/dashboard/{other['blank_uuid']}")[0] in (403, 404))
+        check(f"foreign_blank_page_denied_{name}", client.request("GET", f"/superset/dashboard/{other['blank_uuid']}/")[0] in (403, 404))
+        check(f"foreign_blank_copy_denied_{name}", client.request("POST", f"/api/v1/dashboard/{other['blank_uuid']}/copy/", {
+            "dashboard_title": "forbidden", "json_metadata": "{}", "duplicate_slices": True,
+        })[0] in (403, 404))
+        for kind in ("CHART", "ROW"):
+            check(f"foreign_nested_{kind.lower()}_placement_denied_{name}", client.request("POST", f"/api/v1/dashboard/{current['blank']}/copy/", {
+                "dashboard_title": "forbidden", "duplicate_slices": False,
+                "json_metadata": json.dumps({"positions": {"forged": {"type": kind, "meta": {"chartId": other['chart']}}}}),
+            })[0] in (403, 404))
         check(f'foreign_editor_state_denied_{name}', client.request('GET', f"/tabstateview/{other['tab']}")[0] in (403, 404))
         check(f'editor_ownership_transfer_denied_{name}', client.form('PUT', f"/tabstateview/{current['tab']}", {'user_id': 999})[0] == 403)
         check(f'editor_database_rebinding_denied_{name}', client.form('PUT', f"/tabstateview/{current['tab']}", {'database_id': other['database']})[0] == 403)

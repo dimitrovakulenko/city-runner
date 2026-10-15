@@ -4,9 +4,6 @@ import json
 import os
 import uuid
 
-from flask import abort
-
-
 STATUS = ("Data readiness", "SELECT * FROM analytics.dataset_status", [
     "dataset_id", "dataset_state", "coverage_status", "pending_sources", "failed_sources", "pending_imports"])
 CITY = ("City progress", """SELECT city_id,city_name,rule,
@@ -48,15 +45,16 @@ TEMPLATES = {
             "recorded_date", "rule", "new_nodes", "unavailable_activities"]),
         ("Retained GPS support growth by day", """WITH daily AS (
             SELECT recorded_date,rule,
-              sum(new_nodes) AS new_nodes,
-              bool_and(history_status='ready' AND new_nodes IS NOT NULL) AS ready
-            FROM analytics.exploration_history GROUP BY recorded_date,rule)
+              sum(CASE WHEN supported_nodes=0 THEN 0 ELSE new_nodes END) AS new_nodes,
+              bool_and((history_status='ready' AND new_nodes IS NOT NULL) OR supported_nodes=0) AS ready
+            FROM analytics.exploration_history GROUP BY recorded_date,rule), growth AS (
             SELECT recorded_date,rule,
               CASE WHEN bool_and(ready) OVER (PARTITION BY rule)
                 THEN sum(new_nodes) OVER (PARTITION BY rule ORDER BY recorded_date ROWS UNBOUNDED PRECEDING)
                 ELSE NULL END AS cumulative_retained_nodes,
               CASE WHEN bool_and(ready) OVER (PARTITION BY rule) THEN 'ready' ELSE 'unavailable' END AS history_status
-            FROM daily""", ["recorded_date", "rule", "cumulative_retained_nodes", "history_status"]),
+            FROM daily)
+            SELECT * FROM growth WHERE recorded_date IS NOT NULL""", ["recorded_date", "rule", "cumulative_retained_nodes", "history_status"]),
         CITY, STATUS,
     ]),
     "next-streets": ("Next streets", [
@@ -75,6 +73,7 @@ TEMPLATES = {
 
 
 def copy_template(user, database, key):
+    from flask import abort
     from superset import db
     from superset.connectors.sqla.models import SqlaTable
     from superset.models.dashboard import Dashboard

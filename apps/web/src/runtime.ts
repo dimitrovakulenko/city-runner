@@ -14,6 +14,7 @@ import { createSyncStatusApi } from '../../mobile/src/api/syncStatus';
 import { createAccountApi } from '../../mobile/src/api/account';
 import { createRouteApi } from '../../mobile/src/api/routes';
 import { createActivityApi, createApiRequest } from '../../mobile/src/api/client';
+import { createAnalyticsApi } from '../../mobile/src/api/analytics';
 import { createExploreApi } from '../../mobile/src/api/explore';
 import { createCityExplorerApi } from '../../mobile/src/api/cities';
 import { createDatasetApi } from '../../mobile/src/api/datasets';
@@ -28,6 +29,7 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
   const options = { baseUrl, sessionStore: sessions, fetchImpl };
   const files = new BrowserFiles();
   const api = createActivityApi(options);
+  const analytics = createAnalyticsApi(options);
   const activities = new ActivityStore(api);
   const activitySources = new ActivitySourceStore(createActivitySourceApi(options), (activityId) => {
     const state = activitySources.getState();
@@ -76,7 +78,7 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
   const reset = () => { sync.reset(); preparation.reset(); files.clear(); account.reset(); activitySources.reset(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); planner.reset(); };
   sessions.subscribe(reset);
   const applyFilters = (filters: ActivityFilters) => { activities.setFilters(filters); explore.setFilters(filters); };
-  return { sessions, files, api, account, activities, activitySources, explore, cities, preparation, imports, corrections, planner, sync, reset, applyFilters };
+  return { sessions, files, api, analytics, account, activities, activitySources, explore, cities, preparation, imports, corrections, planner, sync, reset, applyFilters };
 }
 
 export type Runtime = ReturnType<typeof createRuntime>;

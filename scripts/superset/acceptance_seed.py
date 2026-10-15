@@ -1,6 +1,7 @@
 """Seed only a generated disposable application DB; no test login HTTP route."""
 
 import hashlib
+import argparse
 import importlib.util
 import json
 import os
@@ -24,6 +25,10 @@ from backend.app.storage import LocalObjectStore
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--activities", type=int, default=4, choices=range(1, 10001))
+    parser.add_argument("--samples", type=int, default=100, choices=range(2, 1001))
+    args = parser.parse_args()
     url = make_url(os.environ["DATABASE_URL"])
     if re.fullmatch(r"city_runner_analytics_acceptance_[0-9a-f]{12}", url.database or "") is None:
         raise RuntimeError("Only a generated disposable acceptance database is permitted.")
@@ -53,11 +58,12 @@ def main():
                     "digest": hashlib.sha256(token.encode()).hexdigest(), "id": account,
                     "expires": datetime.now(timezone.utc) + timedelta(hours=12),
                 })
-        history.seed(engine, LocalObjectStore(), int(dataset), rows, accounts, 4, 2, 100)
+        history.seed(engine, LocalObjectStore(), int(dataset), rows, accounts, args.activities, 2, args.samples)
         for account, _ in accounts:
             backfill_activity_statistics(engine, account)
     output = Path("/var/lib/city-runner/acceptance.json")
-    output.write_text(json.dumps({"dataset_id": str(dataset), "accounts": {
+    output.write_text(json.dumps({"dataset_id": str(dataset), "activity_counts": {"A": args.activities, "B": 2},
+        "gps_samples": args.activities * args.samples, "accounts": {
         name: {"id": account, "token": token} for name, (account, token) in zip(("A", "B"), accounts)
     }}))
     output.chmod(0o600)

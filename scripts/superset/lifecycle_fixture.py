@@ -6,6 +6,8 @@ from pathlib import Path
 import re
 import sys
 import uuid
+import hashlib
+import secrets
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
@@ -34,8 +36,21 @@ def main():
             receipt = db.execute(text("SELECT status FROM account_deletions WHERE account_id=:id"),
                 {"id": data["lifecycle"]["id"]}).scalar_one_or_none()
         print(json.dumps({"analytics": dict(state) if state else None, "receipt": receipt}))
+    elif sys.argv[1] == "renew":
+        with engine.begin() as db:
+            for account in data["accounts"].values():
+                if not account["id"].startswith("acceptance-"):
+                    raise RuntimeError("Only synthetic acceptance sessions can be renewed.")
+                token = secrets.token_urlsafe(32)
+                db.execute(text("UPDATE sessions SET revoked_at=now() WHERE account_id=:account"), {"account": account["id"]})
+                db.execute(text("INSERT INTO sessions(token_digest,account_id,expires_at) VALUES(:digest,:account,now()+interval '12 hours')"), {
+                    "digest": hashlib.sha256(token.encode()).hexdigest(), "account": account["id"],
+                })
+                account["token"] = token
+        fixture.write_text(json.dumps(data))
+        print("Renewed only synthetic acceptance sessions; credentials remain private.")
     else:
-        raise RuntimeError("Expected create or status.")
+        raise RuntimeError("Expected create, status, or renew.")
     engine.dispose()
 
 

@@ -33,6 +33,7 @@ if not SESSION_DATABASE:
 
 COOKIE = "city_runner_pilot"
 UPSTREAM = "http://superset:8088"
+PUBLIC_ORIGIN = os.getenv("PILOT_PUBLIC_ORIGIN", "http://127.0.0.1:8090")
 PILOT_ACCOUNTS = {"pilot-a", "pilot-b"}
 
 
@@ -52,7 +53,7 @@ def start():
 
 
 def check_origin(request):
-    if request.headers.get("origin") not in (None, "http://127.0.0.1:8090"):
+    if request.headers.get("origin") not in (None, PUBLIC_ORIGIN):
         raise HTTPException(403)
     if request.headers.get("sec-fetch-site") == "cross-site":
         raise HTTPException(403)
@@ -143,6 +144,6 @@ async def local_fence(account):
 
 
 boundary = AuthoringProxy(resolve=resolve_session, fence=local_fence, check_origin=check_origin,
-    cookie=COOKIE, upstream=UPSTREAM, public_origin="http://127.0.0.1:8090")
+    cookie=COOKIE, upstream=UPSTREAM, public_origin=PUBLIC_ORIGIN)
 app.add_api_route("/{path:path}", boundary.proxy,
     methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])

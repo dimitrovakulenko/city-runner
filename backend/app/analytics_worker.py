@@ -115,7 +115,13 @@ def main():
     if config is None:
         parser.error("Analytics requires explicit service configuration.")
     if args.initialize_store:
-        initialize_store(config.store, config.secret)
+        try:
+            initialize_store(config.store, config.secret)
+        except Exception:
+            logger.error("Analytics store initialization failed.")
+            raise SystemExit(1) from None
+        finally:
+            config.store.dispose()
         return
     engine = create_engine(os.environ["DATABASE_URL"], pool_pre_ping=True, pool_size=4, max_overflow=0,
                            pool_timeout=1, connect_args={"connect_timeout": 1})
@@ -130,6 +136,9 @@ def main():
                     time.sleep(1)
     except KeyboardInterrupt:
         pass
+    except Exception:
+        logger.error("Analytics maintenance failed.")
+        raise SystemExit(1) from None
     finally:
         engine.dispose()
         config.store.dispose()

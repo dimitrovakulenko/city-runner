@@ -124,7 +124,8 @@ def create_app(*, backend_url, secret, public_origin, web_origin, superset_url, 
         issued = await rpc("consume", {"token": ticket, "previous_token": request.cookies.get(COOKIE)}, timeout=8)
         response = Response(status_code=303, headers={"Location": issued["destination"], "Cache-Control": "no-store"})
         response.set_cookie(COOKIE, issued["token"], httponly=True, secure=secure, samesite="strict", max_age=1800)
-        response.delete_cookie("session", secure=secure, samesite="strict")
+        # Keep Superset's CSRF session stable across same-account tabs. The
+        # request identity adapter rebinds its login on an account replacement.
         return response
 
     @app.get("/logout")

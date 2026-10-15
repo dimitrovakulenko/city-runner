@@ -4,6 +4,7 @@ import argparse
 import http.cookiejar
 import io
 import json
+import os
 from pathlib import Path
 import time
 import urllib.error
@@ -14,9 +15,9 @@ import zipfile
 
 from probe import Client, NoRedirect
 
-API = "http://127.0.0.1:8011"
-UI = "http://127.0.0.1:8091"
-WEB = "http://127.0.0.1:4183"
+API = os.getenv("ANALYTICS_ACCEPTANCE_API", "http://127.0.0.1:8011")
+UI = os.getenv("ANALYTICS_ACCEPTANCE_UI", "http://127.0.0.1:8091")
+WEB = os.getenv("ANALYTICS_ACCEPTANCE_WEB", "http://127.0.0.1:4183")
 
 
 def application(account, method, path, data=None):
@@ -78,7 +79,7 @@ def run(fixture, report):
         assert code == 200 and len(catalog["result"]) == 1
         database = catalog["result"][0]["id"]
         code, result = client.execute(database, "SELECT count(*) AS activities FROM analytics.activities")
-        report["checks"][f"projected_activity_grain_{label}"] = code == 200 and result["data"][0]["activities"] == (4 if label == "A" else 2)
+        report["checks"][f"projected_activity_grain_{label}"] = code == 200 and result["data"][0]["activities"] == fixture.get("activity_counts", {"A": 4, "B": 2})[label]
         marker = f"{label}-application-private-{uuid.uuid4().hex[:8]}"
         code, query = client.request("POST", "/api/v1/saved_query/", {
             "db_id": database, "label": marker, "schema": "analytics", "sql": "SELECT count(*) FROM analytics.activities",
@@ -102,6 +103,19 @@ def run(fixture, report):
             "metrics": [{"metric_name": "authored_distance", "expression": "SUM(distance_m)", "metric_type": "sum"}],
         })
         assert code == 200, (code, edited)
+        code, blank = application(account, "POST", "/api/analytics/boards", {"template": "blank"})
+        assert code == 201
+        code, blank_detail = client.request("GET", f"/api/v1/dashboard/{blank['id']}")
+        assert code == 200
+        code, _ = client.request("PUT", f"/api/v1/dashboard/{blank['id']}", {"owners": []})
+        assert code == 200
+        code, still_owned = client.request("GET", f"/api/v1/dashboard/{blank['id']}")
+        report["checks"][f"private_ownership_cannot_be_removed_{label}"] = code == 200 and bool(still_owned["result"]["owners"])
+        objects[label]["blank"] = blank["id"]
+        objects[label]["blank_uuid"] = blank_detail["result"]["uuid"]
+        code, charts = client.request("GET", f"/api/v1/dashboard/{board['id']}/charts")
+        assert code == 200
+        objects[label]["chart"] = charts["result"][0]["id"]
         code, archive = application(account, "GET", "/api/account/export")
         assert code == 200, (code, archive)
         with zipfile.ZipFile(io.BytesIO(archive)) as exported:
@@ -116,6 +130,16 @@ def run(fixture, report):
         report["checks"][f"foreign_saved_query_denied_{label}"] = client.request("GET", f"/api/v1/saved_query/{other['query']}")[0] in (403, 404)
         report["checks"][f"foreign_execution_denied_{label}"] = client.execute(other["database"], "SELECT 1")[0] in (403, 404)
         report["checks"][f"foreign_default_denied_{label}"] = application(accounts[label], "PUT", "/api/analytics/preferences", {"default_dashboard_id": other["board"]})[0] == 404
+        report["checks"][f"foreign_blank_uuid_denied_{label}"] = client.request("GET", f"/api/v1/dashboard/{other['blank_uuid']}")[0] in (403, 404)
+        report["checks"][f"foreign_blank_page_denied_{label}"] = client.request("GET", f"/superset/dashboard/{other['blank_uuid']}/")[0] in (403, 404)
+        report["checks"][f"foreign_blank_copy_denied_{label}"] = client.request("POST", f"/api/v1/dashboard/{other['blank_uuid']}/copy/", {
+            "dashboard_title": "Must not copy foreign board", "json_metadata": "{}", "duplicate_slices": True,
+        })[0] in (403, 404)
+        for kind in ("CHART", "ROW"):
+            report["checks"][f"foreign_nested_{kind.lower()}_placement_denied_{label}"] = client.request("POST", f"/api/v1/dashboard/{objects[label]['blank']}/copy/", {
+                "dashboard_title": "Must not attach foreign chart", "duplicate_slices": False,
+                "json_metadata": json.dumps({"positions": {"forged": {"type": kind, "meta": {"chartId": other["chart"]}}}}),
+            })[0] in (403, 404)
     report["objects"] = objects
 
 

@@ -16,16 +16,19 @@ import { Modal } from './Modal';
 import { ActivityFilters } from './ActivityFilters';
 import { Account } from './Account';
 import { Sources } from './Sources';
+import { Insights } from './Insights';
+import { insightLink, insightOwner } from './insightLinks';
 import { CoveragePreparation } from './CoveragePreparation';
 import { BrowserViewports } from './viewports';
 import type { MissingNode } from '../../mobile/src/api/generated';
 
-type Tab = 'explore' | 'activities' | 'cities' | 'imports' | 'routes' | 'sources' | 'account';
+type Tab = 'explore' | 'activities' | 'cities' | 'imports' | 'routes' | 'sources' | 'account' | 'insights';
 const TABS: { id: Tab; name: string; icon: IconName }[] = [
   { id: 'explore', name: 'Explore', icon: 'compass' }, { id: 'activities', name: 'Activities', icon: 'route' },
   { id: 'cities', name: 'Cities & streets', icon: 'city' }, { id: 'imports', name: 'Imports', icon: 'upload' },
   { id: 'routes', name: 'Routes', icon: 'route' },
   { id: 'sources', name: 'Sources & sync', icon: 'refresh' },
+  { id: 'insights', name: 'Insights', icon: 'layers' },
   { id: 'account', name: 'Account', icon: 'layers' },
 ];
 const count = (value: number | null | undefined) => value == null ? '—' : value.toLocaleString();
@@ -46,14 +49,29 @@ export function App({ runtime, auth, developmentAccount = false }: { runtime: Ru
   const [focus, setFocus] = useState<[number, number] | null>(null);
   const [online, setOnline] = useState(navigator.onLine);
   const [deletedNotice, setDeletedNotice] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const accountId = authState.status === 'signed-in' ? authState.account.id : null;
   useEffect(() => { void auth.restore(); return () => { clearTimeout(searchTimer.current); }; }, [auth]);
   useEffect(() => {
     clearTimeout(searchTimer.current); setTab('explore'); setLoginOpen(false); setDeleteOpen(false); setReason(''); setShowMissing(false); setNodeZoomRequest(0); setSelectedNodeKey(null); setFocus(null);
+    setLinkError(null);
     if (!accountId) return;
     setDeletedNotice(null);
     runtime.explore.setConnection(navigator.onLine);
+  }, [accountId, runtime]);
+  useEffect(() => {
+    const link = insightLink(window.location.search);
+    if (!accountId || !link) return;
+    let active = true;
+    const generation = runtime.activities.getAccountGeneration();
+    void insightOwner(accountId).then((owner) => {
+      if (!active || generation !== runtime.activities.getAccountGeneration()) return;
+      if (owner !== link.owner) { setLinkError('This Insights link belongs to another account. Sign in to that account to open it.'); return; }
+      if (link.activity) { setTab('activities'); void runtime.activities.selectActivity(link.activity); }
+      else if (link.street) { setTab('cities'); void runtime.cities.openMapStreet(link.street.dataset, link.street.city, link.street.id); }
+    }).catch(() => { if (active) setLinkError('This Insights link could not be opened.'); });
+    return () => { active = false; };
   }, [accountId, runtime]);
   useEffect(() => {
     const disconnected = () => { setOnline(false); runtime.explore.setConnection(false); runtime.sync.setEligible(false); };
@@ -112,9 +130,10 @@ export function App({ runtime, auth, developmentAccount = false }: { runtime: Ru
     <div className="workspace"><aside className="sidebar"><div className="panel-content">{!accountId && deletedNotice && <div className="success-message" role="status">{deletedNotice}</div>}
       {!accountId ? <><div className="panel-heading welcome"><span className="eyebrow">GO A LITTLE FURTHER</span><h1>Your city.<br />A new perspective.</h1><p>Turn everyday runs into a map of everywhere you’ve been — and everything still waiting.</p></div><div className="welcome-art"><svg viewBox="0 0 300 150" aria-hidden="true"><path d="M-20 25H60V65H125V20H190V100H320M-20 110H100V140H225V50H320M45-20V170M155-20V170M270-20V170" fill="none" stroke="#dfe8d8" strokeWidth="18" /><path d="M45 140V65H125V20H190V100H270V50" fill="none" stroke="#276b55" strokeWidth="4" strokeLinecap="round" /><circle cx="45" cy="140" r="7" fill="#276b55" stroke="#fff" strokeWidth="3" /><circle cx="270" cy="50" r="8" fill="#e4ae60" stroke="#fff" strokeWidth="3" /></svg><span className="art-label"><span className="live-dot" />Your next street is out there.</span></div><div className="welcome-feature"><Icon name="route" /><div><h3>Your runs, connected</h3><p>Import GPX or FIT activities and keep your history in one place.</p></div></div><div className="welcome-feature"><Icon name="compass" /><div><h3>Find a fresh direction</h3><p>See your coverage and discover the streets you haven’t explored.</p></div></div><button className="primary full" onClick={login} disabled={authState.status === 'restoring' || authState.status === 'signing-in'}>{authState.status === 'restoring' ? 'Restoring your session…' : 'Start exploring'}<Icon name="arrow" size={18} /></button><p className="privacy-note">Your activity history is private to your account.</p>{'error' in authState && authState.error && <div className="alert" role="alert">{authState.error}<button className="text-button" onClick={() => void auth.restore()}>Retry</button></div>}</>
       : <>
+        {linkError && <div className="alert" role="alert">{linkError}</div>}
         {(!online || explore.mapStatus === 'offline' || explore.progressStatus === 'offline') && <div className="connection-status" role="status"><strong>{online ? 'Connection interrupted' : 'You’re offline'}</strong><p>{explore.progress ? 'Showing last loaded progress. Map coverage and targets are unavailable until refreshed.' : 'Map coverage and targets are unavailable until you reconnect.'}</p><button className="secondary" disabled={!online} onClick={refresh}>Retry connection</button></div>}
         {online && tab !== 'sources' && sync.error && <div className="alert" role="alert">{sync.error}<button className="text-button" onClick={refresh}>Retry refresh</button></div>}
-        {tab !== 'account' && tab !== 'sources' && <ActivityFilters runtime={runtime} />}
+        {tab !== 'account' && tab !== 'sources' && tab !== 'insights' && <ActivityFilters runtime={runtime} />}
         {(tab === 'explore' || tab === 'imports' || tab === 'cities') && <CoveragePreparation runtime={runtime} online={online} />}
         {tab === 'explore' && <><div className="panel-heading"><span className="eyebrow">ONE STREET AT A TIME</span><h1>Make the city<br />feel like yours.</h1><p>There’s always another corner to discover.</p></div><div className="progress-card"><div className="progress-caption"><span>{region?.region ?? cities.selectedDataset?.region ?? 'Your coverage'}</span><span className="pill">{known ? explore.coverageScope === 'filtered' ? 'Selection GPS coverage' : 'Lifetime GPS coverage' : region?.state?.replaceAll('-', ' ') ?? (cities.selectedDataset ? 'Coverage unavailable' : 'No dataset yet')}</span></div><div className="progress-number">{percent === null ? '—' : `${percent}%`}<span>streets completed</span></div><div className="progress-track"><i style={{ width: `${percent ?? 0}%` }} /></div><div className="progress-foot"><span>{count(known ? region.completed_streets : null)} / {count(known ? region.eligible_streets : null)} streets</span><Icon name="compass" size={16} /></div>{known && explore.coverageScope === 'lifetime' && region.manual_completed_streets > 0 && <p className="note">{count(region.manual_completed_streets)} manually completed separately.</p>}</div><div className="stat-grid"><div><Icon name="route" /><strong>{count(activities.total)}</strong><span>activities</span></div><div><Icon name="pin" /><strong>{count(known ? region.visited_node_count : null)}</strong><span>GPS nodes visited</span></div></div>{cities.selectedDatasetId && !region && explore.coverageScope === 'filtered' && <p className="note">This region is outside the selection overview limit. Its map still uses your activity filters.</p>}{explore.progressError && <div className="alert" role="alert">{explore.progressError}</div>}{explore.progress?.pending_imports ? <p className="note">{explore.progress.pending_imports} import(s) still processing. Coverage refreshes in the foreground.</p> : null}<button className="secondary full" onClick={() => setShowMissing(!showMissing)}><Icon name="pin" size={17} />{showMissing ? 'Hide Node Hunter' : 'Find missing nodes'}</button>{hunter}<div className="section-title"><h2>Recent activities</h2><button className="text-button" onClick={() => setTab('activities')}>View all<Icon name="arrow" size={14} /></button></div><ActivityRows state={activities} onSelect={openActivity} limit={4} /><button className="secondary full" onClick={() => setTab('imports')}><Icon name="plus" size={17} />Import activities</button><div className="tip"><Icon name="compass" size={20} /><p>Zoom into the map to find the original GPS nodes still waiting to be visited.</p></div></>}
         {tab === 'activities' && <><div className="panel-heading"><span className="eyebrow">YOUR EXPLORATION JOURNAL</span><h1>Activities</h1><p>{count(activities.total)} activities, countless corners.</p></div><label className="search-field"><Icon name="search" size={17} /><input aria-label="Search activities" placeholder="Search activities or dates…" onChange={(event) => onSearch(event.target.value)} defaultValue={activities.query} /></label><ActivityRows state={activities} onSelect={openActivity} />{activities.items.length < activities.total && <button className="secondary full" disabled={activities.listStatus === 'loading-more'} onClick={() => void runtime.activities.loadMore()}>Load more activities</button>}{activities.listError && <div className="alert" role="alert">{activities.listError}<button className="text-button" onClick={() => void runtime.activities.retryList()}>Retry</button></div>}{activities.detailStatus === 'loading' && <p className="note">Loading activity…</p>}{activities.detailError && <div className="alert" role="alert">{activities.detailError}</div>}{activities.detail && <div className="detail-card"><span className="eyebrow">SELECTED ACTIVITY</span><h2>{activities.detail.name}</h2><p>{date(activities.detail.date)} · {activities.detail.type}</p><ActivityStatistics activity={activities.detail} /><ActivityImpact runtime={runtime} selectedStreetId={impactStreetId} onFocus={(street) => { setFocus(null); setImpactStreetId(street.street_id); setStreetFocusRequest((value) => value + 1); }} onDetails={(street) => { setFocus(null); setImpactStreetId(street.street_id); setStreetFocusRequest((value) => value + 1); setTab('cities'); runtime.cities.openMapStreet(street.dataset_id, street.city_id, street.street_id, street.city_name); }} /><details className="recording-details"><summary>Recording details</summary><div className="detail-metrics"><span><strong>{count(activities.detail.tracks.reduce((total, segment) => total + segment.length, 0))}</strong> original GPS samples</span><span><strong>{activities.detail.tracks.length}</strong> track segments</span></div><p className="note">{activities.detail.processed ? 'Coverage processed.' : 'Coverage is pending.'}{activities.detail.unmapped_points > 0 ? ` ${count(activities.detail.unmapped_points)} samples outside supported geography.` : ''}</p></details><ActivitySources key={activities.detail.id} runtime={runtime} activityId={activities.detail.id} /><button className="danger text-button" onClick={() => setDeleteOpen(true)} disabled={corrections.pending !== null || activitySources.removingSourceId !== null}>Delete activity</button></div>}</>}
@@ -127,6 +146,7 @@ export function App({ runtime, auth, developmentAccount = false }: { runtime: Ru
         {tab === 'imports' && <Imports runtime={runtime} onOpenActivity={openActivity} />}
         {tab === 'account' && <Account key={accountId} runtime={runtime} accountId={accountId} onDeleted={accountDeleted} />}
         {tab === 'sources' && <Sources runtime={runtime} online={online} onImports={() => setTab('imports')} onActivity={openActivity} />}
+        {tab === 'insights' && <Insights key={accountId} runtime={runtime} />}
         {tab === 'routes' && <><Planner runtime={runtime} onFocus={setFocus} />{hunter}</>}
         {corrections.error && <div className="alert" role="alert">{corrections.error}</div>}{corrections.message && <p className="success-message" role="status">{corrections.message}</p>}
       </>}

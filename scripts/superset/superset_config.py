@@ -5,6 +5,7 @@ import sys
 import math
 import time
 import json
+import re
 
 from flask import abort, g, request
 from flask_appbuilder.security.manager import AUTH_REMOTE_USER
@@ -113,6 +114,8 @@ def configure_identity(app, *, valid_owner=None, internal_endpoint=None):
                     abort(403)
                 if any(owner != user.id for owner in payload.get("owners", [])):
                     abort(403)
+                if "owners" in payload:
+                    payload["owners"] = [user.id]
                 if payload.get("published") or payload.get("roles"):
                     abort(403)
                 from superset import db
@@ -150,16 +153,43 @@ def configure_identity(app, *, valid_owner=None, internal_endpoint=None):
                     dashboard = db.session.query(Dashboard).filter_by(id=identifier).one_or_none()
                     if dashboard is None or user not in dashboard.owners:
                         abort(403)
-                if payload.get("position_json"):
+                def guard_positions(positions):
                     try:
-                        positions = json.loads(payload["position_json"])
+                        positions = json.loads(positions) if isinstance(positions, str) else positions
                     except (TypeError, ValueError):
                         abort(400)
+                    if not isinstance(positions, dict):
+                        abort(400)
                     for component in positions.values():
-                        if isinstance(component, dict) and component.get("type") == "CHART":
-                            chart = db.session.query(Slice).filter_by(id=component.get("meta", {}).get("chartId")).one_or_none()
+                        meta = component.get("meta") if isinstance(component, dict) else None
+                        if isinstance(meta, dict) and meta.get("chartId") is not None:
+                            chart = db.session.query(Slice).filter_by(id=meta["chartId"]).one_or_none()
                             if chart is None or user not in chart.owners:
                                 abort(403)
+                if payload.get("position_json"):
+                    guard_positions(payload["position_json"])
+                if payload.get("json_metadata"):
+                    try:
+                        metadata = json.loads(payload["json_metadata"])
+                    except (TypeError, ValueError):
+                        abort(400)
+                    if not isinstance(metadata, dict):
+                        abort(400)
+                    if "positions" in metadata:
+                        guard_positions(metadata["positions"])
+                copied = re.fullmatch(r"/api/v1/dashboard/([^/]+)/copy/?", request.path)
+                if copied:
+                    from superset.daos.dashboard import DashboardDAO
+                    from superset.commands.dashboard.exceptions import DashboardAccessDeniedError, DashboardNotFoundError
+
+                    try:
+                        original = DashboardDAO.get_by_id_or_slug(copied.group(1))
+                    except (DashboardAccessDeniedError, DashboardNotFoundError):
+                        abort(404)
+                    if original is None or user not in original.owners:
+                        abort(404)
+                    if any(user not in chart.owners for chart in original.slices):
+                        abort(403)
                 if request.path.rstrip("/") == "/api/v1/query/stop":
                     from superset.models.sql_lab import Query
 

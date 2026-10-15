@@ -61,6 +61,56 @@ class SessionTests(unittest.TestCase):
 
 
 class AdmissionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_multiple_preview_waiters_reserve_slots_before_async_validation(self):
+        gateway.boundary.blocked.clear()
+        first, second, started = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        calls = 0
+        async def upstream(*args):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                started.set()
+            await (first if calls <= 2 else second).wait()
+            return Response(status_code=200)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=gateway.app), base_url='http://127.0.0.1:8090') as client:
+            await client.post('/pilot/login/pilot-a')
+            with patch.object(gateway.boundary, 'upstream', upstream):
+                requests = [asyncio.create_task(client.post('/api/v1/chart/data')) for _ in range(5)]
+                try:
+                    await asyncio.wait_for(started.wait(), 3)
+                    await asyncio.sleep(0.05)
+                    first.set()
+                    await asyncio.sleep(0.1)
+                    self.assertEqual(calls, 4)
+                    self.assertEqual(sum(request.done() for request in requests), 2)
+                finally:
+                    first.set(); second.set()
+                    responses = await asyncio.gather(*requests)
+                self.assertTrue(all(response.status_code == 200 for response in responses))
+
+    async def test_saved_dashboard_chart_fanout_waits_for_the_same_sql_slots(self):
+        gateway.boundary.blocked.clear()
+        started, release = asyncio.Event(), asyncio.Event()
+        calls = 0
+        async def upstream(*args):
+            nonlocal calls
+            calls += 1
+            if calls == 2:
+                started.set()
+            await release.wait()
+            return Response(status_code=200)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=gateway.app), base_url='http://127.0.0.1:8090') as client:
+            await client.post('/pilot/login/pilot-a')
+            with patch.object(gateway.boundary, 'upstream', upstream):
+                first = [asyncio.create_task(client.get(f'/api/v1/chart/{number}/data/')) for number in (1, 2)]
+                await asyncio.wait_for(started.wait(), 3)
+                queued = asyncio.create_task(client.get('/api/v1/chart/3/data/'))
+                await asyncio.sleep(0.05)
+                self.assertFalse(queued.done())
+                self.assertEqual(calls, 2)
+                release.set()
+                self.assertTrue(all(response.status_code == 200 for response in await asyncio.gather(*first, queued)))
+
     async def test_metadata_load_does_not_consume_sql_slots(self):
         gateway.boundary.blocked.clear()
         admitted = asyncio.Event()

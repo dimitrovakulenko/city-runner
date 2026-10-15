@@ -150,6 +150,20 @@ class AnalyticsDatasetPostgisTests(unittest.TestCase):
         snapshot = self.snapshot()
         own = [row for row in snapshot.tables["exploration_history"] if row["activity_id"] == BASE_ID + 1]
         self.assertTrue(all(row["history_status"] == "ready" and row["new_nodes"] == len(TINY_NODES) for row in own))
+        from services.analytics.templates import TEMPLATES
+
+        sql = TEMPLATES["exploration"][1][2][1].replace("analytics.exploration_history", "template_history")
+        with self.fixture.engine.begin() as db:
+            db.exec_driver_sql("""CREATE TEMP TABLE template_history(recorded_date date,rule text,
+                new_nodes integer,supported_nodes integer,history_status text) ON COMMIT DROP""")
+            db.execute(text("""INSERT INTO template_history VALUES
+                (:recorded_date,:rule,:new_nodes,:supported_nodes,:history_status)"""), snapshot.tables["exploration_history"])
+            rows = db.execute(text(sql)).mappings().all()
+            self.assertEqual(len(rows), 2)
+            self.assertTrue(all(row["history_status"] == "ready" and row["cumulative_retained_nodes"] == len(TINY_NODES) for row in rows))
+            db.exec_driver_sql("INSERT INTO template_history VALUES(NULL,'normal',NULL,1,'unknown-dates')")
+            rows = db.execute(text(sql)).mappings().all()
+            self.assertIsNone(next(row for row in rows if row["rule"] == "normal")["cumulative_retained_nodes"])
 
     def test_provider_only_and_mixed_provenance_do_not_affect_metrics_or_readiness(self):
         f = self.fixture

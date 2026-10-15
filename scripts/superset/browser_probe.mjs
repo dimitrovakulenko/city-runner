@@ -2,11 +2,12 @@
 import { chromium, expect } from '../../apps/web/node_modules/@playwright/test/index.mjs';
 import { writeFile } from 'node:fs/promises';
 
-const base = 'http://127.0.0.1:8090';
+const base = process.env.SUPERSET_PROBE_ORIGIN || 'http://127.0.0.1:8090';
 const outputIndex = process.argv.indexOf('--output');
 const output = outputIndex < 0 ? '/tmp/d43-browser.json' : process.argv[outputIndex + 1];
 const browser = await chromium.launch({ channel: process.env.PILOT_BROWSER_CHANNEL || 'chrome', headless: true });
 const report = { version: '6.1.0', checks: {}, objects: {}, failures: [] };
+report.browser_errors = [];
 const pages = {};
 const pending = new Set();
 let current;
@@ -22,6 +23,10 @@ async function author(name) {
   const page = await browser.newPage();
   current = pages[name] = page;
   page.setDefaultTimeout(20_000);
+  page.on('pageerror', (error) => report.browser_errors.push(String(error)));
+  page.on('response', (response) => {
+    if (response.status() >= 400) report.browser_errors.push({ path: new URL(response.url()).pathname, status: response.status() });
+  });
   const rejected = [];
   page.on('response', response => {
     if (response.status() === 429) rejected.push(response.url());
@@ -111,9 +116,12 @@ async function author(name) {
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   const saveQuery = page.getByRole('dialog', { name: 'save Save query' });
   await saveQuery.getByRole('textbox').first().fill(`${marker} SQL`);
-  const saved = page.waitForResponse(response => response.url().endsWith('/api/v1/saved_query/') && response.request().method() === 'POST');
-  await saveQuery.getByRole('button', { name: 'Save as new', exact: true }).click();
-  const query = await (await saved).json();
+  const saveAsNew = saveQuery.getByRole('button', { name: 'Save as new', exact: true });
+  const [saved] = await Promise.all([
+    page.waitForResponse(response => response.url().endsWith('/api/v1/saved_query/') && response.request().method() === 'POST'),
+    (await saveAsNew.count() ? saveAsNew : saveQuery.getByRole('button', { name: 'Save', exact: true })).click(),
+  ]);
+  const query = await saved.json();
   expect(query.id).toBeGreaterThan(0);
   report.objects[name].saved_query = query.id;
   await page.goto(`${base}/sqllab?savedQueryId=${query.id}`);

@@ -1,0 +1,25 @@
+# Offline 6.0.0 metadata is populated before the pinned 6.1.0 migration.
+services:
+  previous:
+    build:
+      context: .
+      dockerfile: Previous.Dockerfile
+    environment:
+      PILOT_BOOTSTRAP: '1'
+      SUPERSET_CONFIG_PATH: /pilot/superset_config.py
+      PYTHONPATH: /repo:/pilot
+    volumes:
+      - ./:/pilot:ro
+      - ../../services:/repo/services:ro
+    command: [sh, -c, 'superset db upgrade && superset init && python /pilot/bootstrap.py && python /pilot/upgrade_fixture.py seed']
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [pilot]
+  init:
+    depends_on:
+      previous: {condition: service_completed_successfully}
+    command: [sh, -c, 'superset db upgrade && superset init && python /pilot/bootstrap.py && python /pilot/upgrade_fixture.py verify']
+  gateway:
+    environment:
+      PILOT_PUBLIC_ORIGIN: http://127.0.0.1:18090
+    ports: !override ['127.0.0.1:18090:8090']

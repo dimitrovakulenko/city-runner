@@ -82,14 +82,17 @@ class AuthoringProxy:
         # Superset fans out chart previews and database introspection. Let a bounded
         # burst wait briefly for the same two query slots; SQL Lab remains fail-fast.
         queueable = path.rstrip('/') == 'api/v1/chart/data' or (
+            request.method == 'GET' and re.fullmatch(r'api/v1/chart/\d+/data/?', path) is not None) or (
             request.method == 'POST' and re.fullmatch(r'api/v1/database/\d+/validate_sql/?', path) is not None) or (
             request.method == 'GET' and path.startswith('api/v1/database/'))
+        queued = False
         if not asset and not metadata and not control and queueable and (
             counters.get(account, 0) >= per_owner or sum(counters.values()) >= global_cap
         ):
             if self.waiting.get(account, 0) >= 8 or sum(self.waiting.values()) >= 16:
                 return Response(status_code=429, headers={'Cache-Control': 'no-store'})
             self.waiting[account] += 1
+            queued = True
             try:
                 until = time.monotonic() + 1
                 while counters.get(account, 0) >= per_owner or sum(counters.values()) >= global_cap:
@@ -100,8 +103,6 @@ class AuthoringProxy:
                 self.waiting[account] -= 1
                 if not self.waiting[account]:
                     self.waiting.pop(account)
-            if await self.resolve(token) != identity:
-                return Response(status_code=401, headers={'Cache-Control': 'no-store'})
             if account in self.blocked or any(deadline <= time.time() for deadline in self.deadlines.get(account, {}).values()):
                 return Response(status_code=503, headers={'Cache-Control': 'no-store'})
         if not asset and (counters.get(account, 0) >= per_owner or sum(counters.values()) >= global_cap):
@@ -113,6 +114,10 @@ class AuthoringProxy:
         try:
             # Reserve one second for persisting a failure fence within ten total.
             async with asyncio.timeout(max(0, min(9, started + 9 - time.time()))):
+                # Reserve the slot before this await: concurrent waiters must
+                # not all leave the queue for a single newly available slot.
+                if queued and await self.resolve(token) != identity:
+                    return Response(status_code=401, headers={'Cache-Control': 'no-store'})
                 if not asset and self.admit:
                     await self.admit(identity, token, request_id)
                 response = await self.upstream(path, request, token, identity, started, asset)

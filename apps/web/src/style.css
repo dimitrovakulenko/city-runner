@@ -50,3 +50,4 @@ dialog.modal{position:fixed;inset:0;margin:auto;height:fit-content;max-height:ca
 .import-source-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.import-source-row>div{display:grid;gap:4px;min-width:0}.import-source-row .note{overflow-wrap:anywhere}.import-source-row button{flex-shrink:0}
  .history-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0; }
  .history-files { border-top:1px solid var(--line); margin-top:10px; padding-top:8px; }
+ .insights-sql { overflow-x: auto; padding: 12px; background: #f2f4ef; font-size: 11px; line-height: 1.6; border-radius: 8px; }

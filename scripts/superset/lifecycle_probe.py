@@ -12,7 +12,7 @@ import zipfile
 from application_probe import API, ApplicationClient, application, ready
 
 
-def run(fixture, report):
+def run(fixture, report, before_delete=None):
     account = fixture["lifecycle"]
     boundary = uuid.uuid4().hex
     gpx = b'<?xml version="1.0"?><gpx version="1.1" creator="synthetic-analytics-acceptance"><trk><name>Synthetic lifecycle</name><type>running</type><trkseg><trkpt lat="51.002" lon="3.710"><time>2026-10-01T10:00:00Z</time></trkpt><trkpt lat="51.002" lon="3.7104"><time>2026-10-01T10:01:00Z</time></trkpt></trkseg></trk></gpx>'
@@ -48,6 +48,8 @@ def run(fixture, report):
     with zipfile.ZipFile(io.BytesIO(archive)) as exported:
         report["checks"]["private_definition_exported"] = "Synthetic lifecycle definition" in exported.read("data/analytics.json").decode()
         report["checks"]["original_exported"] = any(name.endswith(".gpx") for name in exported.namelist())
+    if before_delete:
+        before_delete()
     code, receipt = application(account, "DELETE", "/api/account", {"confirmation": "DELETE"})
     report["checks"]["durable_cleanup_pending"] = code == 202 and receipt["status"] == "cleanup-pending"
     report["checks"]["app_session_revoked"] = application(account, "GET", "/api/me")[0] == 401

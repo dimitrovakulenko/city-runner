@@ -1,4 +1,4 @@
-"""Narrow 6.1.0 pilot adapter: SQL Lab query ownership precedes SQL access."""
+"""Narrow 6.1.0 adapter: private object ownership precedes dataset access."""
 
 from superset.errors import ErrorLevel, SupersetError, SupersetErrorType
 from superset.exceptions import SupersetSecurityException
@@ -12,6 +12,13 @@ class PrivateQuerySecurityManager(SupersetSecurityManager):
         query=None, query_context=None, table=None, viz=None, sql=None,
         catalog=None, schema=None, template_params=None,
     ):
+        for definition in (dashboard, chart):
+            if definition is not None and get_user_id() not in {owner.id for owner in definition.owners}:
+                raise SupersetSecurityException(SupersetError(
+                    message="Cannot access another account's analytics object.",
+                    error_type=SupersetErrorType.QUERY_SECURITY_ACCESS_ERROR,
+                    level=ErrorLevel.ERROR,
+                ))
         # Stock tableless query exports can pass the table-access check without
         # any accessible database. A query's creator is an independent boundary.
         if query is not None and hasattr(query, "user_id") and query.user_id != get_user_id():

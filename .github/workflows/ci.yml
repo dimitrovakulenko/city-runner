@@ -8,6 +8,86 @@ permissions:
   contents: read
 
 jobs:
+  analytics-application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install acceptance dependencies
+        run: |
+          python -m pip install -r backend/requirements.txt -r scripts/superset/gateway-requirements.txt
+          npm ci --prefix apps/web
+          npm run build --prefix apps/web
+          cd apps/web
+          npx playwright install --with-deps chromium
+      - name: Start disposable native PostGIS
+        run: |
+          docker build -f scripts/superset/AcceptancePostgis.Dockerfile -t analytics-acceptance-postgis scripts/superset
+          docker run -d --rm --name analytics-acceptance-postgis -e POSTGRES_PASSWORD=disposable-analytics-acceptance -p 55447:5432 analytics-acceptance-postgis
+          for attempt in {1..30}; do docker exec analytics-acceptance-postgis pg_isready -U postgres && break; sleep 1; done
+      - name: Verify real application authoring and deletion replay
+        env:
+          SUPERSET_PROBE_ADMIN_DATABASE_URL: postgresql+psycopg://postgres:disposable-analytics-acceptance@127.0.0.1:55447/postgres
+          PILOT_BROWSER_CHANNEL: chromium
+        run: python scripts/superset/application_acceptance.py --capacity --recovery --output /tmp/analytics-application-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: analytics-application-results
+          path: /tmp/analytics-application-results
+      - name: Remove disposable PostGIS
+        if: always()
+        run: docker rm -f analytics-acceptance-postgis
+
+  analytics-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPERSET_PROBE_ORIGIN: http://127.0.0.1:18090
+      SUPERSET_PROBE_PROJECT: city-runner-superset-upgrade
+      PILOT_BROWSER_CHANNEL: chromium
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci --prefix apps/web
+      - run: npx playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Upgrade populated 6.0.0 metadata to pinned 6.1.0
+        run: docker compose -p city-runner-superset-upgrade -f scripts/superset/compose.yaml -f scripts/superset/upgrade-compose.yaml up -d --build --wait --wait-timeout 240
+      - name: Verify upgraded privacy and browser authoring
+        run: |
+          mkdir -p /tmp/analytics-upgrade-results
+          python scripts/superset/probe.py --output /tmp/analytics-upgrade-results/privacy.json
+          node scripts/superset/browser_probe.mjs --output /tmp/analytics-upgrade-results/browser.json
+      - name: Collect upgrade diagnostics
+        if: always()
+        run: |
+          mkdir -p /tmp/analytics-upgrade-results
+          docker compose -p city-runner-superset-upgrade -f scripts/superset/compose.yaml -f scripts/superset/upgrade-compose.yaml logs --no-color > /tmp/analytics-upgrade-results/containers.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: analytics-upgrade-results
+          path: /tmp/analytics-upgrade-results
+      - name: Remove disposable upgrade project
+        if: always()
+        run: docker compose -p city-runner-superset-upgrade -f scripts/superset/compose.yaml -f scripts/superset/upgrade-compose.yaml down -v
+
   superset-pilot:
     runs-on: ubuntu-latest
     timeout-minutes: 15
