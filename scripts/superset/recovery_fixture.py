@@ -10,12 +10,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from backend.app.account_data import verify_account_deletions
-from backend.app.analytics_api import private_call
 from backend.app.analytics_config import AnalyticsConfig
-from backend.app.analytics_store import owner_key, role_name
-from backend.app.analytics_worker import recover_owner
-from backend.app.storage import LocalObjectStore
+from services.analytics.identity import owner_key, role_name
 
 
 def main():
@@ -32,6 +28,8 @@ def main():
             db.exec_driver_sql("CREATE OR REPLACE FUNCTION analytics.acceptance_slow(seconds double precision) RETURNS integer LANGUAGE sql AS $$ SELECT 1 FROM pg_sleep(least(seconds,30)) $$")
         print(json.dumps({"prepared": True}))
     elif mode == "audit-restored":
+        from backend.app.analytics_api import private_call
+        from backend.app.storage import LocalObjectStore
         with engine.connect() as db:
             primary = db.execute(text("SELECT 1 FROM accounts WHERE id=:account"), {"account": account}).first() is not None
             keys = db.execute(text("SELECT private_object_key FROM activity_sources WHERE account_id=:account"), {"account": account}).scalars().all()
@@ -46,6 +44,7 @@ def main():
         if not all(checks.values()):
             raise SystemExit(1)
     elif mode == "audit-deleted":
+        from backend.app.account_data import verify_account_deletions
         verified = verify_account_deletions(engine)
         print(json.dumps({"all_tombstones_verified": verified}))
         if not verified:
@@ -53,6 +52,7 @@ def main():
     elif mode in {"activity", "recover"}:
         key = owner_key(fixture.get("capacity", fixture["accounts"]["B"])["id"])
         if mode == "recover":
+            from backend.app.analytics_worker import recover_owner
             recover_owner(engine, config, key)
             print(json.dumps({"recovered": True}))
             return
