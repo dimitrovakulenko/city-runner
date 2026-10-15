@@ -14,6 +14,7 @@ const report = { checks: {}, failures: [], objects: {} };
 report.chart_errors = [];
 report.chart_statuses = {};
 report.browser_errors = [];
+report.navigation_statuses = [];
 let current;
 const pages = {};
 
@@ -25,6 +26,15 @@ async function title(page, name, value) {
 try {
   for (const [label, account] of Object.entries(fixture.accounts)) {
     const context = await browser.newContext();
+    context.on('page', (opened) => {
+      opened.on('pageerror', (error) => report.browser_errors.push(String(error)));
+      opened.on('response', (response) => {
+        const url = new URL(response.url());
+        if (url.origin !== analytics) return;
+        if (response.request().isNavigationRequest()) report.navigation_statuses.push({ path: url.pathname, status: response.status() });
+        if (response.status() >= 400) report.browser_errors.push({ path: url.pathname, status: response.status() });
+      });
+    });
     await context.addInitScript(({ origin, token }) => {
       if (location.origin === origin && !sessionStorage.getItem('city-runner.session')) sessionStorage.setItem('city-runner.session', token);
     }, { origin: web, token: account.token });
@@ -53,6 +63,7 @@ try {
     });
     board.setDefaultTimeout(30_000);
     await board.waitForURL(`${analytics}/superset/dashboard/**`);
+    await board.getByRole('button', { name: 'Edit dashboard', exact: true }).waitFor({ timeout: 60_000 });
     await expect(board.getByRole('table')).toHaveCount(5, { timeout: 15_000 });
     await expect(board.getByRole('alert')).toHaveCount(0);
     await expect(board.getByRole('link', { name: 'Open activity', exact: true }).first()).toBeVisible();

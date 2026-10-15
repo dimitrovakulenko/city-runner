@@ -30,7 +30,7 @@ def run(fixture, report):
         for _ in range(5):
             started = time.monotonic()
             code, result = clients[index].execute(databases[index], "SELECT activity_type,count(*) AS activities,sum(distance_m) AS known_distance_m FROM analytics.activities GROUP BY activity_type")
-            assert code == 200, ("Bounded mixed SQL request failed", code)
+            assert code == 200, ("Bounded mixed SQL request failed", code, result.get("message"), result.get("errors"))
             assert sum(row["activities"] for row in result["data"]) == (5000 if index == 0 else 2)
             samples.append((time.monotonic() - started) * 1000)
         return samples
