@@ -51,3 +51,5 @@ dialog.modal{position:fixed;inset:0;margin:auto;height:fit-content;max-height:ca
  .history-actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0; }
  .history-files { border-top:1px solid var(--line); margin-top:10px; padding-top:8px; }
  .insights-sql { overflow-x: auto; padding: 12px; background: #f2f4ef; font-size: 11px; line-height: 1.6; border-radius: 8px; }
+.route-following{max-width:260px;background:#ffffffed;border:1px solid #d1e4ef;border-radius:9px;padding:12px;color:#225575;font-size:11px;line-height:1.6;box-shadow:0 3px 16px #44503515}.route-following[data-course=off-route]{border-color:#dfab99;background:#fff4ee;color:#975d50}.following-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}.following-actions .secondary{font-size:10px;padding:8px 10px}
+@media(max-width:720px){.route-following{max-width:220px;padding:9px;font-size:10px}}

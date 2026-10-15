@@ -35,3 +35,35 @@ sources, jobs, visits, or street completion.
 Tests inject synthetic OSRM-shaped responses through the test-only
 `create_app(routing_provider=...)` hook. The same response validator runs for
 injected results. Tests do not call FOSSGIS or use real route coordinates.
+
+## Web route following
+
+Preview a walking route or open a saved route in **Routes**, then choose **Follow
+route** on the map. The marker follows fresh browser GPS fixes; the map follows
+the marker until you pan. **Recenter route** restores camera following. The map
+shows **On route**, **Off route** with distance to the route, or an uncertain
+position when the reported accuracy overlaps the 50 m route corridor. Distance
+uses the nearest bounded great-circle segment, including endpoints; it does not
+infer progress along loops or crossings.
+
+Following requires browser location permission and HTTPS or localhost. Fixes
+must be finite, within the map's latitude limits, no more than 15 seconds old,
+and accurate to 50 m or better. Invalid, coarse, unavailable or overdue positions
+hide the marker and route classification. The existing watch can recover on a
+fresh fix; **Retry GPS** replaces it. Permission denial clears the watch and
+provides an explicit retry. Out-of-order fixes and callbacks from stopped watches
+are ignored. See the [browser geolocation contract](https://www.w3.org/TR/geolocation/).
+
+A hidden page or `pagehide` pauses following and clears its watch and position.
+Returning requires **Resume following**. Leaving Routes, changing/editing the
+preview, logging out, replacing the account session or reloading stops following.
+Logout clears GPS immediately, including while server revocation is pending.
+**Stop following** clears the watch and marker. Following uses the already-loaded
+route geometry; offline GPS updates can continue while that page stays visible,
+although map tiles and coverage refresh still depend on connectivity.
+
+Positions stay in memory, and automatic following camera moves do not replace
+remembered viewport preferences. Ordinary map/tile viewport requests continue.
+Following creates no activity, recording or GPS coverage and requests no new
+route calculation. Native route-following and device acceptance remain D29 work
+for the separate device team.

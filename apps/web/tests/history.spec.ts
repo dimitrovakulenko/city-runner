@@ -92,7 +92,7 @@ test('ZIP history crosses batch boundaries, stops/reloads/reselects, and never r
 test('folder selection imports more than20files without paths and rejects bad archives without manifests', async ({ page }) => {
   const owner = 'history-folder'; await signIn(page, owner);
   await chooseZip(page, 'Import ZIP', Buffer.from('not a zip'));
-  await expect(page.getByRole('alert')).toContainText('corrupt');
+  await expect(page.getByRole('alert').filter({ hasText: 'corrupt' })).toBeVisible();
   expect((await (await page.request.get('/api/import-histories', { headers: headers(owner) })).json()).total).toBe(0);
   const directory = mkdtempSync(join(tmpdir(), 'city-runner-history-folder-'));
   try {

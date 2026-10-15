@@ -2,7 +2,7 @@
 
 The first D37 slice uses React and MapLibre with the production backend. It reuses the generated API types, API clients, authentication controller and account-scoped stores in `apps/mobile/src`. Browser adapters supply Google Identity Services, tab session storage and real `File` multipart bodies. The PoC is separate.
 
-Implemented: responsive Explore map with current location, account-scoped remembered view and offline recovery, date/type/source activity and track filters with explicit lifetime/selection GPS coverage, activities/search/detail/deletion with per-run exploration gains, city/street search, completion sorting, nearly-done filtering and Node Hunter, separate manual completion/undo, durable GPX/FIT manifests, source status and automatic foreground refresh, account archives/deletion, and waypoint planning with saved routes and GPX export. Provider connections and desktop packaging remain future slices.
+Implemented: responsive Explore map with current location, account-scoped remembered view and offline recovery, date/type/source activity and track filters with explicit lifetime/selection GPS coverage, activities/search/detail/deletion with per-run exploration gains, city/street search, completion sorting, nearly-done filtering and Node Hunter, separate manual completion/undo, durable GPX/FIT manifests, source status and automatic foreground refresh, account archives/deletion, and waypoint planning with saved routes, GPX export and foreground GPS route following. Provider connections and desktop packaging remain future slices.
 
 ## Development
 
@@ -50,6 +50,8 @@ Open **Account** (or the account avatar) and **Download account archive** to sav
 Apply the backend migrations and explicitly set `ROUTING_PROVIDER=fossgis` for development foot routing. Routing is disabled by default; see [routing limits and provider policy](../../docs/routing.md). Routes use the account-owned production APIs, not browser storage.
 
 Open **Routes**, click the map to add up to 20 waypoints, drag numbered markers to move them, and use the list to reorder/remove/undo or enter precise coordinates. A city street's remaining-node **+** button starts or extends the draft. Preview is explicit; edits discard old geometry and late responses cannot overwrite a newer draft. Enter a name, preview, then save. Reopen saved routes after reload or on another device, edit with revision conflict protection, delete, or export the saved GPX. Planned routes never change GPS coverage. GPX uses route points without recording timestamps.
+
+Choose **Follow route** on the map after previewing or opening a saved route. Live position, accuracy-aware on/off-route status and pan/recenter work while the page is visible. GPS loss hides stale guidance and recovers on a fresh fix; hidden pages require explicit resume. Route edits, navigation and logout stop following. See the [following contract](../../docs/routing.md#web-route-following).
 
 The development service receives/logs waypoints and permits at most one request per second. Its foot graph and 100 m snapping bound do not establish acceptance for every access restriction or closure. Provider capacity/terms acceptance remains open before public release.
 

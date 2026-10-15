@@ -24,6 +24,7 @@ import { createCorrectionApi } from '../../mobile/src/api/corrections';
 import type { ActivityFilters, ImportBatchItemResponse } from '../../mobile/src/api/generated';
 import { BrowserFiles } from './files';
 import { BrowserSessions } from './session';
+import { RouteFollowingStore } from './routeFollowing';
 
 export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl = globalThis.fetch) {
   const options = { baseUrl, sessionStore: sessions, fetchImpl };
@@ -48,6 +49,8 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
   const cities = new CityExplorerStore(createCityExplorerApi(options), createDatasetApi(options));
   const preparation = new CoveragePreparationStore(createCoveragePreparationApi(options));
   const planner = new RoutePlannerStore(createRouteApi(options));
+  const following = new RouteFollowingStore();
+  planner.subscribe((state) => following.setRoute(state.preview));
   const imports = new ImportStore(createBrowserImportApi(options, files, false), () => crypto.randomUUID(), () => {
     void sync.retryRefresh();
   }, createHistoryImportApi(options), (uri) => files.release(uri));
@@ -75,10 +78,10 @@ export function createRuntime(sessions: BrowserSessions, baseUrl = '', fetchImpl
       (!city.selectedCityId || !city.streetError) && (!city.selectedStreetId || !city.detailError && !city.contributionError) &&
       !imports.getState().error && !imports.getState().historyError && preparation.getState().status === 'ready';
   });
-  const reset = () => { sync.reset(); preparation.reset(); files.clear(); account.reset(); activitySources.reset(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); planner.reset(); };
+  const reset = () => { following.reset(); sync.reset(); preparation.reset(); files.clear(); account.reset(); activitySources.reset(); activities.reset(); explore.reset(); cities.reset(); imports.reset(); corrections.reset(); planner.reset(); };
   sessions.subscribe(reset);
   const applyFilters = (filters: ActivityFilters) => { activities.setFilters(filters); explore.setFilters(filters); };
-  return { sessions, files, api, analytics, account, activities, activitySources, explore, cities, preparation, imports, corrections, planner, sync, reset, applyFilters };
+  return { sessions, files, api, analytics, account, activities, activitySources, explore, cities, preparation, imports, corrections, planner, following, sync, reset, applyFilters };
 }
 
 export type Runtime = ReturnType<typeof createRuntime>;
