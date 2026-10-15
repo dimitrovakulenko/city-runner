@@ -23,16 +23,16 @@
   },
   "objects": {
     "A": {
-      "chart": 16,
-      "dashboard": 19,
-      "marker": "Browser A 1792069166997",
-      "saved_query": 6
+      "chart": 3,
+      "dashboard": 3,
+      "marker": "Browser A 1792069868037",
+      "saved_query": 3
     },
     "B": {
-      "chart": 17,
-      "dashboard": 20,
-      "marker": "Browser B 1792069180296",
-      "saved_query": 7
+      "chart": 4,
+      "dashboard": 4,
+      "marker": "Browser B 1792069889432",
+      "saved_query": 4
     }
   },
   "failures": [],

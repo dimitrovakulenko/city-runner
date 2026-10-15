@@ -29,35 +29,41 @@
   "observations": {
     "sql_lab_external_deadline_select": {
       "status": 500,
-      "seconds": 8.119,
+      "seconds": 8.113,
       "database_query_gone": true
     },
     "sql_lab_external_deadline_set": {
       "status": 500,
-      "seconds": 8.116,
+      "seconds": 8.112,
       "database_query_gone": true
     },
     "sql_lab_external_deadline_reset": {
       "status": 500,
-      "seconds": 8.116,
+      "seconds": 8.113,
       "database_query_gone": true
     },
     "download_external_deadline": {
       "status": 500,
-      "seconds": 8.117,
+      "seconds": 8.112,
       "database_query_gone": true
     },
     "explore_external_deadline": {
       "status": 400,
-      "seconds": 8.123,
+      "seconds": 8.115,
       "database_query_gone": true
     },
     "two_owner_queries_running": {
       "active": 2
     },
     "explicit_cancel_terminates_database_query": {
-      "seconds": 0.032,
-      "status": 200
+      "seconds": 0.033,
+      "status": 200,
+      "execution_status": 200
+    },
+    "second_cancel_terminates_remaining_query": {
+      "status": 200,
+      "execution_status": 200,
+      "remaining_queries": 0
     }
   },
   "probe_passed": true

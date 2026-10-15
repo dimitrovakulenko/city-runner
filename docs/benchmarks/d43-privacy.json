@@ -142,13 +142,13 @@
   },
   "observations": {
     "database_owner_a": {
-      "seconds": 0.119
+      "seconds": 0.097
     },
     "postgres_timeout_is_mutable_a": {
       "returned": "0"
     },
     "database_owner_b": {
-      "seconds": 0.093
+      "seconds": 0.105
     },
     "postgres_timeout_is_mutable_b": {
       "returned": "0"
@@ -220,26 +220,26 @@
     "a": {
       "database": 1,
       "dataset": 1,
-      "saved_query": 8,
-      "chart": 18,
-      "dashboard": 21,
-      "marker": "a-private-a38dd7fd",
-      "query_id": 20,
-      "client_id": "02e396cdc6",
-      "tab": 4,
-      "table_schema": 3
+      "saved_query": 1,
+      "chart": 1,
+      "dashboard": 1,
+      "marker": "a-private-8d43b719",
+      "query_id": 2,
+      "client_id": "263daee4c4",
+      "tab": 1,
+      "table_schema": 1
     },
     "b": {
       "database": 2,
       "dataset": 2,
-      "saved_query": 9,
-      "chart": 19,
-      "dashboard": 22,
-      "marker": "b-private-a305142b",
-      "query_id": 22,
-      "client_id": "a2843361a3",
-      "tab": 5,
-      "table_schema": 4
+      "saved_query": 2,
+      "chart": 2,
+      "dashboard": 2,
+      "marker": "b-private-c7a5501a",
+      "query_id": 4,
+      "client_id": "a9d0fa86e7",
+      "tab": 2,
+      "table_schema": 2
     }
   },
   "not_covered_by_this_probe": [

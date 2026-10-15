@@ -7,7 +7,7 @@
     "probe_completed": true
   },
   "observations": {
-    "fault_duration_seconds": 8.716
+    "fault_duration_seconds": 8.645
   },
   "probe_passed": true
 }
