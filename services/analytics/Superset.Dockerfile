@@ -3,5 +3,6 @@ USER root
 RUN uv pip install --python /app/.venv/bin/python psycopg2-binary==2.9.11
 COPY services/analytics /repo/services/analytics
 COPY scripts/superset /repo/scripts/superset
+RUN /app/.venv/bin/python /repo/scripts/superset/patch_sql_lab.py
 ENV PYTHONPATH=/repo:/repo/scripts/superset
 USER superset
