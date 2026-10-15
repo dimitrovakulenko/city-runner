@@ -95,18 +95,21 @@ try {
     expect(copyId).not.toBe(id);
     report.checks[`duplicate_board_and_charts_${label}`] = true;
     await board.goto(`${analytics}/dashboard/list/`);
-    const copyRow = board.getByRole('row').filter({ hasText: marker + ' copy' });
-    await copyRow.waitFor();
-    await copyRow.getByRole('button', { name: /delete/i }).click();
+    // The table cell's confirmation can unmount when favorite status refreshes.
+    // Card deletion keeps its confirmation state in DashboardList itself.
+    await board.locator('.toggle-button').first().click();
+    const copyCard = board.locator('[data-test="styled-card"]').filter({ hasText: marker + ' copy' });
+    await copyCard.locator('[data-test="card-actions"] button').click();
+    await board.locator('[data-test="dashboard-card-option-delete-button"]').click();
     const deletion = board.getByRole('dialog');
     await deletion.getByRole('textbox').fill('DELETE');
     const [deleted] = await Promise.all([
       board.waitForResponse((response) => response.url().endsWith(`/api/v1/dashboard/${copyId}`) && response.request().method() === 'DELETE'),
-      deletion.getByRole('button', { name: /delete/i }).click({ force: true }),
+      deletion.getByRole('button', { name: /delete/i }).click(),
     ]);
     expect(deleted.status()).toBe(200);
     await expect(deletion).toHaveCount(0);
-    await expect(copyRow).toHaveCount(0);
+    await expect(copyCard).toHaveCount(0);
     report.checks[`delete_own_board_${label}`] = true;
     await board.goto(`${analytics}/superset/dashboard/${id}/`);
     await page.getByLabel('Default board', { exact: true }).selectOption(id);
