@@ -73,7 +73,8 @@ class AuthoringProxy:
             path,
         ) is not None
         metadata = metadata or request.method in {"POST", "PUT", "PATCH", "DELETE"} and re.fullmatch(
-            r"api/v1/(?:chart|dashboard|saved_query)/(?:\d+/?)?|api/v1/explore/form_data/?", path,
+            r"api/v1/(?:chart|dashboard|saved_query)/(?:\d+/?)?|api/v1/explore/form_data/?"
+            r"|api/v1/dashboard/\d+/(?:copy|filter_state(?:/[^/]+)?)/?", path,
         ) is not None
         metadata = metadata or re.fullmatch(r'(?:tabstateview|tableschemaview)(?:/[^/]+){0,3}/?', path) is not None
         control = request.method == 'POST' and path.rstrip('/') == 'api/v1/query/stop'

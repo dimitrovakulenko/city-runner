@@ -59,6 +59,10 @@ def main():
         def run(command, **kwargs):
             kwargs.setdefault("env", env)
             return subprocess.run(command, check=True, cwd=ROOT, **kwargs)
+        def metadata_probe(filename):
+            with (args.output / filename).open("w") as log:
+                run([*compose, "exec", "-T", "-e", "CITY_RUNNER_SYNTHETIC_ACCEPTANCE=1", "superset", "python", "-"],
+                    input=(ROOT / "scripts/superset/metadata_lifecycle_probe.py").read_text(), text=True, stdout=log, stderr=subprocess.STDOUT)
         try:
             run([*compose, "up", "-d", "--build", "--wait", "--wait-timeout", "180", "app", "superset", "gateway"])
             run([*compose, "exec", "-T", "app", "python", "scripts/superset/acceptance_seed.py"])
@@ -122,13 +126,12 @@ def main():
                 if time.monotonic() > deadline:
                     raise RuntimeError("Durable analytics cleanup did not complete.")
                 time.sleep(0.5)
-            with (args.output / "metadata-cleanup.log").open("w") as log:
-                run([*compose, "exec", "-T", "-e", "CITY_RUNNER_SYNTHETIC_ACCEPTANCE=1", "superset", "python", "-"],
-                    input=(ROOT / "scripts/superset/metadata_lifecycle_probe.py").read_text(), text=True, stdout=log, stderr=subprocess.STDOUT)
+            metadata_probe("metadata-cleanup.log")
             run([*compose, "stop", "projector", "imports"])
             run([*compose, "exec", "-T", "app", "python", "-m", "backend.app.account_data", "--restore"])
             if recovery:
                 recovery.restore_and_verify()
+                metadata_probe("metadata-restored-cleanup.log")
             (args.output / "completion.json").write_text(json.dumps({"application": True, "browser": not args.no_browser,
                 "durable_cleanup": True, "metadata_orphan_cleanup": True, "journal_replay_verified": True}) + "\n")
         finally:

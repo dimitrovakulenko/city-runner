@@ -1,6 +1,7 @@
 """Upload, export, and delete one disposable account through the real APIs."""
 
 import argparse
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -43,6 +44,16 @@ def run(fixture, report, before_delete=None):
     code, query = client.request("POST", "/api/v1/saved_query/", {
         "db_id": database, "label": "Synthetic lifecycle definition", "schema": "analytics", "sql": "SELECT 1"})
     assert code == 201
+    marker = "lifecycle-authoring-" + hashlib.sha256(account["id"].encode()).hexdigest()
+    code, cached = client.request("POST", f"/api/v1/dashboard/{state['boards'][0]['id']}/filter_state", {"value": marker})
+    assert code == 201, (code, cached)
+    report["checks"]["private_filter_state_created"] = marker in str(client.request("GET", f"/api/v1/dashboard/{state['boards'][0]['id']}/filter_state/{cached['key']}")[1])
+    code, datasets = client.request("GET", "/api/v1/dataset/")
+    assert code == 200
+    dataset = next(row["id"] for row in datasets["result"] if row["table_name"] == "activities")
+    code, cached = client.request("POST", "/api/v1/explore/form_data", {"datasource_id": dataset, "datasource_type": "table", "form_data": json.dumps({"private_marker": marker})})
+    assert code == 201, (code, cached)
+    report["checks"]["private_explore_state_created"] = marker in str(client.request("GET", f"/api/v1/explore/form_data/{cached['key']}")[1])
     code, archive = application(account, "GET", "/api/account/export")
     assert code == 200
     with zipfile.ZipFile(io.BytesIO(archive)) as exported:

@@ -146,7 +146,8 @@ class AdmissionTests(unittest.IsolatedAsyncioTestCase):
                         client.get('/api/v1/dashboard/1/datasets'), client.get('/api/v1/dashboard/1/charts'),
                     ])
                     self.assertTrue(all(response.status_code == 200 for response in responses))
-                    for path in ('/api/v1/chart/', '/api/v1/dashboard/1', '/api/v1/saved_query/1', '/api/v1/explore/form_data/'):
+                    for path in ('/api/v1/chart/', '/api/v1/dashboard/1', '/api/v1/saved_query/1', '/api/v1/explore/form_data/',
+                                 '/api/v1/dashboard/1/copy/', '/api/v1/dashboard/1/filter_state'):
                         self.assertEqual((await client.post(path)).status_code, 200)
                     stop = asyncio.create_task(client.post('/api/v1/query/stop'))
                     await asyncio.wait_for(control_admitted.wait(), 3)

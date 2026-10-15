@@ -23,6 +23,9 @@ def main():
         client = app.test_client()
         call = lambda action: client.post(f"/integration/{owner}/{action}", headers=headers, json={})
         checks = {}
+        private_cache = db.session.execute(text("SELECT count(*) FROM key_value WHERE position(:marker in value)>0"),
+            {"marker": ("lifecycle-authoring-" + owner).encode()}).scalar_one()
+        checks["deleted_authoring_cache_payloads_removed"] = private_cache == 0
         checks["deleted_owner_cannot_be_reprovisioned"] = call("provision").status_code == 404
         with owner_rpc(owner, "verify-deleted"):
             checks["inflight_handler_serializes_cleanup"] = call("delete").status_code == 503

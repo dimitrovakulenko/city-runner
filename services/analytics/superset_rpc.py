@@ -212,7 +212,8 @@ def _remove_user_references(user_id):
 
     inspector = inspect(db.engine)
     # These are metadata references to this exact private user, never shared
-    # object IDs. Nullable audit columns are cleared; private join/log rows go.
+    # object IDs. Clear nullable audit columns, but delete private cache payloads
+    # and private join/log rows rather than retaining their contents.
     for table in inspector.get_table_names():
         if table == "ab_user":
             continue
@@ -223,7 +224,7 @@ def _remove_user_references(user_id):
             column = key["constrained_columns"][0]
             quote = db.engine.dialect.identifier_preparer.quote
             table_sql, column_sql = quote(table), quote(column)
-            if column in {"created_by_fk", "changed_by_fk"} and columns[column]["nullable"]:
+            if table != "key_value" and column in {"created_by_fk", "changed_by_fk"} and columns[column]["nullable"]:
                 db.session.execute(text(f"UPDATE {table_sql} SET {column_sql}=NULL WHERE {column_sql}=:user"), {"user": user_id})
             else:
                 db.session.execute(text(f"DELETE FROM {table_sql} WHERE {column_sql}=:user"), {"user": user_id})
