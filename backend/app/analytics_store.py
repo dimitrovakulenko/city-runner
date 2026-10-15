@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import hashlib
-import hmac
-import re
 import time
 
 from sqlalchemy import (BigInteger, Boolean, Column, Date, Float, Index, Integer,
                         MetaData, String, Table, Text, delete, insert, text)
+from services.analytics.identity import owner_key, role_name, role_password, cancel_role, cancel_password
 
 
 metadata = MetaData(schema="analytics")
@@ -47,21 +45,7 @@ TABLES = {
 }
 
 
-def owner_key(account_id: str) -> str:
-    return hashlib.sha256(account_id.encode()).hexdigest()
-
-
-def role_name(owner: str) -> str:
-    if re.fullmatch(r"[0-9a-f]{64}", owner) is None:
-        raise ValueError("Invalid analytics owner.")
-    return "cr_a_" + owner[:48]
-
-
-def role_password(secret: bytes, owner: str) -> str:
-    return hmac.new(secret, f"analytics-role:{owner}".encode(), hashlib.sha256).hexdigest()
-
-
-def initialize_store(engine) -> None:
+def initialize_store(engine, secret: bytes | None = None) -> None:
     """Operator-only initialization; never point this at the application instance."""
     with engine.begin() as db:
         if db.exec_driver_sql("SELECT to_regclass('public.activities') IS NOT NULL").scalar_one():
@@ -75,16 +59,52 @@ def initialize_store(engine) -> None:
         db.exec_driver_sql("""CREATE TABLE IF NOT EXISTS control.schema_version (
             singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),version integer NOT NULL)""")
         db.exec_driver_sql("INSERT INTO control.schema_version VALUES (true,1) ON CONFLICT DO NOTHING")
-        if db.exec_driver_sql("SELECT version FROM control.schema_version").scalar_one() != 1:
+        if db.exec_driver_sql("SELECT version FROM control.schema_version").scalar_one() not in (1, 2):
             raise RuntimeError("Unsupported analytics store schema version.")
         db.exec_driver_sql("""CREATE TABLE IF NOT EXISTS control.owners (
             owner_key char(64) PRIMARY KEY,role_name name NOT NULL UNIQUE,
             generation uuid,source_revision text,fenced boolean NOT NULL DEFAULT false,
             enabled boolean NOT NULL DEFAULT false)""")
+        db.exec_driver_sql("""CREATE TABLE IF NOT EXISTS control.requests (
+            request_id uuid PRIMARY KEY,owner_key char(64) NOT NULL
+              REFERENCES control.owners(owner_key) ON DELETE CASCADE,
+            started_at timestamptz NOT NULL DEFAULT now())""")
+        db.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_requests_owner ON control.requests(owner_key)")
+        db.exec_driver_sql("""CREATE TABLE IF NOT EXISTS control.gateway (
+            singleton boolean PRIMARY KEY DEFAULT true CHECK(singleton),instance uuid,leased_until timestamptz)""")
+        db.exec_driver_sql("INSERT INTO control.gateway(singleton) VALUES(true) ON CONFLICT DO NOTHING")
+        db.exec_driver_sql("UPDATE control.schema_version SET version=2")
         metadata.create_all(db)
         for table in TABLES.values():
             db.exec_driver_sql(f"ALTER TABLE analytics.{table.name} ENABLE ROW LEVEL SECURITY")
             db.exec_driver_sql(f"REVOKE ALL ON analytics.{table.name} FROM PUBLIC")
+        if secret is not None:
+            database_name = db.exec_driver_sql("SELECT current_database()").scalar_one()
+            cancel = cancel_role(database_name)
+            password = cancel_password(secret, database_name)
+            if not db.execute(text("SELECT 1 FROM pg_roles WHERE rolname=:role"), {"role": cancel}).first():
+                db.exec_driver_sql(f"CREATE ROLE {cancel} LOGIN PASSWORD '{password}' CONNECTION LIMIT 4")
+            db.exec_driver_sql("""CREATE OR REPLACE FUNCTION control.terminate_query(
+                requested_owner text,requested_pid integer,requested_start timestamptz)
+                RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
+                SET search_path=pg_catalog,control AS $$
+                DECLARE expected_role name;
+                BEGIN
+                    SELECT role_name INTO expected_role FROM control.owners WHERE owner_key=requested_owner;
+                    IF expected_role IS NULL THEN RETURN false; END IF;
+                    IF EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid=requested_pid
+                        AND backend_start=requested_start AND usename=expected_role
+                        AND datname=current_database()) THEN
+                        PERFORM pg_terminate_backend(requested_pid,500);
+                    END IF;
+                    PERFORM pg_stat_clear_snapshot();
+                    RETURN NOT EXISTS (SELECT 1 FROM pg_stat_activity WHERE pid=requested_pid
+                        AND backend_start=requested_start AND usename=expected_role
+                        AND datname=current_database());
+                END $$""")
+            db.exec_driver_sql("REVOKE ALL ON FUNCTION control.terminate_query(text,integer,timestamptz) FROM PUBLIC")
+            db.exec_driver_sql(f"GRANT USAGE ON SCHEMA control TO {cancel}")
+            db.exec_driver_sql(f"GRANT EXECUTE ON FUNCTION control.terminate_query(text,integer,timestamptz) TO {cancel}")
 
 
 def provision_role(db, owner: str, secret: bytes) -> str:
@@ -135,6 +155,7 @@ def remove_owner(db, owner: str) -> None:
     if db.execute(text("SELECT 1 FROM pg_roles WHERE rolname=:role"), {"role": role}).first():
         db.exec_driver_sql(f"ALTER ROLE {role} NOLOGIN")
         db.execute(text("SELECT pg_terminate_backend(pid,1000) FROM pg_stat_activity WHERE usename=:role"), {"role": role}).all()
+        db.exec_driver_sql("SELECT pg_stat_clear_snapshot()")
         if db.execute(text("SELECT 1 FROM pg_stat_activity WHERE usename=:role"), {"role": role}).first():
             raise RuntimeError("Analytics owner connections remain active.")
         for table in TABLES.values():

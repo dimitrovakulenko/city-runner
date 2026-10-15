@@ -3,10 +3,8 @@
 import asyncio
 import secrets
 import time
-import re
 import threading
 import os
-from http.cookies import SimpleCookie
 from datetime import timedelta
 
 import httpx
@@ -14,6 +12,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import StaticPool
+
+from services.analytics.proxy import AuthoringProxy, Identity
 
 from backend.app.auth import account_for_token, revoke_token, utcnow
 
@@ -33,20 +33,13 @@ if not SESSION_DATABASE:
 
 COOKIE = "city_runner_pilot"
 UPSTREAM = "http://superset:8088"
-ACTIVE = {"pilot-a": 0, "pilot-b": 0}
-METADATA_ACTIVE = {"pilot-a": 0, "pilot-b": 0}
-CONTROL_ACTIVE = {"pilot-a": 0, "pilot-b": 0}
-WAITING = {"pilot-a": 0, "pilot-b": 0}
-DEADLINES = {"pilot-a": {}, "pilot-b": {}}
-BLOCKED = set()
-REQUEST_CAP = 1024 * 1024
-RESPONSE_CAP = 8 * 1024 * 1024
+PILOT_ACCOUNTS = {"pilot-a", "pilot-b"}
 
 
 def owner(token):
     with SESSION_LOCK, engine.connect() as connection:
         account = account_for_token(connection, token) if token else None
-        return account if account in ACTIVE else None
+        return account if account in PILOT_ACCOUNTS else None
 
 
 @app.get("/pilot/", response_class=HTMLResponse)
@@ -140,126 +133,16 @@ def logout(request: Request):
     return response
 
 
-@app.api_route("/{path:path}", methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
-async def proxy(path: str, request: Request):
-    started = time.time()
-    token = request.cookies.get(COOKIE)
-    account = owner(token)
-    if account is None:
-        return Response(status_code=401, headers={"Cache-Control": "no-store"})
-    if account in BLOCKED or any(deadline <= time.time() for deadline in DEADLINES[account].values()):
-        return Response(status_code=503, headers={"Cache-Control": "no-store"})
-    check_origin(request)
-    asset = request.method in {"GET", "HEAD"} and path.startswith("static/") and "%" not in path and ".." not in path.split("/")
-    # Only explicitly metadata-only GET routes bypass query admission. Unknown
-    # routes (including downloads, samples and previews) retain the query budget.
-    metadata = request.method in {"GET", "HEAD"} and re.fullmatch(
-        r"api/v1/(?:chart|dashboard|saved_query|query)/(?:\d+/?|_info/?|favorite_status/?|related/[^/]+/?)?"
-        r"|api/v1/dashboard/\d+/(?:datasets|charts)/?"
-        r"|api/v1/(?:me|database|security/csrf_token)/?"
-        r"|api/v1/explore/(?:form_data/[^/]+/?)?"
-        r"|(?:explore|sqllab|superset/welcome)/?"
-        r"|superset/dashboard/\d+/?"
-        r"|(?:chart/(?:list|add)|dashboard/list|tablemodelview/list)/?",
-        path,
-    ) is not None
-    metadata = metadata or request.method in {"POST", "PUT", "PATCH", "DELETE"} and re.fullmatch(
-        r"api/v1/(?:chart|dashboard|saved_query)/(?:\d+/?)?|api/v1/explore/form_data/?", path,
-    ) is not None
-    metadata = metadata or re.fullmatch(r'(?:tabstateview|tableschemaview)(?:/[^/]+){0,3}/?', path) is not None
-    control = request.method == 'POST' and path.rstrip('/') == 'api/v1/query/stop'
-    counters = CONTROL_ACTIVE if control else METADATA_ACTIVE if metadata else ACTIVE
-    per_owner, global_cap = (1, 2) if control else (16, 32) if metadata else (2, 4)
-    # Superset fans out chart previews and database introspection. Let a bounded
-    # burst wait briefly for the same two query slots; SQL Lab remains fail-fast.
-    queueable = path.rstrip('/') == 'api/v1/chart/data' or (
-        request.method == 'POST' and re.fullmatch(r'api/v1/database/\d+/validate_sql/?', path) is not None) or (
-        request.method == 'GET' and path.startswith('api/v1/database/'))
-    if not asset and not metadata and not control and queueable and (
-        counters[account] >= per_owner or sum(counters.values()) >= global_cap
-    ):
-        if WAITING[account] >= 8 or sum(WAITING.values()) >= 16:
-            return Response(status_code=429, headers={'Cache-Control': 'no-store'})
-        WAITING[account] += 1
-        try:
-            until = time.monotonic() + 1
-            while counters[account] >= per_owner or sum(counters.values()) >= global_cap:
-                if time.monotonic() >= until:
-                    return Response(status_code=429, headers={'Cache-Control': 'no-store'})
-                await asyncio.sleep(0.01)
-        finally:
-            WAITING[account] -= 1
-        if owner(token) != account:
-            return Response(status_code=401, headers={'Cache-Control': 'no-store'})
-        if account in BLOCKED or any(deadline <= time.time() for deadline in DEADLINES[account].values()):
-            return Response(status_code=503, headers={'Cache-Control': 'no-store'})
-    if not asset and (counters[account] >= per_owner or sum(counters.values()) >= global_cap):
-        return Response(status_code=429, headers={"Cache-Control": "no-store"})
-    if not asset:
-        counters[account] += 1
-        request_id = secrets.token_hex(16)
-        DEADLINES[account][request_id] = started + 8
-    try:
-        async with asyncio.timeout(max(0, min(10, started + 10 - time.time()))):
-            return await upstream(path, request, token, account, started, asset)
-    except TimeoutError:
-        if not asset:
-            BLOCKED.add(account)
-        return Response(status_code=504, headers={"Cache-Control": "no-store"})
-    finally:
-        if not asset:
-            counters[account] -= 1
-            DEADLINES[account].pop(request_id)
+async def resolve_session(token):
+    account = await asyncio.to_thread(owner, token)
+    return Identity(account) if account else None
 
 
-async def upstream(path, request, token, account, started, asset):
-    body = bytearray()
-    async for chunk in request.stream():
-        if len(body) + len(chunk) > REQUEST_CAP:
-            return Response(status_code=413)
-        body.extend(chunk)
-    headers = {key: value for key, value in request.headers.items() if not key.lower().startswith(("x-forwarded-", "x-city-runner-")) and key.lower() not in {
-        "host", "connection", "authorization", "x-city-runner-account", "remote-user",
-        "forwarded", "cookie", "accept-encoding",
-    }}
-    cookies = SimpleCookie()
-    cookies.load(request.headers.get("cookie", ""))
-    if "session" in cookies:
-        headers["Cookie"] = f"session={cookies['session'].coded_value}"
-    headers["X-City-Runner-Account"] = account
-    headers["X-City-Runner-Deadline"] = str(started + 8)
-    headers["X-Forwarded-Host"] = "127.0.0.1:8090"
-    headers["X-Forwarded-Proto"] = "http"
-    headers["Accept-Encoding"] = "identity"
-    async with httpx.AsyncClient(timeout=20, follow_redirects=False) as client:
-        try:
-            async with client.stream(
-                request.method, f"{UPSTREAM}/{path}", params=request.query_params,
-                content=bytes(body), headers=headers,
-            ) as result:
-                if result.headers.get("X-Analytics-Cancellation-Failed") == "1":
-                    BLOCKED.add(account)
-                    return Response(status_code=503, headers={"Cache-Control": "no-store"})
-                content = bytearray()
-                async for chunk in result.aiter_bytes():
-                    if len(content) + len(chunk) > (4 * RESPONSE_CAP if asset else RESPONSE_CAP):
-                        if not asset:
-                            BLOCKED.add(account)
-                        return Response(status_code=502)
-                    content.extend(chunk)
-        except httpx.RequestError:
-            if not asset:
-                BLOCKED.add(account)
-            return Response(status_code=502, headers={"Cache-Control": "no-store"})
-    # An expired/revoked/replaced session cannot publish a completed response.
-    if owner(token) != account:
-        return Response(status_code=401, headers={"Cache-Control": "no-store"})
-    if result.headers.get("X-Analytics-Cancellation-Failed") == "1":
-        BLOCKED.add(account)
-        return Response(status_code=503, headers={"Cache-Control": "no-store"})
-    response = Response(bytes(content), status_code=result.status_code)
-    for key, value in result.headers.multi_items():
-        if key.lower() not in {"content-length", "content-encoding", "transfer-encoding", "connection", "cache-control"}:
-            response.headers.append(key, value)
-    response.headers["Cache-Control"] = "no-store"
-    return response
+async def local_fence(account):
+    pass  # Disposable pilot recovery is explicitly process-local.
+
+
+boundary = AuthoringProxy(resolve=resolve_session, fence=local_fence, check_origin=check_origin,
+    cookie=COOKIE, upstream=UPSTREAM, public_origin="http://127.0.0.1:8090")
+app.add_api_route("/{path:path}", boundary.proxy,
+    methods=["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])

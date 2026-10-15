@@ -63,6 +63,12 @@ SCHEMAS = (
     "ActivitySourcePage",
     "CoveragePreparationCity",
     "CoveragePreparationResponse",
+    "AnalyticsBoard",
+    "AnalyticsStatus",
+    "AnalyticsPreferences",
+    "AnalyticsHandoffRequest",
+    "AnalyticsHandoff",
+    "AnalyticsTemplateRequest",
 )
 
 

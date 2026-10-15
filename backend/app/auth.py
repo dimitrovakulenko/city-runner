@@ -146,6 +146,11 @@ def session_lifetime_days() -> int:
 
 def account_for_token(db: Connection, token: str) -> str | None:
     digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    return account_for_session_digest(db, digest)
+
+
+def account_for_session_digest(db: Connection, digest: str) -> str | None:
+    """Server-only session reference used by linked analytics sessions."""
     result = db.execute(text("""SELECT account_id FROM sessions
         WHERE token_digest=:digest AND revoked_at IS NULL AND expires_at>:now"""), {
         "digest": digest, "now": utcnow(),

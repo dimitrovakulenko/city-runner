@@ -36,14 +36,15 @@ class Client:
         self.csrf = body["result"]
 
     def request(self, method, path, data=None, extra_headers=None):
-        headers = {"Origin": BASE}
+        base = getattr(self, "base", BASE)
+        headers = {"Origin": base}
         if self.csrf:
             headers["X-CSRFToken"] = self.csrf
         if data is not None and not isinstance(data, bytes):
             headers["Content-Type"] = "application/json"
         headers.update(extra_headers or {})
         request = urllib.request.Request(
-            BASE + path, data=data if isinstance(data, bytes) else json.dumps(data).encode() if data is not None else (b"" if method == "POST" else None),
+            base + path, data=data if isinstance(data, bytes) else json.dumps(data).encode() if data is not None else (b"" if method == "POST" else None),
             headers=headers, method=method,
         )
         try:

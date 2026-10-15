@@ -23,9 +23,11 @@ services:
       PILOT_BOOTSTRAP: '1'
       <<: &superset-env
         SUPERSET_CONFIG_PATH: /pilot/superset_config.py
+        PYTHONPATH: /repo:/pilot
         PILOT_STOCK_SECURITY: ${PILOT_STOCK_SECURITY:-0}
     volumes: &superset-volumes
       - ./:/pilot:ro
+      - ../../services:/repo/services:ro
     command: [sh, -c, 'superset db upgrade && superset init && python /pilot/bootstrap.py']
     depends_on:
       postgres: {condition: service_healthy}
@@ -60,6 +62,7 @@ services:
     ports: ['127.0.0.1:8090:8090']
     volumes:
       - ../../backend:/pilot/backend:ro
+      - ../../services:/pilot/services:ro
     depends_on:
       superset: {condition: service_healthy}
       app: {condition: service_healthy}
@@ -79,6 +82,7 @@ services:
       PILOT_SESSION_DATABASE_URL: postgresql+psycopg2://pilot_sessions:disposable-sessions@postgres/pilot_sessions
     volumes:
       - ../../backend:/pilot/backend:ro
+      - ../../services:/pilot/services:ro
     mem_limit: 256m
     cpus: 1
     depends_on:

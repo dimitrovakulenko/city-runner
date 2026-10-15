@@ -1,0 +1,29 @@
+{
+  "checks": {
+    "editable_private_starters_A": true,
+    "projected_activity_grain_A": true,
+    "independent_template_copy_A": true,
+    "default_persisted_A": true,
+    "account_export_includes_private_definitions_A": true,
+    "account_export_includes_authored_columns_metrics_A": true,
+    "account_export_excludes_credentials_A": true,
+    "editable_private_starters_B": true,
+    "projected_activity_grain_B": true,
+    "independent_template_copy_B": true,
+    "default_persisted_B": true,
+    "account_export_includes_private_definitions_B": true,
+    "account_export_includes_authored_columns_metrics_B": true,
+    "account_export_excludes_credentials_B": true,
+    "foreign_dashboard_denied_A": true,
+    "foreign_saved_query_denied_A": true,
+    "foreign_execution_denied_A": true,
+    "foreign_default_denied_A": true,
+    "foreign_dashboard_denied_B": true,
+    "foreign_saved_query_denied_B": true,
+    "foreign_execution_denied_B": true,
+    "foreign_default_denied_B": true,
+    "completed": true
+  },
+  "failures": [],
+  "probe_passed": true
+}

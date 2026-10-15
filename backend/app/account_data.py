@@ -57,12 +57,12 @@ class _ClosingStreamingResponse(StreamingResponse):
 
 
 def create_account_data_router(engine: Engine, current_user: Callable[..., str],
-                               store: LocalObjectStore | None = None) -> APIRouter:
+                               store: LocalObjectStore | None = None, analytics_config=None) -> APIRouter:
     router = APIRouter()
 
     @router.get("/api/account/export")
     def export_account(account_id: str = Depends(current_user)):
-        archive = build_account_export(engine, account_id, store or LocalObjectStore())
+        archive = build_account_export(engine, account_id, store or LocalObjectStore(), analytics_config=analytics_config)
 
         def stream() -> Iterator[bytes]:
             archive.seek(0)
@@ -80,7 +80,7 @@ def create_account_data_router(engine: Engine, current_user: Callable[..., str],
     return router
 
 
-def build_account_export(engine: Engine, account_id: str, store: LocalObjectStore) -> BinaryIO:
+def build_account_export(engine: Engine, account_id: str, store: LocalObjectStore, *, analytics_config=None) -> BinaryIO:
     started = time.monotonic()
     deadline = started + MAX_EXPORT_SECONDS
     archive = tempfile.TemporaryFile(mode="w+b")
@@ -207,6 +207,15 @@ def build_account_export(engine: Engine, account_id: str, store: LocalObjectStor
                 for name, query in queries.items():
                     manifest["counts"][name] = json_entry(f"data/{name}.json", query, {"account": account_id},
                                                             batch_size=1 if name == "activities" else 100)
+                from backend.app.analytics_lifecycle import export_definitions
+
+                analytics = export_definitions(db, account_id, analytics_config)
+                if analytics is not None:
+                    payload = json.dumps(_jsonable(analytics), ensure_ascii=False, separators=(",", ":")).encode()
+                    add_entry()
+                    _zip_write(output, "data/analytics.json", payload)
+                    add_size(len(payload))
+                    manifest["entries"].append("data/analytics.json")
                 source_map_payload = json.dumps(_jsonable(source_files), ensure_ascii=False,
                                                separators=(",", ":")).encode("utf-8")
                 add_entry()
@@ -321,10 +330,14 @@ def delete_account_data(engine: Engine, account_id: str, store: LocalObjectStore
                 "deletion": deletion_id, "account": account_id, "key": key,
             })
         # activities deliberately have no cascading owner FK.
+        from backend.app.analytics_lifecycle import fence_deletion
+
+        fence_deletion(db, account_id, configured=bool(os.getenv("ANALYTICS_ADMIN_DATABASE_URL")))
         db.execute(text("DELETE FROM activities WHERE user_id=:account"), {"account": account_id})
         db.execute(text("DELETE FROM accounts WHERE id=:account"), {"account": account_id})
-        pending = db.execute(text("SELECT 1 FROM account_deletion_outbox WHERE deletion_id=:id LIMIT 1"), {
-            "id": deletion_id,
+        pending = db.execute(text("""SELECT 1 WHERE EXISTS (SELECT 1 FROM account_deletion_outbox WHERE deletion_id=:id)
+            OR EXISTS (SELECT 1 FROM analytics_accounts WHERE account_id=:account AND state<>'deleted')"""), {
+            "id": deletion_id, "account": account_id,
         }).first()
         if pending is None:
             db.execute(text("UPDATE account_deletions SET status='complete',completed_at=clock_timestamp() WHERE id=:id"), {
@@ -337,6 +350,10 @@ def delete_account_data(engine: Engine, account_id: str, store: LocalObjectStore
 
 
 def process_account_deletion_cleanup(engine: Engine, store: LocalObjectStore | None = None) -> bool:
+    from backend.app.analytics_lifecycle import process_analytics_cleanup
+
+    if process_analytics_cleanup(engine):
+        return True
     object_store = store or LocalObjectStore()
     token = uuid.uuid4()
     with engine.begin() as db:
@@ -368,7 +385,8 @@ def process_account_deletion_cleanup(engine: Engine, store: LocalObjectStore | N
             db.execute(text("""UPDATE account_deletions SET status='complete',completed_at=clock_timestamp()
                 WHERE id=:deletion AND NOT EXISTS (
                     SELECT 1 FROM account_deletion_outbox WHERE deletion_id=:deletion AND status<>'complete'
-                )"""), {"deletion": row["deletion_id"]})
+                ) AND NOT EXISTS (SELECT 1 FROM analytics_accounts owner JOIN account_deletions receipt
+                    ON owner.account_id=receipt.account_id WHERE receipt.id=:deletion AND owner.state<>'deleted')"""), {"deletion": row["deletion_id"]})
         return True
     except Exception as error:
         with engine.begin() as db:
@@ -425,12 +443,15 @@ def replay_account_deletions(engine: Engine, store: LocalObjectStore | None = No
             db.execute(text("UPDATE account_deletions SET status='cleanup-pending',completed_at=NULL WHERE id=:id"), {
                 "id": deletion_id,
             })
+            from backend.app.analytics_lifecycle import fence_deletion
+
+            fence_deletion(db, account_id, force=force_cleanup, configured=bool(os.getenv("ANALYTICS_ADMIN_DATABASE_URL")))
             db.execute(text("DELETE FROM activities WHERE user_id=:account"), {"account": account_id})
             db.execute(text("DELETE FROM accounts WHERE id=:account"), {"account": account_id})
             db.execute(text("""UPDATE account_deletions SET status='complete',completed_at=clock_timestamp()
                 WHERE id=:id AND NOT EXISTS (
                     SELECT 1 FROM account_deletion_outbox WHERE deletion_id=:id AND status<>'complete'
-                )"""), {"id": deletion_id})
+                ) AND NOT EXISTS (SELECT 1 FROM analytics_accounts WHERE account_id=:account AND state<>'deleted')"""), {"id": deletion_id, "account": account_id})
         replayed += 1
     return replayed
 
@@ -506,7 +527,11 @@ def main() -> None:
 
 
 def verify_account_deletions(engine: Engine, store: LocalObjectStore | None = None) -> bool:
+    from backend.app.analytics_config import AnalyticsConfig
+    from backend.app.analytics_lifecycle import verify_analytics_deleted
+
     object_store = store or LocalObjectStore()
+    analytics = AnalyticsConfig.from_env()
     records = read_records()
     with engine.connect() as db:
         for record in records:
@@ -535,6 +560,13 @@ def verify_account_deletions(engine: Engine, store: LocalObjectStore | None = No
                 "account": account_id,
             }).scalar_one_or_none()
             if exists or pending or receipt != "complete" or object_store.list_owned_keys(account_id):
+                return False
+            analytics_state = db.execute(text("SELECT state FROM analytics_accounts WHERE account_id=:account"), {
+                "account": account_id,
+            }).scalar_one_or_none()
+            if analytics_state is not None and (analytics_state != "deleted" or analytics is None):
+                return False
+            if analytics is not None and not verify_analytics_deleted(account_id, analytics):
                 return False
             for key in record["object_keys"]:
                 if object_store._path(key).exists() or (object_store._owner_dir(account_id) / key).exists():

@@ -1,0 +1,148 @@
+name: city-runner-analytics
+
+services:
+  analytics-postgres:
+    image: postgres:16.10@sha256:21f6013073bc6b92830a2129570e2f5ec42a6c734b5a985a41e83aa58f54c3c1
+    mem_limit: 1g
+    cpus: 1
+    environment:
+      POSTGRES_DB: analytics
+      POSTGRES_PASSWORD: ${ANALYTICS_POSTGRES_PASSWORD:?required}
+      SUPERSET_METADATA_PASSWORD: ${SUPERSET_METADATA_PASSWORD:?required}
+    command: [postgres, -c, log_min_error_statement=panic, -c, log_min_messages=fatal, -c, log_statement=none]
+    volumes:
+      - database:/var/lib/postgresql/data
+      - ./init-databases.sh:/docker-entrypoint-initdb.d/analytics.sh:ro
+    healthcheck:
+      test: [CMD, pg_isready, -U, postgres, -d, analytics]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+    networks: [analytics]
+
+  metadata-init:
+    build:
+      context: ../..
+      dockerfile: services/analytics/Superset.Dockerfile
+    environment: &superset-env
+      ANALYTICS_MODE: production
+      SUPERSET_CONFIG_PATH: /repo/services/analytics/superset_config.py
+      SUPERSET_SECRET_KEY: ${SUPERSET_SECRET_KEY:?required}
+      SUPERSET_METADATA_DATABASE_URL: postgresql+psycopg2://superset_meta:${SUPERSET_METADATA_PASSWORD}@analytics-postgres/superset_meta
+      ANALYTICS_DATABASE_URL: postgresql+psycopg2://analytics-postgres/analytics
+      ANALYTICS_SECRET: ${ANALYTICS_SECRET:?required}
+      ANALYTICS_PUBLIC_ORIGIN: ${ANALYTICS_PUBLIC_ORIGIN:?required}
+      WEB_ORIGIN: ${WEB_ORIGIN:?required}
+    command: [sh, -c, 'superset db upgrade && superset init']
+    depends_on:
+      analytics-postgres: {condition: service_healthy}
+    networks: [analytics]
+
+  superset:
+    build:
+      context: ../..
+      dockerfile: services/analytics/Superset.Dockerfile
+    environment: *superset-env
+    mem_limit: 2g
+    cpus: 2
+    command: [gunicorn, --bind, '0.0.0.0:8088', --workers, '2', --threads, '4', --timeout, '15', 'superset.app:create_app()']
+    depends_on:
+      metadata-init: {condition: service_completed_successfully}
+      store-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8088/health', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 90
+    networks: [analytics]
+
+  store-init:
+    build: &python-build
+      context: ../..
+      dockerfile: services/analytics/Python.Dockerfile
+    environment: &backend-env
+      DATABASE_URL: ${DATABASE_URL:?required}
+      ANALYTICS_ADMIN_DATABASE_URL: postgresql+psycopg://postgres:${ANALYTICS_POSTGRES_PASSWORD}@analytics-postgres/analytics
+      ANALYTICS_SECRET: ${ANALYTICS_SECRET}
+      ANALYTICS_PUBLIC_ORIGIN: ${ANALYTICS_PUBLIC_ORIGIN}
+      WEB_ORIGIN: ${WEB_ORIGIN:?required}
+      SUPERSET_INTERNAL_URL: http://superset:8088
+      UPLOAD_STORAGE_DIR: /var/lib/city-runner/originals
+      ACCOUNT_DELETION_LEDGER: /var/lib/city-runner/privacy/deletions.jsonl
+    command: [python, -m, backend.app.analytics_worker, --initialize-store]
+    depends_on:
+      analytics-postgres: {condition: service_healthy}
+    networks: [analytics]
+
+  app:
+    build: *python-build
+    environment: *backend-env
+    command: [uvicorn, backend.app.main:app, --host, 0.0.0.0, --port, '8000', --no-access-log]
+    mem_limit: 512m
+    cpus: 1
+    volumes: [state:/var/lib/city-runner]
+    ports: ['127.0.0.1:${ANALYTICS_LOCAL_API_PORT:-8001}:8000']
+    extra_hosts: ['host.docker.internal:host-gateway']
+    depends_on:
+      store-init: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [analytics, backend]
+
+  projector:
+    build: *python-build
+    environment: *backend-env
+    command: [python, -m, backend.app.analytics_worker]
+    mem_limit: 512m
+    cpus: 1
+    volumes: [state:/var/lib/city-runner]
+    extra_hosts: ['host.docker.internal:host-gateway']
+    depends_on:
+      app: {condition: service_healthy}
+      superset: {condition: service_healthy}
+    networks: [analytics, backend]
+
+  imports:
+    build: *python-build
+    environment: *backend-env
+    command: [python, -m, backend.app.worker]
+    mem_limit: 512m
+    cpus: 1
+    volumes: [state:/var/lib/city-runner]
+    extra_hosts: ['host.docker.internal:host-gateway']
+    depends_on:
+      app: {condition: service_healthy}
+    networks: [analytics, backend]
+
+  gateway:
+    build: *python-build
+    environment:
+      ANALYTICS_BACKEND_URL: http://app:8000
+      SUPERSET_INTERNAL_URL: http://superset:8088
+      ANALYTICS_SECRET: ${ANALYTICS_SECRET}
+      ANALYTICS_PUBLIC_ORIGIN: ${ANALYTICS_PUBLIC_ORIGIN}
+      WEB_ORIGIN: ${WEB_ORIGIN}
+    command: [uvicorn, services.analytics.gateway:configured_app, --factory, --host, 0.0.0.0, --port, '8091', --workers, '1', --no-access-log]
+    mem_limit: 512m
+    cpus: 1
+    ports: ['127.0.0.1:${ANALYTICS_LOCAL_PORT:-8091}:8091']
+    depends_on:
+      app: {condition: service_healthy}
+      superset: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8091/health', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [analytics, backend]
+
+networks:
+  analytics: {internal: true}
+  backend:
+
+volumes:
+  database:
+  state:

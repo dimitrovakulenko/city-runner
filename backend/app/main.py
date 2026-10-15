@@ -14,6 +14,8 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from backend.app import auth
+from backend.app.analytics_api import create_analytics_router
+from backend.app.analytics_config import AnalyticsConfig
 from backend.app.corrections import create_corrections_router
 from backend.app.schemas import ActivityDetail, ActivityPage
 from backend.app.explorer import create_explorer_router
@@ -66,10 +68,11 @@ class MeResponse(BaseModel):
 
 
 def create_app(engine: Engine | None = None, identity_resolver: Callable[..., Any] | None = None,
-               routing_provider: Callable[..., Any] | None = None) -> FastAPI:
+               routing_provider: Callable[..., Any] | None = None, analytics_config=None) -> FastAPI:
     engine = engine or create_engine(os.getenv("DATABASE_URL", "postgresql+psycopg://localhost/activities"), pool_pre_ping=True)
     app = FastAPI()
     app.state.engine = engine
+    analytics_config = analytics_config or AnalyticsConfig.from_env()
     bearer_docs = HTTPBearer(auto_error=False)
 
     @app.exception_handler(RequestValidationError)
@@ -141,11 +144,12 @@ def create_app(engine: Engine | None = None, identity_resolver: Callable[..., An
         return Response(status_code=204)
 
     app.include_router(create_upload_router(engine, current_user))
+    app.include_router(create_analytics_router(engine, current_user, bearer_token, analytics_config))
     app.include_router(create_import_batch_router(engine, current_user))
     app.include_router(create_import_histories_router(engine, current_user))
     app.include_router(create_routes_router(engine, current_user, routing_provider))
     app.include_router(create_activity_impact_router(engine, current_user))
-    app.include_router(create_account_data_router(engine, current_user))
+    app.include_router(create_account_data_router(engine, current_user, analytics_config=analytics_config))
     app.include_router(create_activity_filters_router(engine, current_user))
     app.include_router(create_sync_status_router(engine, current_user))
     app.include_router(create_recording_groups_router(engine, current_user))

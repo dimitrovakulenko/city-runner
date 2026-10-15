@@ -416,6 +416,38 @@ export type CoveragePreparationResponse = {
   cities_truncated: boolean;
 };
 
+export type AnalyticsBoard = {
+  id: string;
+  title: string;
+};
+
+export type AnalyticsStatus = {
+  state: "disabled" | "pending" | "refreshing" | "ready" | "failed" | "unavailable";
+  dataset_id?: string | null;
+  default_dashboard_id?: string | null;
+  boards?: Array<AnalyticsBoard>;
+};
+
+export type AnalyticsPreferences = {
+  dataset_id?: string | null;
+  default_dashboard_id?: string | null;
+};
+
+export type AnalyticsHandoffRequest = {
+  destination?: "default" | "sql" | "boards" | "dashboard";
+  dashboard_id?: string | null;
+};
+
+export type AnalyticsHandoff = {
+  action: string;
+  ticket: string;
+  expires_in?: number;
+};
+
+export type AnalyticsTemplateRequest = {
+  template: "activity" | "exploration" | "next-streets" | "blank";
+};
+
 export type CityItem = {
   id: string;
   name: string;

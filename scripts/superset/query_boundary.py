@@ -2,17 +2,34 @@
 
 import threading
 import time
+import os
 from contextvars import ContextVar
 
 import psycopg2
 from psycopg2.extensions import connection, cursor
 from sqlalchemy.pool import NullPool
+from services.analytics.identity import role_name, cancel_role, cancel_password
 
 
 OWNERS = {"pilot-a": "pilot_a", "pilot-b": "pilot_b"}
 ROW_CAP = 10000
 FAILED_OWNERS = set()
 REQUEST_SCOPE = ContextVar("pilot_analytics_request", default=None)
+
+
+def owner_role(owner):
+    return role_name(owner) if os.getenv("ANALYTICS_MODE") == "production" else OWNERS[owner]
+
+
+def cancel_parameters():
+    if os.getenv("ANALYTICS_MODE") != "production":
+        return {"host": "postgres", "dbname": "analytics", "user": "pilot_cancel", "password": "disposable-cancel"}
+    from sqlalchemy.engine.url import make_url
+
+    url = make_url(os.environ["ANALYTICS_DATABASE_URL"])
+    secret = os.environ["ANALYTICS_SECRET"].encode()
+    return {"host": url.host, "port": url.port or 5432, "dbname": url.database,
+            "user": cancel_role(url.database), "password": cancel_password(secret, url.database)}
 
 
 class BoundedCursor(cursor):
@@ -72,7 +89,7 @@ class BoundedConnection(connection):
         self._kill_verified = False
         self.check_request()
         super().__init__(*args, **kwargs)
-        if self.get_dsn_parameters().get("user") != OWNERS[self._owner]:
+        if self.get_dsn_parameters().get("user") != owner_role(self._owner):
             super().close()
             raise psycopg2.OperationalError("Analytics connection owner mismatch.")
         # Fixed control query only; every caller-created cursor is bounded below.
@@ -102,8 +119,7 @@ class BoundedConnection(connection):
         self._expired = True
         try:
             with psycopg2.connect(
-                host="postgres", dbname="analytics", user="pilot_cancel",
-                password="disposable-cancel", connect_timeout=1,
+                **cancel_parameters(), connect_timeout=1,
                 options="-c statement_timeout=1000",
             ) as control:
                 with control.cursor() as command:
@@ -125,7 +141,9 @@ class BoundedConnection(connection):
 
 
 def connection_mutator(url, parameters, username, security_manager, source):
-    if url.database != "analytics" or url.username not in OWNERS.values():
+    scope = REQUEST_SCOPE.get()
+    database = cancel_parameters()["dbname"]
+    if scope is None or url.database != database or url.username != owner_role(scope[0]):
         raise psycopg2.OperationalError("Only owner-bound pilot connections are allowed.")
     parameters = dict(parameters)
     for key in ("pool_size", "max_overflow", "pool_timeout", "pool_recycle"):

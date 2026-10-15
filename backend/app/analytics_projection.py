@@ -15,6 +15,7 @@ from backend.app.sync_status import _read_version
 
 
 def register_account(db, account_id: str) -> dict:
+    db.exec_driver_sql("SET LOCAL lock_timeout='250ms'")
     owner_lock(db, account_id)
     db.execute(text("""INSERT INTO analytics_accounts(account_id,owner_key,generation)
         VALUES (:account,:owner,:generation)
@@ -46,10 +47,13 @@ def refresh_projection(engine, store, account_id: str, secret: bytes) -> bool:
     try:
         # Policy DDL must commit before staging: it otherwise holds table locks
         # that block every account's reads for the whole refresh.
-        with store.begin() as setup:
-            setup.exec_driver_sql("SET LOCAL statement_timeout='1500ms'")
-            setup.exec_driver_sql("SET LOCAL lock_timeout='250ms'")
-            provision_role(setup, record["owner_key"], secret)
+        with engine.begin() as source:
+            source.exec_driver_sql("SET LOCAL lock_timeout='250ms'")
+            owner_lock(source, account_id)
+            with store.begin() as setup:
+                setup.exec_driver_sql("SET LOCAL statement_timeout='1500ms'")
+                setup.exec_driver_sql("SET LOCAL lock_timeout='250ms'")
+                provision_role(setup, record["owner_key"], secret)
         snapshot = read_snapshot(engine, account_id, record["selected_dataset_id"], secret, deadline=deadline)
         with store.connect() as target:
             transaction = target.begin()

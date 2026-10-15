@@ -70,7 +70,7 @@ CACHE_CONFIG = {"CACHE_TYPE": "NullCache"}
 WTF_CSRF_TIME_LIMIT = 3600
 
 
-def configure_identity(app):
+def configure_identity(app, *, valid_owner=None, internal_endpoint=None):
     @app.before_request
     def city_runner_identity():
         # Only the gateway is published. It overwrites this header after checking
@@ -79,8 +79,10 @@ def configure_identity(app):
 
         if request.path == "/health":
             return None
+        if internal_endpoint and request.endpoint == internal_endpoint:
+            return None
         name = request.headers.get("X-City-Runner-Account")
-        if name not in {"pilot-a", "pilot-b"}:
+        if not (valid_owner(name) if valid_owner else name in {"pilot-a", "pilot-b"}):
             logout_user()
             abort(401)
         user = security_manager.find_user(username=name)

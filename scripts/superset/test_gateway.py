@@ -62,7 +62,7 @@ class SessionTests(unittest.TestCase):
 
 class AdmissionTests(unittest.IsolatedAsyncioTestCase):
     async def test_metadata_load_does_not_consume_sql_slots(self):
-        gateway.BLOCKED.clear()
+        gateway.boundary.blocked.clear()
         admitted = asyncio.Event()
         release = asyncio.Event()
         control_admitted = asyncio.Event()
@@ -84,7 +84,7 @@ class AdmissionTests(unittest.IsolatedAsyncioTestCase):
         transport = httpx.ASGITransport(app=gateway.app)
         async with httpx.AsyncClient(transport=transport, base_url='http://127.0.0.1:8090') as client:
             await client.post('/pilot/login/pilot-a')
-            with patch.object(gateway, 'upstream', upstream):
+            with patch.object(gateway.boundary, 'upstream', upstream):
                 queries = [asyncio.create_task(client.post('/api/v1/sqllab/execute/')) for _ in range(2)]
                 stop = None
                 try:

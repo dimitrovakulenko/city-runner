@@ -12,7 +12,7 @@ from sqlalchemy.exc import DBAPIError
 
 from backend.app.analytics_datasets import read_snapshot
 from backend.app.analytics_projection import current_projection, refresh_projection, register_account
-from backend.app.analytics_store import initialize_store, owner_key, remove_owner, role_name, role_password, stage_snapshot
+from backend.app.analytics_store import initialize_store, owner_key, provision_role, remove_owner, role_name, role_password, stage_snapshot
 from backend.app.owner_guard import owner_lock
 from backend.tests.integration import test_activity_impact as fixture_module
 from backend.tests.integration.test_explorer import TINY_NODES
@@ -158,6 +158,16 @@ class AnalyticsProjectionPostgisTests(unittest.TestCase):
         self.assertIsNone(self.current())
         self.publish()
         self.assertIsNone(self.current())
+
+    def test_role_setup_keeps_account_deletion_outside_its_commit(self):
+        f = self.fixture
+        def guarded_setup(*args, **kwargs):
+            with self.assertRaises(DBAPIError), f.engine.begin() as deletion:
+                deletion.exec_driver_sql("SET LOCAL lock_timeout='100ms'")
+                owner_lock(deletion, f.account, exclusive=True)
+            return provision_role(*args, **kwargs)
+        with patch("backend.app.analytics_projection.provision_role", side_effect=guarded_setup):
+            self.assertTrue(self.publish())
 
     def test_final_validation_fences_source_and_geography_commits(self):
         f = self.fixture
