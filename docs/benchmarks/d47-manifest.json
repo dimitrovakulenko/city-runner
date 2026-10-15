@@ -1,0 +1,228 @@
+{
+  "recorded_at": "2026-10-15T16:28:17.041931+00:00",
+  "implementation_commit": "2d7b2d51f434f70a593696859be5395d88454ea8",
+  "application_browser_commit": "2d7b2d51f434f70a593696859be5395d88454ea8",
+  "state": "D43\u2013D47 verified; all seven hosted CI jobs passed",
+  "reports": {
+    "d45-application.json": {
+      "sha256": "a27c081c14c1ffa18e1aa4dd6a6ccbe61a794b490bf36e28dbc598f8b8e8bc6e",
+      "checks": 37,
+      "passed": 37,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d45-lifecycle.json": {
+      "sha256": "9bfecff2070831a4f76b12fce6bf7a144e6dec2dfad2f5b51bff33919e680608",
+      "checks": 12,
+      "passed": 12,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d46-browser.json": {
+      "sha256": "36bdaefa1d05e646aab562867257dc0099c7c95c8a7e7c3a7037cc37d08963f2",
+      "checks": 32,
+      "passed": 32,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-backup-restore.json": {
+      "sha256": "33ac0d467ec72405d05c7da522a84cc804a581d9a7561f736c7b23a0048349d8",
+      "checks": 6,
+      "passed": 6,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-capacity.json": {
+      "sha256": "4eccccdec11c11121aa130e3fc90388f53eed3051cd6d369ee107c577e7752e3",
+      "checks": 6,
+      "passed": 6,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-metadata-cleanup.json": {
+      "sha256": "a2b5521deba537cf5bb976e1629f778f7e4cddae1a0929d99e3c6465df122d88",
+      "checks": 7,
+      "passed": 7,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-resources.json": {
+      "sha256": "d594a44c95803e099fb7e17de28088889f51179019aff8cb7198db104750f245",
+      "checks": 0,
+      "passed": 0,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-restart.json": {
+      "sha256": "399aae6f2f528dc6194d4b5f7a1b94c537632dc830a321ef0d6ce7140f33ac92",
+      "checks": 6,
+      "passed": 6,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-upgrade-browser.json": {
+      "sha256": "a768b03dc69628b76139dad9eee14fe5d8f9726ff167291e58b3a6b52ab0f220",
+      "checks": 19,
+      "passed": 19,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-upgrade-privacy.json": {
+      "sha256": "0e81d2d7d5667b27e5fbaa0ad7b1be8418b3a8cb04b1f606cc79cc4759b1516a",
+      "checks": 148,
+      "passed": 148,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-pilot-bounds.json": {
+      "sha256": "75dc353031787a956fcc6a148ec2737795a05e027f274e36879fec747fd4b766",
+      "checks": 25,
+      "passed": 25,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-pilot-browser.json": {
+      "sha256": "c869320a33ef305f640ece8ff8bfe451641c2129bdd82b8f5ca99ff9ee67fc69",
+      "checks": 19,
+      "passed": 19,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-pilot-failure.json": {
+      "sha256": "2f675912a1238285e7136fdcbb02b12759d5daed04969ef206b26385e15c83ed",
+      "checks": 5,
+      "passed": 5,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-pilot-privacy.json": {
+      "sha256": "178bdbbf3755cf73251dcfcef6960019314f8974103242f2e1021e869a5c30fa",
+      "checks": 148,
+      "passed": 148,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-pilot-provisioning.json": {
+      "sha256": "bb7cf4799c7ed14ac8421df8b2a7eefe72ac28a2f4c152a04f39e50ca309cb69",
+      "checks": 2,
+      "passed": 2,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    },
+    "d47-restored-metadata-cleanup.json": {
+      "sha256": "a2b5521deba537cf5bb976e1629f778f7e4cddae1a0929d99e3c6465df122d88",
+      "checks": 7,
+      "passed": 7,
+      "origin": "hosted",
+      "commit": "2d7b2d51f434f70a593696859be5395d88454ea8"
+    }
+  },
+  "source_sha256": {
+    ".github/workflows/ci.yml": "7a22ef55c08bcbc7f3c7b477641a42338128639a5bf4cba126de5fc912b958a9",
+    "apps/mobile/src/api/analytics.ts": "f57403bac4c9b8dfab29c1e4a9ad7596aaca2b100d06213f8922c1b2565eb290",
+    "apps/mobile/src/api/generated.ts": "993c0904f7f6910de96c552f422b354377b9ba06f90475900ec606468a3ca3b1",
+    "apps/web/src/App.tsx": "ab841b1466205d1e7abae1a02ca94e0d60c8611cf808702ae1ef46a23ff4bb4c",
+    "apps/web/src/Insights.tsx": "6edea82fedfebf063d19240db9f0ad3e585f659fc37d9e920b2fc17086b1f058",
+    "apps/web/src/insightLinks.ts": "bcf175b745b4260f1509d13f8db8609d2f98a575db376e16641f6ac25adc8c0c",
+    "apps/web/src/runtime.ts": "97bde8264179b02be5ae612871ab896b250fd7d63617b96003dfbb241af68a1f",
+    "backend/app/account_data.py": "a1c3cc6d8b142490d60f19574e0bf6b80d670842d017ecabd933c2f3a2b36527",
+    "backend/app/analytics_api.py": "7f4c9725c5d5168aa62e291355a78c39fa5e444fe078149dee0ae3c42d033386",
+    "backend/app/analytics_config.py": "c57189cf7ee98e6b2dd84dc419af6a85ad139355f295acc255b7b240565360cf",
+    "backend/app/analytics_datasets.py": "187040d8208a23ef6ae06240ce6ff1a5ba07988be9499c5fc7df44ab9375e0cc",
+    "backend/app/analytics_lifecycle.py": "eb16470e3ecd3b1a57c1eb35ff0c847637423e0f668fdeb5c2cac44f7a50139d",
+    "backend/app/analytics_projection.py": "7cae96c957638b4e0869cc3c13a3a80c89ff811ad9654461facf1bf357b5304d",
+    "backend/app/analytics_store.py": "9fb274c18828af4350c467f9a92dafe350b0650c5abb655945e5b04b52782412",
+    "backend/app/analytics_worker.py": "39136574ef234ee00c697b7dd3df9a0ef914402d79883166f1a9e5bf2744f313",
+    "backend/app/auth.py": "a6888bb4d540fa400833c6700b8e8b143eb493ac99855b8c4db7ff51d78c043a",
+    "backend/app/main.py": "776b88af9a21dab70e0743c603d396e72954642a84406eb92324d4b7bd47bdc2",
+    "backend/migrations/versions/0019_analytics.py": "4d357da5626b9bf244895d967ff7f3f66acd4543717c6428c5cb6b4d1a7e0c19",
+    "backend/migrations/versions/0020_analytics_handoff.py": "4acc92523fce7fa8aa320eb1c24b394676bfaa0ca83d22b6008bdf2db86d0144",
+    "scripts/superset/AcceptancePostgis.Dockerfile": "a031d490f53fdf56cb3307ed6f9701d3397a43575a3a7482a1e51420831a1379",
+    "scripts/superset/Dockerfile": "448512ab7211ce6de6d824c81cbe108e697b05c7c38b668a5ea364382a26b447",
+    "scripts/superset/Gateway.Dockerfile": "653f17f61fcc487011f6c8a47e4097e10ecd8e0495245602dcc7504fed5f97e4",
+    "scripts/superset/Previous.Dockerfile": "4088b50a5ddff3d71fc89acf927d4e02024b93f431492441f69771682b1d4b35",
+    "scripts/superset/acceptance-compose.yaml": "276f0228df2baaceb31759ce10ee21b32661a22421c4f4abcec1e9454b497777",
+    "scripts/superset/acceptance_seed.py": "a55bb7f0879369651998b1957cb3875c681c44d3f6acb919650b754756c502ab",
+    "scripts/superset/app_fixture.py": "6ae78b2fee18c78e25e0aef3399aabb02adf4b623769a0f396e7319342c11d77",
+    "scripts/superset/application_acceptance.py": "96423d2f264c5534e85461ebb84d5cbb35b1e1e54fde248a8ba94fbcc73bbfd5",
+    "scripts/superset/application_browser_probe.mjs": "e08c74a9206d1c7da327a17b9d3001744e69248080a6f4d99cdd105fab3cb5d7",
+    "scripts/superset/application_probe.py": "9159664d825d1b16b846adadea283557da55965c24dd63a741cf1ddd64a124d6",
+    "scripts/superset/bootstrap.py": "7440b78c8721dc121e273c47dfb9d59a4f799cf5b1c2dc1b05559978dad877ff",
+    "scripts/superset/bounds_probe.py": "e81bbc6bf5ee368d6f7caa059bd6cee8afc6e6c871c5281c89367f2d0cd8b578",
+    "scripts/superset/browser_probe.mjs": "aa4d4f63b5c9a484100d9a564b97006caf768ff2f7e2abac7ba8de6abc2fd3a2",
+    "scripts/superset/capacity_probe.py": "627bc3fe6ac32374ea724cec2ecc1217f306ec2e58a1613a02cdf3c86ef96ceb",
+    "scripts/superset/capacity_seed.py": "37d23dbd26792090637b883c6ef2c5961967300f8dd042e9a6d058e46fafd3b0",
+    "scripts/superset/compose.yaml": "ef1e4a1515d861cc07e08fb0b748f770b803c5a3d32466cfc6c5237e7c7d431f",
+    "scripts/superset/editor_state.py": "f27eff50f7293b82046179c3d8c1d9b5d72b13cb7601d6e007336a54021c06fb",
+    "scripts/superset/fixture.sql": "b1040b58bc13d8beee3f70021ab8f33c42bfe4cb72e7789931e4c80ac8d9dddc",
+    "scripts/superset/gateway-requirements.txt": "4a6f5cb345da663d3d2cf52b40ab322e4b2dd79b16cd244c83e88891ac93d1b5",
+    "scripts/superset/gateway.py": "6e0b44a981c6bbca27e718609cde6937a0edcfef2642d547e6c0bdb0092eaaea",
+    "scripts/superset/lifecycle_fixture.py": "05272df8964cf7bb2ac14d7c857caffa6f4268ecffe1bb536ee88ec873e5e02c",
+    "scripts/superset/lifecycle_probe.py": "15203acaa4f75a077aeec2700ac3ae09f735c9be17dec508601c049e3fa6d399",
+    "scripts/superset/live_views_probe.py": "e9feca96308d4b044b5a0d9eb7611f3142774f8c3515f27007d129812ea9e352",
+    "scripts/superset/metadata_lifecycle_probe.py": "f6e4b61cd05d43015b035be6aee15c5fe4249dfbf469b45c10d94429cc5c1aa8",
+    "scripts/superset/patch_sql_lab.py": "bc71b474f3fd4292bf1696a41ccf8de6084ca03310bde5eed269245844d41f13",
+    "scripts/superset/probe.py": "269ed7a25c0e3031c7be5ed80e6515a6625316a65eed2f7ec946ca278fe9655f",
+    "scripts/superset/provisioning.sql": "309042c871093b748d8f9d94d3929a94f14415b27204ae29869dd2926c824cd7",
+    "scripts/superset/query_boundary.py": "f6a3a0f9221261ff89e2306d5b989be50f0ab6978a31e1ad5fa86077edcbb4d3",
+    "scripts/superset/recovery_acceptance.py": "71ff61c668481d886db10ed37be28344d6c148302f52e478756c3831a32ae34e",
+    "scripts/superset/recovery_fixture.py": "72dd6be1237a802f0b2f788f8bb35926aed6cabe15738a300113e47b3b41e80f",
+    "scripts/superset/restart_acceptance.py": "bbcfeced25c4d6e2dea286e5b0f2044d5d4791d6b0894ec4f2b32f67a95fd134",
+    "scripts/superset/security.py": "cc8c6f74bd07b43ef5d3b24672e13f085662e7562492217db0be316548595164",
+    "scripts/superset/superset_config.py": "d75a9bdece2c05eae83d668cd52f4e35448cd35a38ead672943cbc13c0182249",
+    "scripts/superset/test_authoring_gateway.py": "2f731b0bca79e34833cc26d7a814f3a97a8e6a374a04580a99dcc8fb6fdd23ea",
+    "scripts/superset/test_gateway.py": "f8e34b7486036d4c47a25a08cbd466468d1c749f04caf80f9fb6cb837a661b35",
+    "scripts/superset/upgrade-compose.yaml": "d40ab6cf622dd91245bad54137a5acb420d2c8ee445da50c653bf17cb155810d",
+    "scripts/superset/upgrade_fixture.py": "2415a963b3850b688051a12b533bc8cfb62a954f2d19c1a0ed2cbf430f3b8fe9",
+    "services/analytics/Python.Dockerfile": "de5821f48e55df716d9a9e8844f5cda91e254feac74ccc352403f02845ce40d4",
+    "services/analytics/Superset.Dockerfile": "239c05abd2a68181f9c8b9374a4e42a54d4e6e136dc59c93e69289f39e7c3813",
+    "services/analytics/compose.yaml": "c40810a545245a4145d7d257a6b43fe07307c85299deddf096487b94f8dc1052",
+    "services/analytics/gateway.py": "7f163e92e03ed075990b3b3a84a978814015ab228035072b0e03bb3eb958e524",
+    "services/analytics/identity.py": "2007b71a195d250676eb5513180d986dd81bded072f34c1c8ba65a05b52ccaa8",
+    "services/analytics/init-databases.sh": "d2abfaa5ffddc9dbdc33d200c6b1cfda3b48d7b93b9261c07591d37d512171df",
+    "services/analytics/proxy.py": "cb4ab22d6c2b2fb1b0405075ae7ef0f46aeaf5a3d55361afd96597ef463abfe2",
+    "services/analytics/superset_config.py": "c5bcb1136fe97433d0a9a99b858fde464cecf3e72f292b3d0034dcbf57ef5cba",
+    "services/analytics/superset_rpc.py": "68742cdab042a2b6602317da3a4ec2ed12f936584bc49b474d6408b21df619f4",
+    "services/analytics/templates.py": "a6d5e99a6024eb084d96240cbc95bb927571ab22a7140bfc431d7f47bf22c723"
+  },
+  "checks": {
+    "backend_postgis": 189,
+    "backend_sqlite": 121,
+    "backend_sqlite_skipped": 1,
+    "shared_gateway": 10,
+    "web": 26,
+    "mobile": 230,
+    "type_generation": "passed",
+    "web_build": "passed",
+    "mobile_typecheck": "passed",
+    "ios_js_export": "passed",
+    "android_js_export": "passed"
+  },
+  "scope": "Synthetic acceptance only. Cloud deployment D34 and provider registrations remain deferred.",
+  "hosted_ci": {
+    "url": "https://github.com/dimitrovakulenko/city-runner/actions/runs/38767948590",
+    "commit": "2d7b2d51f434f70a593696859be5395d88454ea8",
+    "jobs": {
+      "analytics-application": "success",
+      "analytics-upgrade": "success",
+      "web": "success",
+      "hosting": "success",
+      "backend": "success",
+      "superset-pilot": "success",
+      "mobile": "success"
+    }
+  },
+  "reviews": {
+    "spec": "No outstanding findings",
+    "standards": "No outstanding findings",
+    "scope": "Implementation and final native initialization correction reviewed independently."
+  },
+  "native_sql_lab_fix": {
+    "upstream": "https://github.com/apache/superset/blob/6.1.0/superset-frontend/src/pages/SqlLab/index.tsx#L39",
+    "observed_equal_initialization_timestamps_ms": 1792080965375,
+    "initial_state_request_status": "fulfilled",
+    "change": "Initialization guard <= becomes <; equal timestamps are initialized.",
+    "original_asset_sha256": "bd6b8f4becb09e4ec6e90a89860114c9ce2926c43674694ff993e7304dbd8726",
+    "build_guard": "Exact original SHA-256 and exactly one matching expression required in both current images."
+  }
+}

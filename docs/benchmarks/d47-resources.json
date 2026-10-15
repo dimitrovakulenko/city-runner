@@ -1,0 +1,20 @@
+{
+  "app": {
+    "peak_memory_bytes": 536883200
+  },
+  "projector": {
+    "peak_memory_bytes": 128540672
+  },
+  "imports": {
+    "peak_memory_bytes": 67870720
+  },
+  "superset": {
+    "peak_memory_bytes": 482648064
+  },
+  "gateway": {
+    "peak_memory_bytes": 75210752
+  },
+  "analytics-postgres": {
+    "peak_memory_bytes": 247435264
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "checks": {
+    "primary_resurrected": true,
+    "projection_resurrected": true,
+    "role_resurrected": true,
+    "private_metadata_resurrected": true,
+    "original_resurrected": true,
+    "all_tombstones_verified": true
+  },
+  "probe_passed": true
+}

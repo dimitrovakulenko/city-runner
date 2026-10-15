@@ -1,0 +1,12 @@
+{
+  "checks": {
+    "deleted_authoring_cache_payloads_removed": true,
+    "deleted_owner_cannot_be_reprovisioned": true,
+    "inflight_handler_serializes_cleanup": true,
+    "orphan_connection_detected": true,
+    "orphan_cleanup_completed": true,
+    "orphan_connection_removed": true,
+    "tombstone_still_blocks_provision": true
+  },
+  "probe_passed": true
+}

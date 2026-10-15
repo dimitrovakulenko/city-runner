@@ -1,0 +1,20 @@
+{
+  "checks": {
+    "provisioning_rolled_back": true,
+    "probe_completed": true
+  },
+  "observations": {
+    "role_policy_provisioning": {
+      "samples": 25,
+      "mean_ms": 3.6447200000000004,
+      "p95_ms": 3.7248,
+      "max_ms": 4.614
+    },
+    "authenticated_connection_start_ms": {
+      "samples": 10,
+      "mean": 3.2182,
+      "max": 4.137
+    }
+  },
+  "probe_passed": true
+}

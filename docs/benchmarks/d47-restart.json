@@ -1,0 +1,16 @@
+{
+  "checks": {
+    "completed": true,
+    "immutable_deadline_terminates_actual_database_work": true,
+    "native_stop_terminates_actual_database_work": true,
+    "crash_reconciles_durable_admission_and_withholds_results": true,
+    "operator_recovery_republishes_fresh_complete_projection": true,
+    "api_superset_workers_restart_preserves_private_definitions": true
+  },
+  "deadline_observation": {
+    "status": 500,
+    "seconds": 8.135
+  },
+  "deadline_seconds": 8.135,
+  "probe_passed": true
+}

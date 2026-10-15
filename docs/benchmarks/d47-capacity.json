@@ -1,0 +1,32 @@
+{
+  "checks": {
+    "five_thousand_activities_not_truncated": true,
+    "five_million_source_samples_project_to_scalar_support": true,
+    "four_concurrent_owner_scoped_sql_requests": true,
+    "maps_remain_available": true,
+    "accepted_import_completes": true,
+    "completed": true
+  },
+  "failures": [],
+  "observations": {
+    "retained_activities": 5000,
+    "original_gps_samples": 5000000,
+    "analytics_concurrency": 4,
+    "map_concurrency": 2,
+    "sql": {
+      "samples": 20,
+      "p50_ms": 212.71,
+      "p95_ms": 423.54,
+      "max_ms": 434.09
+    },
+    "map": {
+      "samples": 20,
+      "p50_ms": 36.14,
+      "p95_ms": 43.14,
+      "max_ms": 61.68
+    },
+    "accepted_import_ms": 272.44,
+    "scope": "Synthetic two-city workload; heavy-owner full account archive size is not a capacity acceptance claim."
+  },
+  "probe_passed": true
+}

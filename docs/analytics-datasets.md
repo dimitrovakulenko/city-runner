@@ -1,7 +1,7 @@
 # Personal analytics datasets
 
 D44 backend contract. The reviewed reader and atomic publisher are implemented.
-D45 identity/worker/lifecycle and D46 web wiring are still required before user access.
+The opt-in D45 identity/worker/lifecycle integration and D46 Insights entry are implemented; see [operations](analytics-operations.md).
 
 All rows belong to the authenticated account through an immutable database role.
 Only retained, successfully imported GPX/FIT activities qualify. A logical activity
@@ -91,5 +91,5 @@ commit precedes the application ready marker; a crash between them remains
 unavailable. Every result-release validation takes the same source/geography
 fences and checks both committed generation markers. Failure fences survive a
 refresh. Policy provisioning commits separately, so normal refreshes hold no
-policy DDL locks. Fifteen synthetic PostGIS tests cover metric parity, provider
+policy DDL locks. Sixteen synthetic PostGIS tests cover metric parity, provider
 exclusion, two-owner RLS, concurrent reads, and source/deletion publication races.

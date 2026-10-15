@@ -1,0 +1,265 @@
+{
+  "version": "6.1.0",
+  "checks": {
+    "database_owner_a": true,
+    "database_denies_other_role_a": true,
+    "database_denies_superuser_role_a": true,
+    "database_denies_other_identity_a": true,
+    "database_denies_excluded_fields_a": true,
+    "database_denies_write_a": true,
+    "database_denies_create_a": true,
+    "database_denies_privileged_function_a": true,
+    "mutable_setting_cannot_change_owner_a": true,
+    "postgres_timeout_is_mutable_a": true,
+    "database_owner_b": true,
+    "database_denies_other_role_b": true,
+    "database_denies_superuser_role_b": true,
+    "database_denies_other_identity_b": true,
+    "database_denies_excluded_fields_b": true,
+    "database_denies_write_b": true,
+    "database_denies_create_b": true,
+    "database_denies_privileged_function_b": true,
+    "mutable_setting_cannot_change_owner_b": true,
+    "postgres_timeout_is_mutable_b": true,
+    "private_connection_catalog_a": true,
+    "private_dataset_catalog_a": true,
+    "sql_lab_owner_a": true,
+    "async_execution_rejected_a": true,
+    "async_result_not_created_a": true,
+    "async_job_not_published_a": true,
+    "own_editor_state_reopens_a": true,
+    "create_reopen_virtual_dataset_a": true,
+    "create_reopen_saved_query_a": true,
+    "own_saved_query_export_a": true,
+    "create_reopen_chart_a": true,
+    "own_chart_export_a": true,
+    "create_reopen_dashboard_a": true,
+    "own_dashboard_export_a": true,
+    "own_result_download_a": true,
+    "ui_shell_sqllab_a": true,
+    "ui_shell_explore_a": true,
+    "private_connection_catalog_b": true,
+    "private_dataset_catalog_b": true,
+    "sql_lab_owner_b": true,
+    "async_execution_rejected_b": true,
+    "async_result_not_created_b": true,
+    "async_job_not_published_b": true,
+    "own_editor_state_reopens_b": true,
+    "create_reopen_virtual_dataset_b": true,
+    "create_reopen_saved_query_b": true,
+    "own_saved_query_export_b": true,
+    "create_reopen_chart_b": true,
+    "own_chart_export_b": true,
+    "create_reopen_dashboard_b": true,
+    "own_dashboard_export_b": true,
+    "own_result_download_b": true,
+    "ui_shell_sqllab_b": true,
+    "ui_shell_explore_b": true,
+    "foreign_blank_uuid_denied_a": true,
+    "foreign_blank_page_denied_a": true,
+    "foreign_blank_copy_denied_a": true,
+    "foreign_nested_chart_placement_denied_a": true,
+    "foreign_nested_row_placement_denied_a": true,
+    "foreign_editor_state_denied_a": true,
+    "editor_ownership_transfer_denied_a": true,
+    "editor_database_rebinding_denied_a": true,
+    "editor_foreign_saved_query_denied_a": true,
+    "editor_foreign_result_reference_denied_a": true,
+    "editor_foreign_query_migration_denied_a": true,
+    "foreign_table_schema_mutation_denied_a": true,
+    "foreign_table_schema_deletion_denied_a": true,
+    "foreign_tab_schema_creation_denied_a": true,
+    "other_connection_execution_denied_a": true,
+    "other_dataset_detail_denied_a": true,
+    "other_dataset_list_private_a": true,
+    "other_saved_query_detail_denied_a": true,
+    "other_saved_query_list_private_a": true,
+    "other_chart_detail_denied_a": true,
+    "other_chart_list_private_a": true,
+    "other_dashboard_detail_denied_a": true,
+    "other_dashboard_list_private_a": true,
+    "other_chart_export_denied_a": true,
+    "other_saved_query_export_denied_a": true,
+    "other_dashboard_export_denied_a": true,
+    "other_query_history_detail_denied_a": true,
+    "other_query_history_list_private_a": true,
+    "other_result_download_denied_a": true,
+    "forged_identity_ignored_a": true,
+    "other_chart_mutation_denied_a": true,
+    "other_saved_query_mutation_denied_a": true,
+    "other_dashboard_mutation_denied_a": true,
+    "foreign_datasource_chart_creation_denied_a": true,
+    "chart_datasource_rebinding_denied_a": true,
+    "dataset_database_rebinding_denied_a": true,
+    "public_publishing_denied_a": true,
+    "foreign_chart_query_context_mutation_denied_a": true,
+    "metadata_import_disabled_chart_a": true,
+    "metadata_import_disabled_dashboard_a": true,
+    "metadata_import_disabled_dataset_a": true,
+    "foreign_blank_uuid_denied_b": true,
+    "foreign_blank_page_denied_b": true,
+    "foreign_blank_copy_denied_b": true,
+    "foreign_nested_chart_placement_denied_b": true,
+    "foreign_nested_row_placement_denied_b": true,
+    "foreign_editor_state_denied_b": true,
+    "editor_ownership_transfer_denied_b": true,
+    "editor_database_rebinding_denied_b": true,
+    "editor_foreign_saved_query_denied_b": true,
+    "editor_foreign_result_reference_denied_b": true,
+    "editor_foreign_query_migration_denied_b": true,
+    "foreign_table_schema_mutation_denied_b": true,
+    "foreign_table_schema_deletion_denied_b": true,
+    "foreign_tab_schema_creation_denied_b": true,
+    "other_connection_execution_denied_b": true,
+    "other_dataset_detail_denied_b": true,
+    "other_dataset_list_private_b": true,
+    "other_saved_query_detail_denied_b": true,
+    "other_saved_query_list_private_b": true,
+    "other_chart_detail_denied_b": true,
+    "other_chart_list_private_b": true,
+    "other_dashboard_detail_denied_b": true,
+    "other_dashboard_list_private_b": true,
+    "other_chart_export_denied_b": true,
+    "other_saved_query_export_denied_b": true,
+    "other_dashboard_export_denied_b": true,
+    "other_query_history_detail_denied_b": true,
+    "other_query_history_list_private_b": true,
+    "other_result_download_denied_b": true,
+    "forged_identity_ignored_b": true,
+    "other_chart_mutation_denied_b": true,
+    "other_saved_query_mutation_denied_b": true,
+    "other_dashboard_mutation_denied_b": true,
+    "foreign_datasource_chart_creation_denied_b": true,
+    "chart_datasource_rebinding_denied_b": true,
+    "dataset_database_rebinding_denied_b": true,
+    "public_publishing_denied_b": true,
+    "foreign_chart_query_context_mutation_denied_b": true,
+    "metadata_import_disabled_chart_b": true,
+    "metadata_import_disabled_dashboard_b": true,
+    "metadata_import_disabled_dataset_b": true,
+    "account_replacement_changes_identity": true,
+    "account_replacement_revokes_old_cookie": true,
+    "expired_session_denied": true,
+    "actual_application_session_valid": true,
+    "existing_bearer_session_handoff": true,
+    "invalid_bearer_handoff_denied": true,
+    "invalid_handoff_preserves_session": true,
+    "ordinary_application_logout": true,
+    "application_logout_revokes_superset": true,
+    "revoked_bearer_handoff_denied": true,
+    "logout_revokes_copied_cookie": true,
+    "probe_completed": true
+  },
+  "observations": {
+    "database_owner_a": {
+      "seconds": 0.124
+    },
+    "postgres_timeout_is_mutable_a": {
+      "returned": "0"
+    },
+    "database_owner_b": {
+      "seconds": 0.139
+    },
+    "postgres_timeout_is_mutable_b": {
+      "returned": "0"
+    },
+    "sql_lab_owner_a": {
+      "status": 200
+    },
+    "sql_lab_owner_b": {
+      "status": 200
+    },
+    "other_connection_execution_denied_a": {
+      "status": 403
+    },
+    "other_dataset_detail_denied_a": {
+      "status": 404
+    },
+    "other_saved_query_detail_denied_a": {
+      "status": 404
+    },
+    "other_chart_detail_denied_a": {
+      "status": 404
+    },
+    "other_dashboard_detail_denied_a": {
+      "status": 404
+    },
+    "other_chart_export_denied_a": {
+      "status": 404
+    },
+    "other_saved_query_export_denied_a": {
+      "status": 404
+    },
+    "other_dashboard_export_denied_a": {
+      "status": 404
+    },
+    "other_result_download_denied_a": {
+      "status": 403,
+      "other_value_returned": false
+    },
+    "other_connection_execution_denied_b": {
+      "status": 403
+    },
+    "other_dataset_detail_denied_b": {
+      "status": 404
+    },
+    "other_saved_query_detail_denied_b": {
+      "status": 404
+    },
+    "other_chart_detail_denied_b": {
+      "status": 404
+    },
+    "other_dashboard_detail_denied_b": {
+      "status": 404
+    },
+    "other_chart_export_denied_b": {
+      "status": 404
+    },
+    "other_saved_query_export_denied_b": {
+      "status": 404
+    },
+    "other_dashboard_export_denied_b": {
+      "status": 404
+    },
+    "other_result_download_denied_b": {
+      "status": 403,
+      "other_value_returned": false
+    }
+  },
+  "objects": {
+    "a": {
+      "database": 1,
+      "dataset": 1,
+      "saved_query": 3,
+      "chart": 3,
+      "dashboard": 3,
+      "marker": "a-private-6c2484d4",
+      "query_id": 2,
+      "client_id": "207e7f6820",
+      "blank": 4,
+      "blank_uuid": "ebe44122-4a77-46b8-a2fe-64a04ee59b82",
+      "tab": 1,
+      "table_schema": 1
+    },
+    "b": {
+      "database": 2,
+      "dataset": 2,
+      "saved_query": 4,
+      "chart": 4,
+      "dashboard": 5,
+      "marker": "b-private-a4d305b3",
+      "query_id": 4,
+      "client_id": "af781e6a82",
+      "blank": 6,
+      "blank_uuid": "e168e2b7-0a73-4da6-94d6-d6dd1c392a1c",
+      "tab": 2,
+      "table_schema": 2
+    }
+  },
+  "not_covered_by_this_probe": [
+    "query bounds and database termination: run bounds_probe.py separately",
+    "interactive browser authoring and reviewed production dataset contract",
+    "representative workload capacity and hosted CI"
+  ],
+  "probe_passed": true
+}

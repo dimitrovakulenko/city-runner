@@ -1,15 +1,17 @@
 {
   "checks": {
+    "completed": true,
     "normal_upload_succeeded": true,
     "uploaded_activity_projected": true,
+    "private_filter_state_created": true,
+    "private_explore_state_created": true,
     "private_definition_exported": true,
     "original_exported": true,
     "durable_cleanup_pending": true,
     "app_session_revoked": true,
     "analytics_session_revoked": true,
     "stale_query_denied": true,
-    "other_account_unaffected": true,
-    "completed": true
+    "other_account_unaffected": true
   },
   "failures": [],
   "probe_passed": true

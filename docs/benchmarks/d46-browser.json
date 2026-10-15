@@ -1,0 +1,230 @@
+{
+  "checks": {
+    "web_insights_ready_A": true,
+    "starter_renders_and_opener_removed_A": true,
+    "edit_reopen_private_board_A": true,
+    "duplicate_board_and_charts_A": true,
+    "delete_own_board_A": true,
+    "default_survives_web_reload_A": true,
+    "owner_activity_deep_link_A": true,
+    "real_sql_lab_owner_grain_A": true,
+    "save_reopen_sql_A": true,
+    "visual_chart_create_compose_edit_reopen_A": true,
+    "responsive_web_entry_A": true,
+    "web_insights_ready_B": true,
+    "starter_renders_and_opener_removed_B": true,
+    "edit_reopen_private_board_B": true,
+    "duplicate_board_and_charts_B": true,
+    "delete_own_board_B": true,
+    "default_survives_web_reload_B": true,
+    "owner_activity_deep_link_B": true,
+    "real_sql_lab_owner_grain_B": true,
+    "save_reopen_sql_B": true,
+    "visual_chart_create_compose_edit_reopen_B": true,
+    "responsive_web_entry_B": true,
+    "foreign_board_denied_A": true,
+    "foreign_deep_link_withheld_A": true,
+    "foreign_board_denied_B": true,
+    "foreign_deep_link_withheld_B": true,
+    "empty_board_state": true,
+    "stale_state_withholds_authoring": true,
+    "error_retry_recovers": true,
+    "logout_fences_delayed_handoff": true,
+    "logout_revokes_analytics_without_affecting_other_account": true,
+    "completed": true
+  },
+  "failures": [],
+  "objects": {
+    "A": {
+      "board": "14",
+      "marker": "Private web A 1792081358320",
+      "activity_link": "http://127.0.0.1:4183/?owner=f3e6514744d047eb13b52e913c30dfb840dd438316cbb027f9def2a53794174e&activity=1"
+    },
+    "B": {
+      "board": "16",
+      "marker": "Private web B 1792081402492",
+      "activity_link": "http://127.0.0.1:4183/?owner=491f1eb3dee8214cf8c6e11d6284868370e3aacf560869220f1431b8d76bd03b&activity=5"
+    }
+  },
+  "chart_errors": [],
+  "chart_statuses": {
+    "200": 30
+  },
+  "browser_errors": [
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/tabstateview/ppSln88ENJ2",
+      "status": 405
+    },
+    {
+      "path": "/tabstateview/ppSln88ENJ2",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/tabstateview/Nsb61kbAanW",
+      "status": 405
+    },
+    {
+      "path": "/tabstateview/Nsb61kbAanW",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    }
+  ],
+  "navigation_statuses": [
+    {
+      "path": "/session",
+      "status": 303
+    },
+    {
+      "path": "/superset/dashboard/14/",
+      "status": 200
+    },
+    {
+      "path": "/superset/dashboard/14/",
+      "status": 200
+    },
+    {
+      "path": "/superset/dashboard/15/",
+      "status": 200
+    },
+    {
+      "path": "/dashboard/list/",
+      "status": 200
+    },
+    {
+      "path": "/superset/dashboard/14/",
+      "status": 200
+    },
+    {
+      "path": "/session",
+      "status": 303
+    },
+    {
+      "path": "/sqllab/",
+      "status": 200
+    },
+    {
+      "path": "/sqllab",
+      "status": 308
+    },
+    {
+      "path": "/sqllab/",
+      "status": 200
+    },
+    {
+      "path": "/chart/add",
+      "status": 200
+    },
+    {
+      "path": "/explore/",
+      "status": 200
+    },
+    {
+      "path": "/explore/",
+      "status": 200
+    },
+    {
+      "path": "/session",
+      "status": 303
+    },
+    {
+      "path": "/superset/dashboard/16/",
+      "status": 200
+    },
+    {
+      "path": "/superset/dashboard/16/",
+      "status": 200
+    },
+    {
+      "path": "/superset/dashboard/17/",
+      "status": 200
+    },
+    {
+      "path": "/dashboard/list/",
+      "status": 200
+    },
+    {
+      "path": "/superset/dashboard/16/",
+      "status": 200
+    },
+    {
+      "path": "/session",
+      "status": 303
+    },
+    {
+      "path": "/sqllab/",
+      "status": 200
+    },
+    {
+      "path": "/sqllab",
+      "status": 308
+    },
+    {
+      "path": "/sqllab/",
+      "status": 200
+    },
+    {
+      "path": "/chart/add",
+      "status": 200
+    },
+    {
+      "path": "/explore/",
+      "status": 200
+    },
+    {
+      "path": "/explore/",
+      "status": 200
+    }
+  ],
+  "probe_passed": true
+}

@@ -1,0 +1,13 @@
+{
+  "checks": {
+    "failed_cancellation_fences_new_admission": true,
+    "failed_cancellation_withholds_inflight_result": true,
+    "failure_fence_survives_response_cleanup": true,
+    "failure_is_owner_scoped": true,
+    "probe_completed": true
+  },
+  "observations": {
+    "fault_duration_seconds": 8.839
+  },
+  "probe_passed": true
+}

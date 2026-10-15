@@ -1,0 +1,86 @@
+{
+  "version": "6.1.0",
+  "checks": {
+    "create_chart_and_dashboard_A": true,
+    "edit_reopen_chart_A": true,
+    "edit_reopen_dashboard_A": true,
+    "metadata_admission_A": true,
+    "execute_sql_A": true,
+    "save_reopen_sql_A": true,
+    "create_chart_and_dashboard_B": true,
+    "edit_reopen_chart_B": true,
+    "edit_reopen_dashboard_B": true,
+    "metadata_admission_B": true,
+    "execute_sql_B": true,
+    "save_reopen_sql_B": true,
+    "foreign_chart_denied_A": true,
+    "foreign_dashboard_denied_A": true,
+    "foreign_saved_query_denied_A": true,
+    "foreign_chart_denied_B": true,
+    "foreign_dashboard_denied_B": true,
+    "foreign_saved_query_denied_B": true,
+    "probe_completed": true
+  },
+  "objects": {
+    "A": {
+      "chart": 5,
+      "dashboard": 7,
+      "marker": "Browser A 1792081287717",
+      "saved_query": 5
+    },
+    "B": {
+      "chart": 6,
+      "dashboard": 8,
+      "marker": "Browser B 1792081316851",
+      "saved_query": 6
+    }
+  },
+  "failures": [],
+  "browser_errors": [
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/tabstateview/3",
+      "status": 403
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    },
+    {
+      "path": "/superset/log/",
+      "status": 405
+    }
+  ],
+  "probe_passed": true
+}

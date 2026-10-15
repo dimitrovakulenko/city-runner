@@ -15,7 +15,7 @@ rtk proxy python3 scripts/superset/bounds_probe.py --output /tmp/d43-bounds.json
 
 Open <http://127.0.0.1:8090/pilot/> and choose synthetic account A or B.
 The full Superset UI supports SQL Lab, Explore, virtual datasets and private saved
-charts/boards. The ordinary City Runner Insights entry is D46.
+charts/boards. The ordinary City Runner Insights entry and application service stack are documented in [analytics operations](../../docs/analytics-operations.md).
 
 The bounds probe intentionally fences A after discarding an oversized response.
 Restart the pilot processes before the deliberate cancellation-failure probe:
